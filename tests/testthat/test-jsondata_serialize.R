@@ -1,0 +1,144 @@
+context("jsondata_serialize")
+
+
+test_that("serializing jsondata works", {
+    x <- c("S", "P", "Q", "R")
+    file <- tempfile()
+    writeLines(paste0('"', x, '"'), file)
+    ds <- read_ndjson(file)
+
+    file2 <- tempfile()
+    saveRDS(ds, file2)
+    ds2 <- readRDS(file2)
+    
+    expect_equal(as.character(ds), as.character(ds2))
+
+    rm("ds", "ds2"); gc()
+    file.remove(file)
+    file.remove(file2)
+})
+
+
+test_that("serializing jsondata should use relative, not absolute path", {
+    wd <- getwd()
+    on.exit(setwd(wd))
+
+    x <- c("S", "P", "Q", "R")
+
+    # create and change directory to dir/a
+    dir <- tempfile()
+    dir.create(dir)
+    setwd(dir)
+    dir.create("a")
+    setwd("a")
+
+    # save dir/a/data.json
+    # save dir/a/obj.rds
+    writeLines(paste0('{"x": "', x, '"}'), "data.json")
+    ds <- read_ndjson("data.json")
+    saveRDS(ds, "obj.rds")
+    rm("ds"); gc()
+
+    # move the files to
+    # dir/data.json
+    # dir/obj.rds
+    file.rename(file.path(dir, "a", "data.json"), file.path(dir, "data.json"))
+    file.rename(file.path(dir, "a", "obj.rds"), file.path(dir, "obj.rds"))
+
+    # set the working directory to dir
+    setwd(dir)
+    unlink(file.path(dir, "a"), recursive=TRUE)
+
+    # read obj.rds
+    ds2 <- readRDS("obj.rds")
+    expect_equal(as.character(ds2$x), x)
+
+    rm("ds2"); gc()
+    file.remove(file.path(dir, "data.json"))
+    file.remove(file.path(dir, "obj.rds"))
+})
+
+
+test_that("serializing jsondata subset works", {
+    x <- LETTERS
+    file <- tempfile()
+    writeLines(paste0('"', x, '"'), file)
+    ds <- read_ndjson(file)
+
+    i <- seq(2, 26, 2)
+    ds <- ds[i]
+
+    file2 <- tempfile()
+    saveRDS(ds, file2)
+    ds2 <- readRDS(file2)
+
+    expect_equal(as.character(ds), as.character(ds2))
+
+    rm("ds", "ds2"); gc()
+    file.remove(file)
+    file.remove(file2)
+})
+
+
+test_that("serializing jsondata field works", {
+    x <- LETTERS
+    y <- 3.14 * seq_along(LETTERS) - 10
+    file <- tempfile()
+    writeLines(paste0('{"x": "', x, '", "z": { "y": ', y, "} }"), file)
+    ds <- read_ndjson(file)
+
+    ds <- ds$z
+
+    file2 <- tempfile()
+    saveRDS(ds, file2)
+    ds2 <- readRDS(file2)
+
+    expect_equal(as.numeric(ds$y), as.numeric(ds2$y))
+
+    rm("ds", "ds2"); gc()
+    file.remove(file)
+    file.remove(file2)
+})
+
+
+test_that("serializing jsondata nested fields works", {
+    x <- 1:10
+    file <- tempfile()
+    writeLines(paste0('{"f1": {"f2": {"f3": {"x": ', x, '}}}}'), file)
+    ds <- read_ndjson(file)
+
+    ds <- ds$f1$f2$f3
+
+    file2 <- tempfile()
+    saveRDS(ds, file2)
+    ds2 <- readRDS(file2)
+
+    expect_equal(as.integer(ds$x), as.numeric(ds2$x))
+
+    rm("ds", "ds2"); gc()
+    file.remove(file)
+    file.remove(file2)
+})
+
+
+test_that("serializing jsondata field subset works", {
+    x <- LETTERS
+    y <- 3.14 * seq_along(LETTERS) - 10
+    file <- tempfile()
+    writeLines(paste0('{"z": {"x": "', x, '"}, "y": ', y, "}"), file)
+    ds <- read_ndjson(file)
+
+    ds <- ds$z
+    i <- c(20, 2, 9, 4, 6, 2)
+    ds <- ds[i,]
+
+    file2 <- tempfile()
+    saveRDS(ds, file2)
+    ds2 <- readRDS(file2)
+
+    expect_equal(as.character(ds$x), as.character(ds2$x))
+
+    rm("ds", "ds2"); gc()
+    file.remove(file)
+    file.remove(file2)
+})

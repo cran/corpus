@@ -15,55 +15,81 @@
 text <- function(...)
 {
     x <- c(...)
-    nm <- names(x)
-    x <- as.text(x)
-    names(x) <- nm
-    x
+    as_text(x)
 }
 
-as.text <- function(x, ...)
+as_text <- function(x, ...)
 {
-    UseMethod("as.text")
+    UseMethod("as_text")
 }
 
-as.text.default <- function(x, ...)
+as_text.character <- function(x, ...)
 {
-    x <- .Call(C_coerce_text, x)
-    names(x) <- NULL
-    x
+    .Call(C_as_text_character, c(x)) # c(x) drops attributes, keeps names
 }
 
-as.text.text <- function(x, ...)
+as_text.default <- function(x, ...)
 {
-    x <- list(handle=unclass(x)$handle)
-    class(x) <- "text"
-    x
+    if (is_text(x)) {
+        attrs <- attributes(x)
+        for (a in names(attrs)) {
+            if (!(a %in% c("class", "names"))) {
+                attr(x, a) <- NULL
+            }
+        }
+        attr(x, "class") <- "text"
+        x
+    } else if (length(dim(x)) == 2 && !is.matrix(x)) {
+        if (!("text" %in% names(x))) {
+            stop("no column named 'text'")
+        }
+
+        if (is.data.frame(x) && .row_names_info(x) <= 0) {
+            nm <- NULL
+        } else {
+            nm <- row.names(x)
+        }
+
+        x <- as_text(x$text)
+        names(x) <- nm
+        x
+    } else {
+        nm <- names(c(x))
+        x <- as_text(as.character(x, ...))
+        names(x) <- nm
+        x
+    }
 }
 
-is.text <- function(x)
+is_text <- function(x)
 {
-    UseMethod("is.text")
+    UseMethod("is_text")
 }
 
-is.text.default <- function(x)
+
+is_text.default <- function(x)
 {
     inherits(x, "text")
 }
+
 
 length.text <- function(x)
 {
     .Call(C_length_text, x)
 }
 
+
 dim.text <- function(x)
 {
     NULL
 }
 
+
 names.text <- function(x)
 {
     unclass(x)$names
 }
+
 
 `names<-.text` <- function(x, value)
 {
@@ -75,26 +101,37 @@ names.text <- function(x)
                         length(x), "]"))
         }
     }
-    y <- list(handle=unclass(x)$handle, names=value)
-    attrs <- attributes(x)
-    attrs[["names"]] <- NULL
 
-    for (a in names(attrs)) {
-        attr(y, a) <- attrs[[a]]
-    }
-
+    y <- unclass(x)
+    y$names <- value
+    class(y) <- class(x)
     y
 }
+
 
 `[.text` <- function(x, i)
 {
-    ind <- seq_along(x)
-    names(ind) <- names(x)
-    sub <- ind[i]
-    y <- .Call(C_subset_text, x, sub)
-    names(y) <- names(sub)
+    index <- seq_along(x)
+    names(index) <- names(x)
+    i <- index[i]
+
+    y <- unclass(x)
+    y$handle <- .Call(C_subset_text_handle, y$handle, as.double(i))
+    y$table <- y$table[i,]
+    y$names <- y$names[i]
+    class(y) <- class(x)
     y
 }
+
+
+`[[.text` <- function(x, i)
+{
+    index <- seq_along(x)
+    names(index) <- names(x)
+    i <- index[[i]]
+    as.character(x[i])
+}
+
 
 `$.text` <- function(x, name)
 {
@@ -114,21 +151,13 @@ names.text <- function(x)
 }
 
 
-`[[.text` <- function(x, i)
-{
-    ind <- seq_along(x)
-    names(ind) <- names(x)
-    as.character(x[ind[[i]]])
-}
-
-
-`[<-.text` <- function(x, i, value)
+`[[<-.text` <- function(x, i, value)
 {
     stop("[[<- operator is invalid for text objects")
 }
 
 
-format.text <- function(x, nchar_max = 66, suffix = "\u2026", ...)
+format.text <- function(x, nchar_max = 60, suffix = "\u2026", ...)
 {
     if (length(x) == 0) {
         str <- character()
@@ -139,15 +168,14 @@ format.text <- function(x, nchar_max = 66, suffix = "\u2026", ...)
         str <- as.character(x)
         names(str) <- names(x)
         len <- nchar(str)
-        long <- len >= nchar_max + 1
+        long <- !is.na(len) & (len >= nchar_max + 1)
         str[long] <- paste0(substr(str[long], 1, nchar_max), suffix)
     }
-    format(str, ...)
+    format(str, justify = "left")
 }
 
 
-print.text <- function(x, justify = "none", print_max = 6L,
-                       nchar_max = ifelse(is.null(names(x)), 66, 50), ...)
+print.text <- function(x, print_max = 6L, ...)
 {
     if (length(x) == 0) {
         cat("text(0)\n")
@@ -162,8 +190,7 @@ print.text <- function(x, justify = "none", print_max = 6L,
         nextra <- length(x) - print_max
     }
 
-    str <- format(xsub, nchar_max = nchar_max, justify = justify,
-                  na.encode = FALSE, ...)
+    str <- format(xsub, na.encode = FALSE, ...)
     nm <- names(str)
 
     if (is.null(nm)) {
@@ -201,6 +228,41 @@ as.complex.text <- function(x, ...)
     as.complex(as.character(x, ...))
 }
 
+as.data.frame.text <- function(x, row.names = NULL, optional = FALSE, ...)
+{
+    nm <- deparse(substitute(x), width.cutoff = 500L)
+
+    nrows <- length(x)
+
+    # get row names
+    if (!is.null(row.names)) {
+        if (!(is.character(row.names) && length(row.names) == nrows)) {
+            stop("'row.names' is not a character vector of length %d", nrows)
+        }
+    } else if (is.null(row.names)) {
+        if (nrows == 0L) {
+            row.names <- character()
+        } else {
+            row.names <- names(x)
+
+            if (is.null(row.names)) {
+                row.names <- .set_row_names(nrows)
+            }
+        }
+    }
+
+    if (!is.null(names(x))) {
+        names(x) <- NULL
+    }
+
+    value <- list(x)
+    if (!optional)  {
+        names(value) <- nm
+    }
+
+    structure(value, row.names = row.names, class = "data.frame")
+}
+
 as.double.text <- function(x, ...)
 {
     as.double(as.character(x, ...))
@@ -223,23 +285,37 @@ as.Date.text <- function(x, format, ...)
 
 is.character.text <- function(x)
 {
-    TRUE
+    FALSE
 }
 
 all.equal.text <- function(target, current, ...)
 {
-    if (!is.text(current)) {
+    if (!is_text(current)) {
         return(c(paste("Modes: text,", mode(current)),
                  paste("target is text, current is", mode(current))))
     }
 
     nt <- names(target)
+    at <- attributes(target)
     target <- as.character(target)
     names(target) <- nt
 
+    for (a in names(at)) {
+        if (!(a %in% c("names", "class"))) {
+            attr(target, a) <- at[[a]]
+        }
+    }
+
     nc <- names(current)
+    ac <- attributes(current)
     current <- as.character(current)
     names(current) <- nc
+
+    for (a in names(ac)) {
+        if (!(a %in% c("names", "class"))) {
+            attr(current, a) <- ac[[a]]
+        }
+    }
 
     all.equal(target, current, ...)
 }

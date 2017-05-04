@@ -1,16 +1,16 @@
 \name{text}
-\alias{as.text}
-\alias{as.text.default}
-\alias{is.text}
-\alias{is.text.default}
+\alias{as_text}
+\alias{as_text.default}
+\alias{is_text}
+\alias{is_text.default}
 \alias{text}
 \title{Text Vectors}
 \description{
     Create or test for objects of type \code{"text"}.
 }
 \usage{
-    as.text(x, ...)
-    is.text(x)
+    as_text(x, ...)
+    is_text(x)
 }
 \arguments{
     \item{x}{object to be coerced or tested.}
@@ -21,13 +21,22 @@
     package suitable for processing Unicode text. Text vectors behave
     like character vectors (and can be converted to them with the
     \code{as.character} function). They can be created using the
-    \code{\link{read_json}} function or by converting another object
-    using the \code{as.text} function.
+    \code{\link{read_ndjson}} function or by converting another object
+    using the \code{as_text} function.
 
-    \code{as.text} and \code{is.text} are generic: you can write methods
+    The \code{as_text} function first gets the names of the object
+    by calling \code{names(x)}; then, it converts the object to type
+    \code{"text"} and drops all of the object attributes. Finally,
+    the function sets the converted objects names to original object
+    names. This special handling for the names of the object is
+    different from the other R conversion functions
+    (\code{as.numeric}, \code{as.character}, etc.), which drop the names.
+
+    \code{as_text} and \code{is_text} are generic: you can write methods
     to handle specific classes of objects. The default behavior is to
-    call \code{as.character} on the object, then to convert the character
-    vector to a \code{text} object.
+    extract the names from the object using the \code{names} function,
+    then call \code{as.character} on the object and convert the
+    resulting character vector to a \code{text} object.
 }
 \value{
     \code{as.text} attempts to coerce its argument to text type; it
@@ -37,12 +46,12 @@
         whether its argument is of text type or not.
 }
 \seealso{
-    \code{\link{read_json}}.
+    \code{\link{read_ndjson}}.
 }
 \examples{
-    as.text("hello, world!")
-    as.text(c(a="goodnight", b="moon")) # drops names
+    as_text("hello, world!")
+    as_text(c(a="goodnight", b="moon")) # keeps names
 
-    is.text("hello") # FALSE, "hello" is character, not text
+    is_text("hello") # FALSE, "hello" is character, not text
 }
 \keyword{classes}

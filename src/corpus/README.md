@@ -21,13 +21,13 @@ as a JSON-style escape, 1 bit indicating whether the text includes a byte
 sequence that may decode to a non-ASCII character, and 62 bits to store the
 encoding size, in bytes.
 
-In typical usage, you will memory-map a [JSON Lines][jsonlines] data file,
-validate and type-check the data values using the `datatype.h` interface,
-extract the appropriate fields using the `data.h` interface, and create text
-objects that point into the file. By memory mapping the file, you can let the
-operating system move data between the hard drive and RAM whenever necessary.
-You can process a large data set seamlessly without loading everything into
-RAM at the same time.
+In typical usage, you will memory-map a [newline-demimited JSON][ndjson]
+data file, validate and type-check the data values using the `datatype.h`
+interface, extract the appropriate fields using the `data.h` interface, and
+create text objects that point into the file. By memory mapping the file,
+you can let the operating system move data between the hard drive and RAM
+whenever necessary.  You can process a large data set seamlessly without
+loading everything into RAM at the same time.
 
 
 ### Text segmentation
@@ -42,7 +42,7 @@ respectively.
 
 Corpus supports the following text normalization transformations:
 
- + transforming to Unicode NFD or NFKD normal form;
+ + transforming to Unicode NFC or NFKC normal form;
 
  + performing Unicode case folding (using the default mappings, not
    the locale-specific ones);
@@ -58,7 +58,10 @@ Corpus supports the following text normalization transformations:
  + removing Unicode default ignorable characters like zero-width-space
    and soft hyphen;
 
- + removing white space characters.
+ + removing white space characters;
+
+ + stemming, using one of the algorithms supported by the [Snowball][snowball]
+   stemming library.
 
 These normalizations can be applied to arbitrary text, but they are designed
 to be applied to individual word tokens, so that the results can be cached
@@ -95,13 +98,22 @@ memory-mapping used internally by the `filebuf.h` interface.
 License
 -------
 
-Corpus is released under the [Apache Licence, Version 2.0][apache].
+Corpus is released under the [Apache Licence, Version 2.0][apache]. The
+stemming algorithms used by Corpus come from the [Snowball][snowball]
+library and are subject to the conditions of the
+[3-clause BSD license][snowball-lic]. Portions of Corpus rely on data
+from the [Unicode Character Database][ucd] and are
+subject to the terms of the [Unicode Licence][unicode].
 
 
 [apache]: https://www.apache.org/licenses/LICENSE-2.0.html
 [check]: https://libcheck.github.io/check/
 [doxygen]: http://www.stack.nl/~dimitri/doxygen/
 [json]: http://www.json.org/
-[jsonlines]: http://jsonlines.org/
+[ndjson]: http://ndjson.org/
 [rcorpus]: https://github.com/patperry/r-corpus
 [segmentation]: http://unicode.org/reports/tr29/
+[snowball]: http://snowballstem.org/
+[snowball-lic]: http://snowballstem.org/license.html
+[ucd]: http://unicode.org/ucd/
+[unicode]: http://www.unicode.org/copyright.html#License

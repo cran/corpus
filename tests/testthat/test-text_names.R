@@ -14,12 +14,12 @@ test_that("`names<-` should work on text", {
 })
 
 
-test_that("`as.text` should drop names", {
-    x <- as.text(c(a="1", b="2"))
-    expect_equal(names(x), NULL)
+test_that("`as_text` should not drop names", {
+    x <- as_text(c(a="1", b="2"))
+    expect_equal(names(x), c("a", "b"))
 
-    y <- as.text(text(a="1", b="2"))
-    expect_equal(names(y), NULL)
+    y <- as_text(text(a="1", b="2"))
+    expect_equal(names(y), c("a", "b"))
 })
 
 
@@ -32,21 +32,34 @@ test_that("`all.equal` should test names", {
 })
 
 
-test_that("`as.text` should drop names", {
+test_that("`as_text` should not drop names", {
     x <- text(foo="hello")
-    y <- as.text(x)
+    y <- as_text(x)
 
-    expect_equal(x, text(foo="hello"))
+    expect_equal(y, text(foo="hello"))
+})
+
+
+test_that("`as_text` should drop attributes", {
+    x <- text("hello")
+    attr(x, "foo") <- "bar"
+    y <- as_text(x)
+
     expect_equal(y, text("hello"))
 })
 
 
-test_that("`as.text` should drop attributes", {
-    x <- text("hello")
+test_that("`as_text` should drop attributes for JSON objects", {
+    file <- tempfile()
+    writeLines('{"text": "hello"}', file)
+    x <- read_ndjson(file)$text
+
     attr(x, "foo") <- "bar"
-    y <- as.text(x)
+    y <- as_text(x)
 
     expect_equal(y, text("hello"))
+
+    rm("x", "y"); gc(); file.remove(file)
 })
 
 
@@ -65,4 +78,18 @@ test_that("`names<-` should preserve attributes", {
     names(x) <- c("a", "b", "c")
     expect_equal(names(x), c("a", "b", "c"))
     expect_equal(attr(x, "foo"), "bar")
+})
+
+
+test_that("`names<-` should allow NA", {
+    x <- text(1:3)
+    names(x) <- c("a", NA, "b")
+    expect_equal(names(x), c("a", NA, "b"))
+})
+
+
+test_that("`names<-` should allow duplicates", {
+    x <- text(1:3)
+    names(x) <- c("a", "b", "a")
+    expect_equal(names(x), c("a", "b", "a"))
 })

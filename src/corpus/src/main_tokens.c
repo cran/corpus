@@ -36,24 +36,46 @@
 
 void usage_tokens(int status)
 {
+	const char **stems = stemmer_list();
+	int i;
+
 	printf("\
 Usage:\t%s tokens [options] <path>\n\
 \n\
 Description:\n\
-\tTokenize text from from a data file.\n\
+\tSegment text into tokens.\n\
 \n\
 Options:\n\
 \t-c\t\tKeeps original case instead of case folding.\n\
 \t-d\t\tKeeps dashes instead of replacing them with \"-\".\n\
 \t-f <field>\tGets text from the given field (defaults to \"text\").\n\
 \t-i\t\tKeeps default ignorable characters like soft hyphens.\n\
-\t-k\t\tDoes not perform compatibility decompositions (NFKD).\n\
+\t-k\t\tDoes not perform compatibility decompositions (NFKC).\n\
 \t-o <path>\tSaves output at the given path.\n\
 \t-q\t\tKeeps quotes instead of replacing them with \"'\".\n\
+\t-s <stemmer>\tStems tokens with the given algorithm.\n\
 \t-w\t\tKeeps white space.\n\
 \t-x\t\tKeeps non-white-space control characters.\n\
 \t-z\t\tKeeps zero-character (empty) tokens.\n\
 ", PROGRAM_NAME);
+
+	printf("\nStemming Algorithms:");
+	if (*stems) {
+
+		for (i = 0; stems[i] != NULL; i++) {
+			if (i != 0) {
+				printf(",");
+			}
+			if (i % 6 == 0) {
+				printf("\n\t%s", stems[i]);
+			} else {
+				printf(" %s", stems[i]);
+			}
+		}
+		printf("\n");
+	} else {
+		printf("\n\t(none available)\n");
+	}
 
 	exit(status);
 }
@@ -69,6 +91,7 @@ int main_tokens(int argc, char * const argv[])
 	struct filebuf buf;
 	struct filebuf_iter it;
 	const char *output = NULL;
+	const char *stemmer = NULL;
 	const char *field, *input;
 	FILE *stream;
 	size_t field_len;
@@ -105,6 +128,9 @@ int main_tokens(int argc, char * const argv[])
 			break;
 		case 'q':
 			flags &= ~TYPE_QUOTFOLD;
+			break;
+		case 's':
+			stemmer = optarg;
 			break;
 		case 'w':
 			flags &= ~TYPE_RMWS;
@@ -148,7 +174,7 @@ int main_tokens(int argc, char * const argv[])
 		goto error_schema;
 	}
 
-	if ((err = symtab_init(&symtab, flags))) {
+	if ((err = symtab_init(&symtab, flags, stemmer))) {
 		goto error_symtab;
 	}
 
