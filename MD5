@@ -1,4 +1,4 @@
-5143e2b8f333d2c891402b7036fd7ac4 *DESCRIPTION
+8d0a45227d0be5bc2948beaac85e7c7a *DESCRIPTION
 3b83ef96387f14655fc854ddc3c6bd57 *LICENSE
 5c0d12c30cac9e7d8813c4482e70a1d2 *NAMESPACE
 c9b6c3f8db6707c79124a7d770167c67 *R/jsondata.R
@@ -108,7 +108,7 @@ a54b2b536d9edaee8e84b81eedc81b73 *src/corpus/lib/libstemmer_c/src_c/stem_UTF_8_t
 f78100d2babff69edce40763a941994c *src/corpus/lib/strntoimax.c
 8d027375964aedfd11a50dd2fb8301cd *src/corpus/src/array.c
 a8d5a9e8567a710e59a37fe44d3daefc *src/corpus/src/array.h
-0f1f11adcd9a1dd70f56389d6e3c44ea *src/corpus/src/census.c
+7dfb7f52c9576b30c44837cc71179845 *src/corpus/src/census.c
 a974048323635547baeb4ec45c25f94f *src/corpus/src/census.h
 704adcbb1e90ca25dc37234c67fb6f35 *src/corpus/src/data.c
 c25d8afa87a06d079bfebdd7e2c2f123 *src/corpus/src/data.h
@@ -118,7 +118,7 @@ b3c2a07e2ba7a50f98a752157ead44da *src/corpus/src/error.c
 151d8e421e30838a085887c45183442e *src/corpus/src/error.h
 c83e5630dc64104e30741b018167cbda *src/corpus/src/filebuf.c
 e04448974375207fc7ac29b001e1b1af *src/corpus/src/filebuf.h
-bfec66d12c66560e26154ee052da2456 *src/corpus/src/main.c
+efc2e3889cbc2fdb8150ff640c80bc2a *src/corpus/src/main.c
 69fc6a17c99e74b8d2fc86cf8e7aaeb6 *src/corpus/src/main_get.c
 8a2f84c3a27eb0a0d17abbb19f693fe2 *src/corpus/src/main_scan.c
 cc2d95db0e1bd897294d4b24120e6aeb *src/corpus/src/main_sentences.c

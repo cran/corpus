@@ -1,5 +1,5 @@
 Package: corpus
-Version: 0.3.0
+Version: 0.3.1
 Date: 2017-05-04
 Title: Text Corpus Analysis
 Maintainer: Patrick O. Perry <pperry@stern.nyu.edu>
@@ -15,6 +15,6 @@ Author: Patrick O. Perry [aut, cre],
              Martin Porter and Richard Boulton [ctb, cph] (Snowball),
              Unicode, Inc. [ctb, cph] (Unicode Character Database)
 NeedsCompilation: yes
-Packaged: 2017-05-04 18:17:07 UTC; ptrck
+Packaged: 2017-05-05 12:54:17 UTC; ptrck
 Repository: CRAN
-Date/Publication: 2017-05-04 22:24:35 UTC
+Date/Publication: 2017-05-05 17:34:20 UTC
