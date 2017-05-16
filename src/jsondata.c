@@ -50,7 +50,7 @@ static void free_jsondata(SEXP sjsondata)
 }
 
 
-SEXP alloc_jsondata(SEXP sfilebuf, SEXP sfield, SEXP srows)
+SEXP alloc_jsondata(SEXP sbuffer, SEXP sfield, SEXP srows)
 {
 	SEXP ans, sclass, shandle, snames;
 	struct jsondata *obj;
@@ -63,27 +63,27 @@ SEXP alloc_jsondata(SEXP sfilebuf, SEXP sfield, SEXP srows)
 		error("failed allocating memory (%u bytes)",
 			(unsigned)sizeof(*obj));
 	}
-	if ((err = schema_init(&obj->schema))) {
+	if ((err = corpus_schema_init(&obj->schema))) {
 		free(obj);
 		error("failed allocating memory");
 	}
 
 	obj->rows = NULL;
 	obj->nrow = 0;
-	obj->type_id = DATATYPE_NULL;
-	obj->kind = DATATYPE_NULL;
+	obj->type_id = CORPUS_DATATYPE_NULL;
+	obj->kind = CORPUS_DATATYPE_NULL;
 
 	R_SetExternalPtrAddr(shandle, obj);
 
 	PROTECT(ans = allocVector(VECSXP, 4));
 	SET_VECTOR_ELT(ans, 0, shandle);
-	SET_VECTOR_ELT(ans, 1, sfilebuf);
+	SET_VECTOR_ELT(ans, 1, sbuffer);
 	SET_VECTOR_ELT(ans, 2, sfield);
 	SET_VECTOR_ELT(ans, 3, srows);
 
 	PROTECT(snames = allocVector(STRSXP, 4));
 	SET_STRING_ELT(snames, 0, mkChar("handle"));
-	SET_STRING_ELT(snames, 1, mkChar("filebuf"));
+	SET_STRING_ELT(snames, 1, mkChar("buffer"));
 	SET_STRING_ELT(snames, 2, mkChar("field"));
 	SET_STRING_ELT(snames, 3, mkChar("rows"));
 	setAttrib(ans, R_NamesSymbol, snames);
@@ -97,7 +97,7 @@ SEXP alloc_jsondata(SEXP sfilebuf, SEXP sfield, SEXP srows)
 }
 
 
-static void grow_datarows(struct data **rowsptr, R_xlen_t *nrow_maxptr)
+static void grow_datarows(struct corpus_data **rowsptr, R_xlen_t *nrow_maxptr)
 {
 	void *base1, *base = *rowsptr;
 	size_t size1, size = (size_t)*nrow_maxptr;
@@ -143,13 +143,14 @@ static void grow_datarows(struct data **rowsptr, R_xlen_t *nrow_maxptr)
 
 static void jsondata_load(SEXP sdata)
 {
-	SEXP shandle, sparent_handle, sfilebuf, sfield, sfield_path,
+	SEXP shandle, sparent_handle, sbuffer, sfield, sfield_path,
 	     srows, sparent, sparent2;
 	struct jsondata *obj;
-	struct data *rows;
-	struct filebuf *buf;
-	struct filebuf_iter it;
-	const uint8_t *ptr;
+	struct corpus_data *rows;
+	struct corpus_filebuf *buf;
+	struct corpus_filebuf_iter it;
+	const uint8_t *ptr, *begin, *line_end, *end;
+	uint_fast8_t ch;
 	size_t size;
 	R_xlen_t nrow, nrow_max, j, m;
 	int err, type_id;
@@ -160,43 +161,83 @@ static void jsondata_load(SEXP sdata)
 		return;
 	}
 
-	sfilebuf = getListElement(sdata, "filebuf");
-	PROTECT(sparent = alloc_jsondata(sfilebuf, R_NilValue, R_NilValue));
+	sbuffer = getListElement(sdata, "buffer");
+	PROTECT(sparent = alloc_jsondata(sbuffer, R_NilValue, R_NilValue));
 	sparent_handle = getListElement(sparent, "handle");
 	obj = R_ExternalPtrAddr(sparent_handle);
 
-	type_id = DATATYPE_NULL;
+	type_id = CORPUS_DATATYPE_NULL;
 	nrow = 0;
 	nrow_max = 0;
 	rows = NULL;
 
-	buf = as_filebuf(sfilebuf);
-	filebuf_iter_make(&it, buf);
+	if (is_filebuf(sbuffer)) {
+		buf = as_filebuf(sbuffer);
 
-	while (filebuf_iter_advance(&it)) {
-		if (nrow == nrow_max) {
-			grow_datarows(&rows, &nrow_max);
+		corpus_filebuf_iter_make(&it, buf);
+		while (corpus_filebuf_iter_advance(&it)) {
+			if (nrow == nrow_max) {
+				grow_datarows(&rows, &nrow_max);
+			}
+
+			ptr = it.current.ptr;
+			size = it.current.size;
+
+			if ((err = corpus_data_assign(&rows[nrow],
+						      &obj->schema,
+						      ptr, size))) {
+				free(rows);
+				error("error parsing row %"PRIu64
+				      " of JSON data", (uint64_t)(nrow + 1));
+			}
+
+			if ((err = corpus_schema_union(&obj->schema, type_id,
+						       rows[nrow].type_id,
+						       &type_id))) {
+				free(rows);
+				error("memory allocation failure"
+				      " after parsing row %"PRIu64
+				      " of JSON data", (uint64_t)(nrow + 1));
+			}
+			nrow++;
 		}
+	} else {
+		// parse data from buffer
+		begin = (const uint8_t *)RAW(sbuffer);
+		end = begin + XLENGTH(sbuffer);
+		ptr = begin;
 
-		ptr = it.current.ptr;
-		size = it.current.size;
+		while (ptr != end) {
+			if (nrow == nrow_max) {
+				grow_datarows(&rows, &nrow_max);
+			}
 
-		if ((err = data_assign(&rows[nrow], &obj->schema,
-						ptr, size))) {
-			free(rows);
-			error("error parsing row %"PRIu64
-			      " of JSON file", (uint64_t)(nrow + 1));
+			line_end = ptr;
+			do {
+				ch = *line_end++;
+			} while (ch != '\n' && line_end != end);
+
+			size = (size_t)(line_end - ptr);
+
+			if ((err = corpus_data_assign(&rows[nrow],
+						      &obj->schema,
+						      ptr, size))) {
+				free(rows);
+				error("error parsing row %"PRIu64
+				      " of JSON data", (uint64_t)(nrow + 1));
+			}
+
+			if ((err = corpus_schema_union(&obj->schema, type_id,
+						       rows[nrow].type_id,
+						       &type_id))) {
+				free(rows);
+				error("memory allocation failure"
+				      " after parsing row %"PRIu64
+				      " of JSON data", (uint64_t)(nrow + 1));
+			}
+			nrow++;
+			ptr = line_end;
 		}
-
-		if ((err = schema_union(&obj->schema, type_id,
-					rows[nrow].type_id,
-					&type_id))) {
-			free(rows);
-			error("memory allocation failure"
-			      " after parsing row %"PRIu64
-			      " of JSON file", (uint64_t)(nrow + 1));
-		}
-		nrow++;
 	}
 
 	// free excess memory
@@ -216,7 +257,7 @@ static void jsondata_load(SEXP sdata)
 	obj->nrow = nrow;
 	obj->type_id = type_id;
 	if (type_id < 0) {
-		obj->kind = DATATYPE_ANY;
+		obj->kind = CORPUS_DATATYPE_ANY;
 	} else {
 		obj->kind = obj->schema.types[type_id].kind;
 	}
@@ -257,7 +298,7 @@ static void jsondata_load(SEXP sdata)
 
 int is_jsondata(SEXP sdata)
 {
-	SEXP handle, filebuf;
+	SEXP handle, buffer;
 
 	if (!isVectorList(sdata)) {
 		return 0;
@@ -268,8 +309,8 @@ int is_jsondata(SEXP sdata)
 		return 0;
 	}
 
-	filebuf = getListElement(sdata, "filebuf");
-	if (!is_filebuf(filebuf)) {
+	buffer = getListElement(sdata, "buffer");
+	if (!(TYPEOF(buffer) == RAWSXP || is_filebuf(buffer))) {
 		return 0;
 	}
 
@@ -300,10 +341,10 @@ SEXP dim_jsondata(SEXP sdata)
 {
 	SEXP dims;
 	const struct jsondata *d = as_jsondata(sdata);
-	const struct datatype *t;
-	const struct datatype_record *r;
+	const struct corpus_datatype *t;
+	const struct corpus_datatype_record *r;
 
-	if (d->kind != DATATYPE_RECORD) {
+	if (d->kind != CORPUS_DATATYPE_RECORD) {
 		return R_NilValue;
 	}
 
@@ -328,10 +369,10 @@ SEXP dim_jsondata(SEXP sdata)
 SEXP length_jsondata(SEXP sdata)
 {
 	const struct jsondata *d = as_jsondata(sdata);
-	const struct datatype *t;
-	const struct datatype_record *r;
+	const struct corpus_datatype *t;
+	const struct corpus_datatype_record *r;
 
-	if (d->kind == DATATYPE_RECORD) {
+	if (d->kind == CORPUS_DATATYPE_RECORD) {
 		t = &d->schema.types[d->type_id];
 		r = &t->meta.record;
 		return ScalarInteger(r->nfield);
@@ -349,12 +390,12 @@ SEXP names_jsondata(SEXP sdata)
 {
 	SEXP names, str;
 	const struct jsondata *d = as_jsondata(sdata);
-	const struct datatype *t;
-	const struct datatype_record *r;
-	const struct text *name;
+	const struct corpus_datatype *t;
+	const struct corpus_datatype_record *r;
+	const struct corpus_text *name;
 	int i;
 
-	if (d->kind != DATATYPE_RECORD) {
+	if (d->kind != CORPUS_DATATYPE_RECORD) {
 		return R_NilValue;
 	}
 
@@ -364,7 +405,8 @@ SEXP names_jsondata(SEXP sdata)
 	PROTECT(names = allocVector(STRSXP, r->nfield));
 	for (i = 0; i < r->nfield; i++) {
 		name = &d->schema.names.types[r->name_ids[i]].text;
-		str = mkCharLenCE((char *)name->ptr, TEXT_SIZE(name), CE_UTF8);
+		str = mkCharLenCE((char *)name->ptr, CORPUS_TEXT_SIZE(name),
+				  CE_UTF8);
 		SET_STRING_ELT(names, i, str);
 	}
 
@@ -377,17 +419,17 @@ SEXP datatype_jsondata(SEXP sdata)
 {
 	SEXP str, ans;
 	const struct jsondata *d = as_jsondata(sdata);
-	struct render r;
+	struct corpus_render r;
 
-	if (render_init(&r, ESCAPE_NONE) != 0) {
+	if (corpus_render_init(&r, CORPUS_ESCAPE_NONE) != 0) {
 		error("memory allocation failure");
 	}
-	render_set_tab(&r, "");
-	render_set_newline(&r, " ");
+	corpus_render_set_tab(&r, "");
+	corpus_render_set_newline(&r, " ");
 
-	render_datatype(&r, &d->schema, d->type_id);
+	corpus_render_datatype(&r, &d->schema, d->type_id);
 	if (r.error) {
-		render_destroy(&r);
+		corpus_render_destroy(&r);
 		error("memory allocation failure");
 	}
 
@@ -395,7 +437,7 @@ SEXP datatype_jsondata(SEXP sdata)
 	str = mkCharLenCE(r.string, r.length, CE_UTF8);
 	SET_STRING_ELT(ans, 0, str);
 
-	render_destroy(&r);
+	corpus_render_destroy(&r);
 	UNPROTECT(1);
 	return ans;
 }
@@ -405,12 +447,12 @@ SEXP datatypes_jsondata(SEXP sdata)
 {
 	SEXP types, str, names;
 	const struct jsondata *d = as_jsondata(sdata);
-	const struct datatype *t;
-	const struct datatype_record *rec;
-	struct render r;
+	const struct corpus_datatype *t;
+	const struct corpus_datatype_record *rec;
+	struct corpus_render r;
 	int i;
 
-	if (d->kind != DATATYPE_RECORD) {
+	if (d->kind != CORPUS_DATATYPE_RECORD) {
 		return R_NilValue;
 	}
 
@@ -419,26 +461,26 @@ SEXP datatypes_jsondata(SEXP sdata)
 	t = &d->schema.types[d->type_id];
 	rec = &t->meta.record;
 
-	if (render_init(&r, ESCAPE_NONE) != 0) {
+	if (corpus_render_init(&r, CORPUS_ESCAPE_NONE) != 0) {
 		error("memory allocation failure");
 	}
-	render_set_tab(&r, "");
-	render_set_newline(&r, " ");
+	corpus_render_set_tab(&r, "");
+	corpus_render_set_newline(&r, " ");
 
 	PROTECT(types = allocVector(STRSXP, rec->nfield));
 	for (i = 0; i < rec->nfield; i++) {
-		render_datatype(&r, &d->schema, rec->type_ids[i]);
+		corpus_render_datatype(&r, &d->schema, rec->type_ids[i]);
 		if (r.error) {
-			render_destroy(&r);
+			corpus_render_destroy(&r);
 			error("memory allocation failure");
 		}
 		str = mkCharLenCE(r.string, r.length, CE_UTF8);
 		SET_STRING_ELT(types, i, str);
-		render_clear(&r);
+		corpus_render_clear(&r);
 	}
 	setAttrib(types, R_NamesSymbol, names);
 
-	render_destroy(&r);
+	corpus_render_destroy(&r);
 	UNPROTECT(2);
 	return types;
 }
@@ -447,19 +489,19 @@ SEXP datatypes_jsondata(SEXP sdata)
 SEXP print_jsondata(SEXP sdata)
 {
 	const struct jsondata *d = as_jsondata(sdata);
-	struct render r;
+	struct corpus_render r;
 
-	if (render_init(&r, ESCAPE_CONTROL) != 0) {
+	if (corpus_render_init(&r, CORPUS_ESCAPE_CONTROL) != 0) {
 		error("memory allocation failure");
 	}
 
-	render_datatype(&r, &d->schema, d->type_id);
+	corpus_render_datatype(&r, &d->schema, d->type_id);
 	if (r.error) {
-		render_destroy(&r);
+		corpus_render_destroy(&r);
 		error("memory allocation failure");
 	}
 
-	if (d->kind == DATATYPE_RECORD) {
+	if (d->kind == CORPUS_DATATYPE_RECORD) {
 		Rprintf("JSON jsondata with %"PRIu64" rows"
 			" of the following type:\n%s\n",
 			(uint64_t)d->nrow, r.string);
@@ -468,7 +510,7 @@ SEXP print_jsondata(SEXP sdata)
 			" of type %s\n", (uint64_t)d->nrow, r.string);
 	}
 
-	render_destroy(&r);
+	corpus_render_destroy(&r);
 	return sdata;
 }
 
@@ -477,10 +519,10 @@ SEXP subscript_jsondata(SEXP sdata, SEXP si)
 {
 	SEXP ans, sname;
 	const struct jsondata *d = as_jsondata(sdata);
-	const struct schema *s = &d->schema;
-	const struct datatype *t;
-	const struct datatype_record *r;
-	const struct text *name;
+	const struct corpus_schema *s = &d->schema;
+	const struct corpus_datatype *t;
+	const struct corpus_datatype_record *r;
+	const struct corpus_text *name;
 	double i;
 	int name_id;
 
@@ -489,7 +531,7 @@ SEXP subscript_jsondata(SEXP sdata, SEXP si)
 	}
 	i = REAL(si)[0];
 
-	if (d->kind != DATATYPE_RECORD) {
+	if (d->kind != CORPUS_DATATYPE_RECORD) {
 		ans = subrows_jsondata(sdata, si);
 	} else {
 		t = &d->schema.types[d->type_id];
@@ -502,7 +544,8 @@ SEXP subscript_jsondata(SEXP sdata, SEXP si)
 		name = &s->names.types[name_id].text;
 
 		PROTECT(sname = mkCharLenCE((const char *)name->ptr,
-					    (int)TEXT_SIZE(name), CE_UTF8));
+					    (int)CORPUS_TEXT_SIZE(name),
+					    CE_UTF8));
 		PROTECT(ans = subfield_jsondata(sdata, sname));
 		UNPROTECT(2);
 	}
@@ -513,11 +556,11 @@ SEXP subscript_jsondata(SEXP sdata, SEXP si)
 
 SEXP subrows_jsondata(SEXP sdata, SEXP si)
 {
-	SEXP ans, shandle, sfilebuf, sfield, srows, srows2;
+	SEXP ans, shandle, sbuffer, sfield, srows, srows2;
 	const struct jsondata *obj = as_jsondata(sdata);
 	struct jsondata *obj2;
-	struct data *rows;
-	const struct data *src;
+	struct corpus_data *rows;
+	const struct corpus_data *src;
 	const double *index;
 	double *irows;
 	R_xlen_t i, n, ind;
@@ -531,14 +574,14 @@ SEXP subrows_jsondata(SEXP sdata, SEXP si)
 	index = REAL(si);
 	n = XLENGTH(si);
 
-	sfilebuf = getListElement(sdata, "filebuf");
+	sbuffer = getListElement(sdata, "buffer");
 	sfield = getListElement(sdata, "field");
 	srows = getListElement(sdata, "rows");
 
 	PROTECT(srows2 = allocVector(REALSXP, n));
 	irows = REAL(srows2);
 
-	PROTECT(ans = alloc_jsondata(sfilebuf, sfield, srows2));
+	PROTECT(ans = alloc_jsondata(sbuffer, sfield, srows2));
 	shandle = getListElement(ans, "handle");
 	obj2 = R_ExternalPtrAddr(shandle);
 
@@ -550,7 +593,7 @@ SEXP subrows_jsondata(SEXP sdata, SEXP si)
 		      (uint64_t)n * sizeof(*rows));
 	}
 
-	type_id = DATATYPE_NULL;
+	type_id = CORPUS_DATATYPE_NULL;
 
 	for (i = 0; i < n; i++) {
 		if (!(1 <= index[i] && index[i] <= (double)obj->nrow)) {
@@ -566,14 +609,14 @@ SEXP subrows_jsondata(SEXP sdata, SEXP si)
 		}
 		src = &obj->rows[ind];
 
-		if ((err = data_assign(&rows[i], &obj2->schema, src->ptr,
-				       src->size))) {
+		if ((err = corpus_data_assign(&rows[i], &obj2->schema,
+					      src->ptr, src->size))) {
 			error("error parsing row %"PRIu64
 			      " of JSON file", (uint64_t)(irows[i] + 1));
 		}
 
-		if ((err = schema_union(&obj2->schema, type_id,
-					rows[i].type_id, &type_id))) {
+		if ((err = corpus_schema_union(&obj2->schema, type_id,
+					       rows[i].type_id, &type_id))) {
 			error("memory allocation failure"
 			      " after parsing row %"PRIu64
 			      " of JSON file", (uint64_t)(irows[i] + 1));
@@ -586,7 +629,7 @@ SEXP subrows_jsondata(SEXP sdata, SEXP si)
 	obj2->type_id = type_id;
 
 	if (type_id < 0) {
-		obj2->kind = DATATYPE_ANY;
+		obj2->kind = CORPUS_DATATYPE_ANY;
 	} else {
 		obj2->kind = obj2->schema.types[type_id].kind;
 	}
@@ -598,11 +641,11 @@ SEXP subrows_jsondata(SEXP sdata, SEXP si)
 
 SEXP subfield_jsondata(SEXP sdata, SEXP sname)
 {
-	SEXP ans, sfilebuf, sfield, sfield2, shandle, srows;
+	SEXP ans, sbuffer, sfield, sfield2, shandle, srows;
 	const struct jsondata *obj = as_jsondata(sdata);
-	struct text name;
-	struct data *rows;
-	struct data field;
+	struct corpus_text name;
+	struct corpus_data *rows;
+	struct corpus_data field;
 	const char *name_ptr;
 	size_t name_len;
 	struct jsondata *obj2;
@@ -617,16 +660,16 @@ SEXP subfield_jsondata(SEXP sdata, SEXP sname)
 	name_ptr = translateCharUTF8(sname);
 	name_len = strlen(name_ptr);
 	PROTECT(sname = mkCharLenCE(name_ptr, name_len, CE_UTF8));
-	if ((err = text_assign(&name, (uint8_t *)name_ptr, name_len,
-					TEXT_NOESCAPE))) {
+	if ((err = corpus_text_assign(&name, (uint8_t *)name_ptr, name_len,
+				      CORPUS_TEXT_NOESCAPE))) {
 		error("invalid UTF-8 in 'name' argument");
 	}
-	if (!symtab_has_type(&obj->schema.names, &name, &name_id)) {
+	if (!corpus_symtab_has_type(&obj->schema.names, &name, &name_id)) {
 		UNPROTECT(1);
 		return R_NilValue;
 	}
 
-	sfilebuf = getListElement(sdata, "filebuf");
+	sbuffer = getListElement(sdata, "buffer");
 	sfield = getListElement(sdata, "field");
 	srows = getListElement(sdata, "rows");
 
@@ -642,7 +685,7 @@ SEXP subfield_jsondata(SEXP sdata, SEXP sname)
 	}
 	SET_STRING_ELT(sfield2, m, sname);
 
-	PROTECT(ans = alloc_jsondata(sfilebuf, sfield2, srows));
+	PROTECT(ans = alloc_jsondata(sbuffer, sfield2, srows));
 	shandle = getListElement(ans, "handle");
 	obj2 = R_ExternalPtrAddr(shandle);
 
@@ -655,13 +698,14 @@ SEXP subfield_jsondata(SEXP sdata, SEXP sname)
 	}
 	obj2->rows = rows;
 
-	type_id = DATATYPE_NULL;
+	type_id = CORPUS_DATATYPE_NULL;
 	for (i = 0; i < n; i++) {
-		data_field(&obj->rows[i], &obj->schema, name_id, &field);
-		data_assign(&rows[i], &obj2->schema, field.ptr,
-			    field.size);
-		if (schema_union(&obj2->schema, type_id, rows[i].type_id,
-				 &type_id) != 0) {
+		corpus_data_field(&obj->rows[i], &obj->schema, name_id,
+				  &field);
+		corpus_data_assign(&rows[i], &obj2->schema, field.ptr,
+				   field.size);
+		if (corpus_schema_union(&obj2->schema, type_id,
+					rows[i].type_id, &type_id) != 0) {
 			error("memory allocation failure");
 		}
 	}
@@ -670,7 +714,7 @@ SEXP subfield_jsondata(SEXP sdata, SEXP sname)
 	obj2->type_id = type_id;
 
 	if (type_id < 0) {
-		obj2->kind = DATATYPE_ANY;
+		obj2->kind = CORPUS_DATATYPE_ANY;
 	} else {
 		obj2->kind = obj2->schema.types[type_id].kind;
 	}
@@ -689,7 +733,7 @@ SEXP subset_jsondata(SEXP sdata, SEXP si, SEXP sj)
 		if (sj == R_NilValue) {
 			return sdata;
 		} else {
-			if (d->kind != DATATYPE_RECORD) {
+			if (d->kind != CORPUS_DATATYPE_RECORD) {
 				error("incorrect number of dimensions");
 			}
 			return subscript_jsondata(sdata, sj);
@@ -697,7 +741,7 @@ SEXP subset_jsondata(SEXP sdata, SEXP si, SEXP sj)
 	} else if (sj == R_NilValue) {
 		return subrows_jsondata(sdata, si);
 	} else {
-		if (d->kind != DATATYPE_RECORD) {
+		if (d->kind != CORPUS_DATATYPE_RECORD) {
 			error("incorrect number of dimensions");
 		}
 
@@ -722,10 +766,10 @@ SEXP as_double_jsondata(SEXP sdata)
 	overflow = 0;
 
 	for (i = 0; i < n; i++) {
-		err = data_double(&d->rows[i], &val[i]);
-		if (err == ERROR_INVAL) {
+		err = corpus_data_double(&d->rows[i], &val[i]);
+		if (err == CORPUS_ERROR_INVAL) {
 			val[i] = NA_REAL;
-		} else if (err == ERROR_OVERFLOW) {
+		} else if (err == CORPUS_ERROR_OVERFLOW) {
 			overflow = 1;
 		}
 	}
@@ -752,11 +796,12 @@ static SEXP as_integer_jsondata_check(SEXP sdata, int *overflowptr)
 	overflow = 0;
 
 	for (i = 0; i < n; i++) {
-		err = data_int(&d->rows[i], &val[i]);
-		if (err == ERROR_INVAL) {
+		err = corpus_data_int(&d->rows[i], &val[i]);
+		if (err == CORPUS_ERROR_INVAL) {
 			val[i] = NA_INTEGER;
 		} else {
-			if (err == ERROR_OVERFLOW || val[i] == NA_INTEGER) {
+			if (err == CORPUS_ERROR_OVERFLOW
+					|| val[i] == NA_INTEGER) {
 				overflow = 1;
 				val[i] = NA_INTEGER;
 			}
@@ -799,8 +844,8 @@ SEXP as_logical_jsondata(SEXP sdata)
 	val = LOGICAL(ans);
 
 	for (i = 0; i < n; i++) {
-		err = data_bool(&d->rows[i], &b);
-		if (err == ERROR_INVAL) {
+		err = corpus_data_bool(&d->rows[i], &b);
+		if (err == CORPUS_ERROR_INVAL) {
 			val[i] = NA_LOGICAL;
 		} else {
 			val[i] = b ? TRUE : FALSE;
@@ -814,36 +859,36 @@ SEXP as_logical_jsondata(SEXP sdata)
 
 static SEXP as_list_jsondata_record(SEXP sdata)
 {
-	SEXP ans, ans_j, names, sfilebuf, sfield, sfield2, srows,
+	SEXP ans, ans_j, names, sbuffer, sfield, sfield2, srows,
 	     shandle, sname;
 	const struct jsondata *d = as_jsondata(sdata);
 	struct jsondata *d_j;
-	struct schema **schema;
-	const struct datatype_record *r;
-	struct data_fields it;
+	struct corpus_schema **schema;
+	const struct corpus_datatype_record *r;
+	struct corpus_data_fields it;
 	R_xlen_t i, n = d->nrow, k, m;
 	int err, j, nfield;
 	int *type_id;
-	struct data **rows;
+	struct corpus_data **rows;
 	int *cols;
 
-	if (d->kind != DATATYPE_RECORD) {
+	if (d->kind != CORPUS_DATATYPE_RECORD) {
 		return R_NilValue;
 	}
 
 	r = &d->schema.types[d->type_id].meta.record;
 	nfield = r->nfield;
 
-	sfilebuf = getListElement(sdata, "filebuf");
+	sbuffer = getListElement(sdata, "buffer");
 	sfield = getListElement(sdata, "field");
 	srows = getListElement(sdata, "rows");
 	PROTECT(names = names_jsondata(sdata));
 
 	PROTECT(ans = allocVector(VECSXP, r->nfield));
 	setAttrib(ans, R_NamesSymbol, names);
-	rows = (struct data **)R_alloc(nfield, sizeof(*rows));
+	rows = (struct corpus_data **)R_alloc(nfield, sizeof(*rows));
 	cols = (int *)R_alloc(d->schema.names.ntype, sizeof(*cols));
-	schema = (struct schema **)R_alloc(nfield, sizeof(*schema));
+	schema = (struct corpus_schema **)R_alloc(nfield, sizeof(*schema));
 	type_id = (int *)R_alloc(nfield, sizeof(type_id));
 
 	for (j = 0; j < nfield; j++) {
@@ -863,7 +908,7 @@ static SEXP as_list_jsondata_record(SEXP sdata)
 			SET_STRING_ELT(sfield2, k, STRING_ELT(sfield, k));
 		}
 		SET_STRING_ELT(sfield2, m, sname);
-		ans_j = alloc_jsondata(sfilebuf, sfield2, srows);
+		ans_j = alloc_jsondata(sbuffer, sfield2, srows);
 		SET_VECTOR_ELT(ans, j, ans_j);
 		UNPROTECT(1); // sfield2 protected by ans_j, protected by ans
 
@@ -872,25 +917,26 @@ static SEXP as_list_jsondata_record(SEXP sdata)
 		d_j->rows = rows[j];
 		d_j->nrow = n;
 		schema[j] = &d_j->schema;
-		type_id[j] = DATATYPE_NULL;
+		type_id[j] = CORPUS_DATATYPE_NULL;
 	}
 
 	for (i = 0; i < n; i++) {
-		if ((err = data_fields(&d->rows[i], &d->schema, &it))) {
+		if ((err = corpus_data_fields(&d->rows[i], &d->schema, &it))) {
 			continue;
 		}
 
-		while (data_fields_advance(&it)) {
+		while (corpus_data_fields_advance(&it)) {
 			j = cols[it.name_id];
-			if ((err = data_assign(&rows[j][i], schema[j],
-						it.current.ptr,
-						it.current.size))) {
+			if ((err = corpus_data_assign(&rows[j][i], schema[j],
+						      it.current.ptr,
+						      it.current.size))) {
 				error("failed parsing field value");
 			}
 
-			if ((err = schema_union(schema[j], rows[j][i].type_id,
-							type_id[j],
-							&type_id[j]))) {
+			if ((err = corpus_schema_union(schema[j],
+						       rows[j][i].type_id,
+						       type_id[j],
+						       &type_id[j]))) {
 				error("memory allocation failure");
 			}
 		}
@@ -902,7 +948,7 @@ static SEXP as_list_jsondata_record(SEXP sdata)
 		d_j = R_ExternalPtrAddr(shandle);
 		d_j->type_id = type_id[j];
 		if (type_id[j] < 0) {
-			d_j->kind = DATATYPE_ANY;
+			d_j->kind = CORPUS_DATATYPE_ANY;
 		} else {
 			d_j->kind = schema[j]->types[type_id[j]].kind;
 		}
@@ -921,13 +967,12 @@ SEXP as_list_jsondata(SEXP sdata)
 	SEXP ans, val;
 	const struct jsondata *d = as_jsondata(sdata);
 	struct decode decode;
-	struct data data;
+	struct corpus_data data;
 	R_xlen_t i, n = d->nrow;
 
-	if (d->kind == DATATYPE_RECORD) {
+	if (d->kind == CORPUS_DATATYPE_RECORD) {
 		return as_list_jsondata_record(sdata);
 	}
-
 
 	PROTECT(ans = allocVector(VECSXP, n));
 
@@ -956,27 +1001,27 @@ SEXP simplify_jsondata(SEXP sdata)
 	int overflow;
 
 	switch (d->kind) {
-	case DATATYPE_NULL:
-	case DATATYPE_BOOLEAN:
+	case CORPUS_DATATYPE_NULL:
+	case CORPUS_DATATYPE_BOOLEAN:
 		ans = as_logical_jsondata(sdata);
 		break;
 
-	case DATATYPE_INTEGER:
+	case CORPUS_DATATYPE_INTEGER:
 		ans = as_integer_jsondata_check(sdata, &overflow);
 		if (overflow) {
 			ans = as_double_jsondata(sdata);
 		}
 		break;
 
-	case DATATYPE_REAL:
+	case CORPUS_DATATYPE_REAL:
 		ans = as_double_jsondata(sdata);
 		break;
 
-	case DATATYPE_TEXT:
+	case CORPUS_DATATYPE_TEXT:
 		ans = as_text_jsondata(sdata);
 		break;
 
-	case DATATYPE_ARRAY:
+	case CORPUS_DATATYPE_ARRAY:
 		ans = as_list_jsondata(sdata);
 		break;
 

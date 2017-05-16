@@ -19,13 +19,14 @@
 #include "wordscan.h"
 
 
-void wordscan_make(struct wordscan *scan, const struct text *text)
+void corpus_wordscan_make(struct corpus_wordscan *scan,
+			  const struct corpus_text *text)
 {
 	scan->text = *text;
-	scan->text_attr = text->attr & ~TEXT_SIZE_MASK;
+	scan->text_attr = text->attr & ~CORPUS_TEXT_SIZE_MASK;
 
-	text_iter_make(&scan->iter, text);
-	wordscan_reset(scan);
+	corpus_text_iter_make(&scan->iter, text);
+	corpus_wordscan_reset(scan);
 }
 
 #define SCAN() \
@@ -36,7 +37,7 @@ void wordscan_make(struct wordscan *scan, const struct text *text)
 		scan->attr = scan->iter.attr; \
 		scan->prop = scan->iter_prop; \
 		scan->iter_ptr = scan->iter.ptr; \
-		if (text_iter_advance(&scan->iter)) { \
+		if (corpus_text_iter_advance(&scan->iter)) { \
 			scan->iter_prop = word_break(scan->iter.current); \
 		} else { \
 			scan->iter_prop = -1; \
@@ -54,7 +55,7 @@ void wordscan_make(struct wordscan *scan, const struct text *text)
 				|| scan->iter_prop == WORD_BREAK_ZWJ) { \
 			scan->attr |= scan->iter.attr; \
 			scan->iter_ptr = scan->iter.ptr; \
-			if (text_iter_advance(&scan->iter)) { \
+			if (corpus_text_iter_advance(&scan->iter)) { \
 				scan->iter_prop = \
 					word_break(scan->iter.current); \
 			} else { \
@@ -84,22 +85,22 @@ void wordscan_make(struct wordscan *scan, const struct text *text)
 	} while (0)
 
 
-void wordscan_reset(struct wordscan *scan)
+void corpus_wordscan_reset(struct corpus_wordscan *scan)
 {
 	scan->current.ptr = 0;
 	scan->current.attr = 0;
-	scan->type = WORD_NONE;
+	scan->type = CORPUS_WORD_NONE;
 
-	text_iter_reset(&scan->iter);
+	corpus_text_iter_reset(&scan->iter);
 	scan->ptr = scan->iter.ptr;
 
-	if (text_iter_advance(&scan->iter)) {
+	if (corpus_text_iter_advance(&scan->iter)) {
 		scan->code = scan->iter.current;
 		scan->attr = scan->iter.attr;
 		scan->prop = word_break(scan->code);
 
 		scan->iter_ptr = scan->iter.ptr;
-		if (text_iter_advance(&scan->iter)) {
+		if (corpus_text_iter_advance(&scan->iter)) {
 			scan->iter_prop = word_break(scan->iter.current);
 		} else {
 			scan->iter_prop = -1;
@@ -115,22 +116,20 @@ void wordscan_reset(struct wordscan *scan)
 }
 
 
-int wordscan_advance(struct wordscan *scan)
+int corpus_wordscan_advance(struct corpus_wordscan *scan)
 {
 	scan->current.ptr = (uint8_t *)scan->ptr;
 	scan->current.attr = 0;
+	scan->type = CORPUS_WORD_NONE;
 
 	// Break at the start and end of text, unless the text is empty.
 	if (scan->prop < 0) {
-		scan->type = WORD_NONE;
 		// WB2: Any + eot
 		goto Break;
 	}
 
 	switch (scan->prop) {
 	case WORD_BREAK_CR:
-		scan->type = WORD_NEWLINE;
-
 		if (scan->iter_prop == WORD_BREAK_LF) {
 			// Do not break within CRLF
 			// WB3: CR * LF
@@ -146,13 +145,10 @@ int wordscan_advance(struct wordscan *scan)
 	case WORD_BREAK_LF:
 		// Break after Newlines
 		// WB3a: (Newline | LF) +
-		scan->type = WORD_NEWLINE;
 		NEXT();
 		goto Break;
 
 	case WORD_BREAK_ZWJ:
-		scan->type = WORD_ZWJ;
-
 		if (scan->iter_prop == WORD_BREAK_GLUE_AFTER_ZWJ) {
 			// Do not break within emoji zwj sequences
 			// WB3c: ZWJ * (Glue_After_Zwj | EBG)
@@ -171,43 +167,57 @@ int wordscan_advance(struct wordscan *scan)
 		goto Break;
 
 	case WORD_BREAK_ALETTER:
-		scan->type = WORD_ALETTER;
+		scan->type = CORPUS_WORD_LETTER;
 		NEXT();
 		goto ALetter;
 
 	case WORD_BREAK_NUMERIC:
-		scan->type = WORD_NUMERIC;
+		scan->type = CORPUS_WORD_NUMBER;
 		NEXT();
 		goto Numeric;
 
 	case WORD_BREAK_EXTENDNUMLET:
-		scan->type = WORD_EXTEND;
 		NEXT();
+		switch (scan->prop) {
+			case WORD_BREAK_EXTENDNUMLET:
+			case WORD_BREAK_ALETTER:
+			case WORD_BREAK_HEBREW_LETTER:
+				scan->type = CORPUS_WORD_LETTER;
+				break;
+
+			case WORD_BREAK_NUMERIC:
+				scan->type = CORPUS_WORD_NUMBER;
+				break;
+
+			case WORD_BREAK_KATAKANA:
+				scan->type = CORPUS_WORD_KANA;
+				break;
+
+			default:
+				break;
+		}
 		goto ExtendNumLet;
 
 	case WORD_BREAK_HEBREW_LETTER:
-		scan->type = WORD_HEBREW;
+		scan->type = CORPUS_WORD_LETTER;
 		NEXT();
 		goto Hebrew_Letter;
 
 	case WORD_BREAK_KATAKANA:
-		scan->type = WORD_KATAKANA;
+		scan->type = CORPUS_WORD_KANA;
 		NEXT();
 		goto Katakana;
 
 	case WORD_BREAK_E_BASE:
 	case WORD_BREAK_E_BASE_GAZ:
-		scan->type = WORD_EBASE;
 		NEXT();
 		goto E_Base;
 
 	case WORD_BREAK_REGIONAL_INDICATOR:
-		scan->type = WORD_REGIONAL;
 		NEXT();
 		goto Regional_Indicator;
 
 	default:
-		scan->type = WORD_OTHER;
 		NEXT();
 		goto Break;
 	}
@@ -461,6 +471,6 @@ Regional_Indicator:
 	}
 
 Break:
-	scan->current.attr |= (scan->ptr - scan->current.ptr);
-	return (scan->type == WORD_NONE) ? 0 : 1;
+	scan->current.attr |= (size_t)(scan->ptr - scan->current.ptr);
+	return (scan->ptr == scan->current.ptr) ? 0 : 1;
 }

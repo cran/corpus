@@ -24,24 +24,27 @@
 #include "../src/symtab.h"
 #include "testutil.h"
 
-struct symtab tab;
+struct corpus_symtab tab;
 
 
 void setup_empty_symtab(void)
 {
 	setup();
-	symtab_init(&tab, TYPE_COMPAT | TYPE_CASEFOLD | TYPE_RMDI, NULL);
+	corpus_symtab_init(&tab,
+			   CORPUS_TYPE_COMPAT | CORPUS_TYPE_CASEFOLD
+			   	| CORPUS_TYPE_RMDI,
+			   NULL);
 }
 
 
 void teardown_symtab(void)
 {
-	symtab_destroy(&tab);
+	corpus_symtab_destroy(&tab);
 	teardown();
 }
 
 
-int has_type(const struct text *typ)
+int has_type(const struct corpus_text *typ)
 {
 	int ntoken = tab.ntoken;
 	int ntype = tab.ntype;
@@ -49,7 +52,7 @@ int has_type(const struct text *typ)
 	int ans;
 
 	// after searching for a type
-	ans = symtab_has_type(&tab, typ, &type_id);
+	ans = corpus_symtab_has_type(&tab, typ, &type_id);
 
 	// it should leave the token count unchanged
 	ck_assert_int_eq(tab.ntoken, ntoken);
@@ -76,7 +79,7 @@ int has_type(const struct text *typ)
 }
 
 
-int has_token(const struct text *tok)
+int has_token(const struct corpus_text *tok)
 {
 	int ntoken = tab.ntoken;
 	int ntype = tab.ntype;
@@ -84,7 +87,7 @@ int has_token(const struct text *tok)
 	int ans;
 
 	// after searching for a token
-	ans = symtab_has_token(&tab, tok, &tok_id);
+	ans = corpus_symtab_has_token(&tab, tok, &tok_id);
 
 	// it should leave the token count unchanged
 	ck_assert_int_eq(tab.ntoken, ntoken);
@@ -112,15 +115,15 @@ int has_token(const struct text *tok)
 
 
 
-int add_type(const struct text *typ)
+int add_type(const struct corpus_text *typ)
 {
 	int type_id;
 	int ntoken = tab.ntoken;
 	int ntype = tab.ntype;
-	bool had_type = symtab_has_type(&tab, typ, NULL);
+	bool had_type = corpus_symtab_has_type(&tab, typ, NULL);
 
 	// after adding a type
-	symtab_add_type(&tab, typ, &type_id);
+	corpus_symtab_add_type(&tab, typ, &type_id);
 
 	// it should leave the token count unchanged
 	ck_assert_int_eq(tab.ntoken, ntoken);
@@ -151,23 +154,24 @@ int add_type(const struct text *typ)
 }
 
 
-int add_token(const struct text *tok)
+int add_token(const struct corpus_text *tok)
 {
 	int i, token_id, type_id;
 	int ntoken = tab.ntoken;
 	int ntype = tab.ntype;
 	int type_ntoken;
-	bool had_token = symtab_has_token(&tab, tok, &token_id);
+	bool had_token = corpus_symtab_has_token(&tab, tok, &token_id);
 
 	if (had_token) {
 		type_id = tab.tokens[token_id].type_id;
 		type_ntoken = tab.types[type_id].ntoken;
 	} else {
+		type_id = -1;
 		type_ntoken = 0;
 	}
 
 	// after adding a token
-	symtab_add_token(&tab, tok, &token_id);
+	corpus_symtab_add_token(&tab, tok, &token_id);
 
 	if (had_token) {
 		// when the token already existed,
@@ -298,7 +302,7 @@ START_TEST(test_many_add_typ)
 {
 	char buf[256];
 	int i, j, n = 100;
-	struct text *typ;
+	struct corpus_text *typ;
 
 	for (i = 0; i < n; i++) {
 		sprintf(buf, "type %d", i);
@@ -319,7 +323,7 @@ START_TEST(test_many_add_tok)
 {
 	char buf[256];
 	int i, j, n = 100;
-	struct text *tok;
+	struct corpus_text *tok;
 
 	for (i = 0; i < n; i++) {
 		sprintf(buf, "token %d", i);

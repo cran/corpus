@@ -17,20 +17,23 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 #include "error.h"
+#include "memory.h"
 #include "unicode.h"
-#include "xalloc.h"
 #include "text.h"
 
 /* http://stackoverflow.com/a/11986885 */
 #define hextoi(ch) ((ch > '9') ? (ch &~ 0x20) - 'A' + 10 : (ch - '0'))
 
-static int assign_esc(struct text *text, const uint8_t *ptr, size_t size);
-static int assign_esc_unsafe(struct text *text, const uint8_t *ptr, size_t size);
-static int assign_raw(struct text *text, const uint8_t *ptr, size_t size);
-static int assign_raw_unsafe(struct text *text, const uint8_t *ptr, size_t size);
+static int assign_esc(struct corpus_text *text, const uint8_t *ptr,
+		      size_t size);
+static int assign_esc_unsafe(struct corpus_text *text, const uint8_t *ptr,
+			     size_t size);
+static int assign_raw(struct corpus_text *text, const uint8_t *ptr,
+		      size_t size);
+static int assign_raw_unsafe(struct corpus_text *text, const uint8_t *ptr,
+			     size_t size);
 
 static int decode_uescape(const uint8_t **inputptr, const uint8_t *end,
 			  uint32_t *codeptr);
@@ -38,15 +41,16 @@ static void decode_valid_escape(const uint8_t **inputptr, uint32_t *codeptr);
 static void decode_valid_uescape(const uint8_t **inputptr, uint32_t *codeptr);
 
 
-int text_init_copy(struct text *text, const struct text *other)
+int corpus_text_init_copy(struct corpus_text *text,
+			  const struct corpus_text *other)
 {
-        size_t size = TEXT_SIZE(other);
+        size_t size = CORPUS_TEXT_SIZE(other);
         size_t attr = other->attr;
 	int err;
 
-        if (!(text->ptr = xmalloc(size + 1))) {
-                err = ERROR_NOMEM;
-                logmsg(err, "failed allocating text object");
+        if (!(text->ptr = corpus_malloc(size + 1))) {
+                err = CORPUS_ERROR_NOMEM;
+                corpus_log(err, "failed allocating text object");
                 return err;
         }
 
@@ -57,24 +61,25 @@ int text_init_copy(struct text *text, const struct text *other)
 }
 
 
-void text_destroy(struct text *text)
+void corpus_text_destroy(struct corpus_text *text)
 {
-        free(text->ptr);
+        corpus_free(text->ptr);
 }
 
 
-int text_assign(struct text *text, const uint8_t *ptr, size_t size, int flags)
+int corpus_text_assign(struct corpus_text *text, const uint8_t *ptr,
+		       size_t size, int flags)
 {
 	int err;
 
-	if (flags & TEXT_NOESCAPE) {
-		if (flags & TEXT_NOVALIDATE) {
+	if (flags & CORPUS_TEXT_NOESCAPE) {
+		if (flags & CORPUS_TEXT_NOVALIDATE) {
 			err = assign_raw_unsafe(text, ptr, size);
 		} else {
 			err = assign_raw(text, ptr, size);
 		}
 	} else {
-		if (flags & TEXT_NOVALIDATE) {
+		if (flags & CORPUS_TEXT_NOVALIDATE) {
 			err = assign_esc_unsafe(text, ptr, size);
 		} else {
 			err = assign_esc(text, ptr, size);
@@ -86,17 +91,18 @@ int text_assign(struct text *text, const uint8_t *ptr, size_t size, int flags)
 
 
 
-void text_iter_make(struct text_iter *it, const struct text *text)
+void corpus_text_iter_make(struct corpus_text_iter *it,
+			   const struct corpus_text *text)
 {
 	it->ptr = text->ptr;
-	it->end = it->ptr + TEXT_SIZE(text);
+	it->end = it->ptr + CORPUS_TEXT_SIZE(text);
 	it->text_attr = text->attr;
 	it->attr = 0;
-	it->current = -1;
+	it->current = (uint32_t)-1;
 }
 
 
-int text_iter_advance(struct text_iter *it)
+int corpus_text_iter_advance(struct corpus_text_iter *it)
 {
 	const uint8_t *ptr = it->ptr;
 	size_t text_attr = it->text_attr;
@@ -111,19 +117,19 @@ int text_iter_advance(struct text_iter *it)
 	attr = 0;
 	code = *ptr++;
 
-	if (code == '\\' && (text_attr & TEXT_ESC_BIT)) {
-		attr = TEXT_ESC_BIT;
+	if (code == '\\' && (text_attr & CORPUS_TEXT_ESC_BIT)) {
+		attr = CORPUS_TEXT_ESC_BIT;
 		decode_valid_escape(&ptr, &code);
 		if (code >= 0x80) {
-			attr |= TEXT_UTF8_BIT;
+			attr |= CORPUS_TEXT_UTF8_BIT;
 		}
-	} else if ((text_attr & TEXT_UTF8_BIT) && code >= 0x80) {
-		attr = TEXT_UTF8_BIT;
+	} else if ((text_attr & CORPUS_TEXT_UTF8_BIT) && code >= 0x80) {
+		attr = CORPUS_TEXT_UTF8_BIT;
 		ptr--;
-		decode_utf8(&ptr, &code);
+		corpus_decode_utf8(&ptr, &code);
 	}
 
-	it->ptr = (uint8_t *)ptr;
+	it->ptr = ptr;
 	it->current = code;
 	it->attr = attr;
 	return 1;
@@ -135,15 +141,15 @@ at_end:
 }
 
 
-void text_iter_reset(struct text_iter *it)
+void corpus_text_iter_reset(struct corpus_text_iter *it)
 {
-	it->ptr = it->end - (it->text_attr & TEXT_SIZE_MASK);
-	it->current = -1;
+	it->ptr = it->end - (it->text_attr & CORPUS_TEXT_SIZE_MASK);
+	it->current = (uint32_t)-1;
 	it->attr = 0;
 }
 
 
-int assign_raw(struct text *text, const uint8_t *ptr, size_t size)
+int assign_raw(struct corpus_text *text, const uint8_t *ptr, size_t size)
 {
 	const uint8_t *input = ptr;
 	const uint8_t *end = ptr + size;
@@ -156,37 +162,38 @@ int assign_raw(struct text *text, const uint8_t *ptr, size_t size)
 	while (ptr != end) {
 		ch = *ptr++;
 		if (ch & 0x80) {
-			attr |= TEXT_UTF8_BIT;
+			attr |= CORPUS_TEXT_UTF8_BIT;
 			ptr--;
-			if ((err = scan_utf8(&ptr, end))) {
+			if ((err = corpus_scan_utf8(&ptr, end))) {
 				goto error_inval_utf8;
 			}
 		}
 	}
 
 	// validate size
-	size = ptr - text->ptr;
-	if (size > TEXT_SIZE_MAX) {
+	size = (size_t)(ptr - text->ptr);
+	if (size > CORPUS_TEXT_SIZE_MAX) {
 		goto error_overflow;
 	}
 
-	attr |= (size & TEXT_SIZE_MASK);
+	attr |= (size & CORPUS_TEXT_SIZE_MASK);
 	text->attr = attr;
 	return 0;
 
 error_inval_utf8:
-	logmsg(err, "invalid UTF-8 byte (0x%02X)", (unsigned)*ptr);
+	corpus_log(err, "invalid UTF-8 byte (0x%02X)", (unsigned)*ptr);
 	goto error_inval;
 
 error_inval:
-	logmsg(err, "error in text at byte %"PRIu64, (uint64_t)(ptr - input));
+	corpus_log(err, "error in text at byte %"PRIu64,
+		   (uint64_t)(ptr - input));
 	goto error;
 
 error_overflow:
-	err = ERROR_OVERFLOW;
-	logmsg(err, "text size (%"PRIu64" bytes)"
-		" exceeds maximum (%"PRIu64" bytes)",
-	       (uint64_t)size, (uint64_t)TEXT_SIZE_MAX);
+	err = CORPUS_ERROR_OVERFLOW;
+	corpus_log(err, "text size (%"PRIu64" bytes)"
+		   " exceeds maximum (%"PRIu64" bytes)",
+		   (uint64_t)size, (uint64_t)CORPUS_TEXT_SIZE_MAX);
 	goto error;
 
 error:
@@ -196,7 +203,7 @@ error:
 }
 
 
-int assign_raw_unsafe(struct text *text, const uint8_t *ptr, size_t size)
+int assign_raw_unsafe(struct corpus_text *text, const uint8_t *ptr, size_t size)
 {
 	const uint8_t *end = ptr + size;
 	size_t attr = 0;
@@ -208,26 +215,26 @@ int assign_raw_unsafe(struct text *text, const uint8_t *ptr, size_t size)
 	while (ptr != end) {
 		ch = *ptr++;
 		if (ch & 0x80) {
-			attr |= TEXT_UTF8_BIT;
-			ptr += UTF8_TAIL_LEN(ch);
+			attr |= CORPUS_TEXT_UTF8_BIT;
+			ptr += CORPUS_UTF8_TAIL_LEN(ch);
 		}
 	}
 
 	// validate size
-	size = ptr - text->ptr;
-	if (size > TEXT_SIZE_MAX) {
+	size = (size_t)(ptr - text->ptr);
+	if (size > CORPUS_TEXT_SIZE_MAX) {
 		goto error_overflow;
 	}
 
-	attr |= (size & TEXT_SIZE_MASK);
+	attr |= (size & CORPUS_TEXT_SIZE_MASK);
 	text->attr = attr;
 	return 0;
 
 error_overflow:
-	err = ERROR_OVERFLOW;
-	logmsg(err, "text size (%"PRIu64" bytes)"
-	       " exceeds maximum (%"PRIu64" bytes)",
-	       (uint64_t)size, (uint64_t)TEXT_SIZE_MAX);
+	err = CORPUS_ERROR_OVERFLOW;
+	corpus_log(err, "text size (%"PRIu64" bytes)"
+		   " exceeds maximum (%"PRIu64" bytes)",
+		   (uint64_t)size, (uint64_t)CORPUS_TEXT_SIZE_MAX);
 	goto error;
 
 error:
@@ -237,7 +244,7 @@ error:
 }
 
 
-int assign_esc(struct text *text, const uint8_t *ptr, size_t size)
+int assign_esc(struct corpus_text *text, const uint8_t *ptr, size_t size)
 {
 	const uint8_t *input = ptr;
 	const uint8_t *end = ptr + size;
@@ -251,7 +258,7 @@ int assign_esc(struct text *text, const uint8_t *ptr, size_t size)
 	while (ptr != end) {
 		ch = *ptr++;
 		if (ch == '\\') {
-			attr |= TEXT_ESC_BIT;
+			attr |= CORPUS_TEXT_ESC_BIT;
 
 			if (ptr == end) {
 				goto error_inval_incomplete;
@@ -273,58 +280,58 @@ int assign_esc(struct text *text, const uint8_t *ptr, size_t size)
 					goto error_inval_uesc;
 				}
 				if (code >= 0x80) {
-					attr |= TEXT_UTF8_BIT;
+					attr |= CORPUS_TEXT_UTF8_BIT;
 				}
 				break;
 			default:
 				goto error_inval_esc;
 			}
 		} else if (ch & 0x80) {
-			attr |= TEXT_UTF8_BIT;
+			attr |= CORPUS_TEXT_UTF8_BIT;
 			ptr--;
-			if ((err = scan_utf8(&ptr, end))) {
+			if ((err = corpus_scan_utf8(&ptr, end))) {
 				goto error_inval_utf8;
 			}
 		}
 	}
 
 	// validate size
-	size = ptr - text->ptr;
-	if (size > TEXT_SIZE_MAX) {
+	size = (size_t)(ptr - text->ptr);
+	if (size > CORPUS_TEXT_SIZE_MAX) {
 		goto error_overflow;
 	}
 
-	attr |= (size & TEXT_SIZE_MASK);
+	attr |= (size & CORPUS_TEXT_SIZE_MASK);
 	text->attr = attr;
 	return 0;
 
 error_inval_incomplete:
-	err = ERROR_INVAL;
-	logmsg(err, "incomplete escape code (\\)");
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "incomplete escape code (\\)");
 	goto error_inval;
 
 error_inval_esc:
-	err = ERROR_INVAL;
-	logmsg(err, "invalid escape code (\\%c)", ch);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "invalid escape code (\\%c)", ch);
 	goto error_inval;
 
 error_inval_uesc:
 	goto error_inval;
 
 error_inval_utf8:
-	logmsg(err, "invalid UTF-8 byte (0x%02X)", (unsigned)*ptr);
+	corpus_log(err, "invalid UTF-8 byte (0x%02X)", (unsigned)*ptr);
 	goto error_inval;
 
 error_inval:
-	logmsg(err, "error in text at byte %"PRIu64,
-		(uint64_t)(ptr - input));
+	corpus_log(err, "error in text at byte %"PRIu64,
+		   (uint64_t)(ptr - input));
 	goto error;
 
 error_overflow:
-	err = ERROR_OVERFLOW;
-	logmsg(err, "text size (%"PRIu64" bytes)"
-	       " exceeds maximum (%"PRIu64" bytes)",
-	       (uint64_t)size, (uint64_t)TEXT_SIZE_MAX);
+	err = CORPUS_ERROR_OVERFLOW;
+	corpus_log(err, "text size (%"PRIu64" bytes)"
+		   " exceeds maximum (%"PRIu64" bytes)",
+		   (uint64_t)size, (uint64_t)CORPUS_TEXT_SIZE_MAX);
 	goto error;
 
 error:
@@ -334,7 +341,7 @@ error:
 }
 
 
-int assign_esc_unsafe(struct text *text, const uint8_t *ptr, size_t size)
+int assign_esc_unsafe(struct corpus_text *text, const uint8_t *ptr, size_t size)
 {
 	const uint8_t *end = ptr + size;
 	size_t attr = 0;
@@ -347,40 +354,40 @@ int assign_esc_unsafe(struct text *text, const uint8_t *ptr, size_t size)
 	while (ptr != end) {
 		ch = *ptr++;
 		if (ch == '\\') {
-			attr |= TEXT_ESC_BIT;
+			attr |= CORPUS_TEXT_ESC_BIT;
 			ch = *ptr++;
 
 			switch (ch) {
 			case 'u':
 				decode_valid_uescape(&ptr, &code);
 				if (code >= 0x80) {
-					attr |= TEXT_UTF8_BIT;
+					attr |= CORPUS_TEXT_UTF8_BIT;
 				}
 				break;
 			default:
 				break;
 			}
 		} else if (ch & 0x80) {
-			attr |= TEXT_UTF8_BIT;
-			ptr += UTF8_TAIL_LEN(ch);
+			attr |= CORPUS_TEXT_UTF8_BIT;
+			ptr += CORPUS_UTF8_TAIL_LEN(ch);
 		}
 	}
 
 	// validate size
-	size = ptr - text->ptr;
-	if (size > TEXT_SIZE_MAX) {
+	size = (size_t)(ptr - text->ptr);
+	if (size > CORPUS_TEXT_SIZE_MAX) {
 		goto error_overflow;
 	}
 
-	attr |= (size & TEXT_SIZE_MASK);
+	attr |= (size & CORPUS_TEXT_SIZE_MASK);
 	text->attr = attr;
 	return 0;
 
 error_overflow:
-	err = ERROR_OVERFLOW;
-	logmsg(err, "text size (%"PRIu64" bytes)"
-	       " exceeds maximum (%"PRIu64" bytes)",
-	       (uint64_t)size, (uint64_t)TEXT_SIZE_MAX);
+	err = CORPUS_ERROR_OVERFLOW;
+	corpus_log(err, "text size (%"PRIu64" bytes)"
+		   " exceeds maximum (%"PRIu64" bytes)",
+		   (uint64_t)size, (uint64_t)CORPUS_TEXT_SIZE_MAX);
 	goto error;
 
 error:
@@ -413,7 +420,7 @@ int decode_uescape(const uint8_t **inputptr, const uint8_t *end,
 		code = (code << 4) + hextoi(ch);
 	}
 
-	if (IS_UTF16_HIGH(code)) {
+	if (CORPUS_IS_UTF16_HIGH(code)) {
 		if (ptr + 6 > end || ptr[0] != '\\' || ptr[1] != 'u') {
 			goto error_inval_nolow;
 		}
@@ -428,12 +435,12 @@ int decode_uescape(const uint8_t **inputptr, const uint8_t *end,
 			}
 			low = (low << 4) + hextoi(ch);
 		}
-		if (!IS_UTF16_LOW(low)) {
+		if (!CORPUS_IS_UTF16_LOW(low)) {
 			ptr -= 6;
 			goto error_inval_low;
 		}
-		code = DECODE_UTF16_PAIR(code, low);
-	} else if (IS_UTF16_LOW(code)) {
+		code = CORPUS_DECODE_UTF16_PAIR(code, low);
+	} else if (CORPUS_IS_UTF16_LOW(code)) {
 		goto error_inval_nohigh;
 	}
 
@@ -441,40 +448,38 @@ int decode_uescape(const uint8_t **inputptr, const uint8_t *end,
 	goto out;
 
 error_inval_incomplete:
-	err = ERROR_INVAL;
-	logmsg(err, "incomplete escape code (\\u%.*s)",
-	       (int)(end - input), input);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "incomplete escape code (\\u%.*s)",
+		   (int)(end - input), input);
 	goto error_inval;
 
 error_inval_hex:
-	err = ERROR_INVAL;
-	logmsg(err, "invalid hex value in escape code (\\u%.*s)", 4, input);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "invalid hex value in escape code (\\u%.*s)",
+		   4, input);
 	goto error_inval;
 
 error_inval_nolow:
-	err = ERROR_INVAL;
-	logmsg(err,
-	       "missing UTF-16 low surrogate after high surrogate escape code"
-	       " (\\u%.*s)", 4, input);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing UTF-16 low surrogate"
+		   " after high surrogate escape code (\\u%.*s)", 4, input);
 	goto error_inval;
 
 error_inval_low:
-	err = ERROR_INVAL;
-	logmsg(err,
-		"invalid UTF-16 low surrogate (\\u%.*s)"
-	        " after high surrogate escape code (\\u%.*s)",
-		4, input, 4, input - 6);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "invalid UTF-16 low surrogate (\\u%.*s)"
+		   " after high surrogate escape code (\\u%.*s)",
+		   4, input, 4, input - 6);
 	goto error_inval;
 
 error_inval_nohigh:
-	err = ERROR_INVAL;
-	logmsg(err,
-	       "missing UTF-16 high surrogate before low surrogate escape code"
-	       " (\\u%.*s)", 4, input);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing UTF-16 high surrogate"
+		   " before low surrogate escape code (\\u%.*s)", 4, input);
 	goto error_inval;
 
 error_inval:
-	code = UNICODE_REPLACEMENT;
+	code = CORPUS_UNICODE_REPLACEMENT;
 
 out:
 	*codeptr = code;
@@ -497,17 +502,17 @@ void decode_valid_uescape(const uint8_t **inputptr, uint32_t *codeptr)
 		code = (code << 4) + hextoi(ch);
 	}
 
-	if (IS_UTF16_HIGH(code)) {
+	if (CORPUS_IS_UTF16_HIGH(code)) {
 		// skip over \u
 		ptr += 2;
 
 		low = 0;
 		for (i = 0; i < 4; i++) {
 			ch = *ptr++;
-			low = (low << 4) + hextoi(ch);
+			low = (uint_fast16_t)(low << 4) + hextoi(ch);
 		}
 
-		code = DECODE_UTF16_PAIR(code, low);
+		code = CORPUS_DECODE_UTF16_PAIR(code, low);
 	}
 
 	*codeptr = code;

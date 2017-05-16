@@ -47,7 +47,7 @@
 */
 
 
-int scan_utf8(const uint8_t **bufptr, const uint8_t *end)
+int corpus_scan_utf8(const uint8_t **bufptr, const uint8_t *end)
 {
 	const uint8_t *ptr = *bufptr;
 	uint_fast8_t ch, ch1;
@@ -55,7 +55,7 @@ int scan_utf8(const uint8_t **bufptr, const uint8_t *end)
 	int err;
 
 	if (ptr >= end) {
-		return ERROR_INVAL;
+		return CORPUS_ERROR_INVAL;
 	}
 
 	/* First byte
@@ -188,14 +188,14 @@ success:
 	goto out;
 backtrack:
 	ptr--;
-	err = ERROR_INVAL;
+	err = CORPUS_ERROR_INVAL;
 out:
 	*bufptr = ptr;
 	return err;
 }
 
 
-void decode_utf8(const uint8_t **bufptr, uint32_t *codeptr)
+void corpus_decode_utf8(const uint8_t **bufptr, uint32_t *codeptr)
 {
 	const uint8_t *ptr = *bufptr;
 	uint32_t code;
@@ -228,25 +228,25 @@ void decode_utf8(const uint8_t **bufptr, uint32_t *codeptr)
 
 
 // http://www.fileformat.info/info/unicode/utf8.htm
-void encode_utf8(uint32_t code, uint8_t **bufptr)
+void corpus_encode_utf8(uint32_t code, uint8_t **bufptr)
 {
 	uint8_t *ptr = *bufptr;
 	uint32_t x = code;
 
 	if (x <= 0x7F) {
-		*ptr++ = x;
+		*ptr++ = (uint8_t)x;
 	} else if (x <= 0x07FF) {
-		*ptr++ = 0xC0 | (x >> 6);
-		*ptr++ = 0x80 | (x & 0x3F);
+		*ptr++ = (uint8_t)(0xC0 | (x >> 6));
+		*ptr++ = (uint8_t)(0x80 | (x & 0x3F));
 	} else if (x <= 0xFFFF) {
-		*ptr++ = 0xE0 | (x >> 12);
-		*ptr++ = 0x80 | ((x >> 6) & 0x3F);
-		*ptr++ = 0x80 | (x & 0x3F);
+		*ptr++ = (uint8_t)(0xE0 | (x >> 12));
+		*ptr++ = (uint8_t)(0x80 | ((x >> 6) & 0x3F));
+		*ptr++ = (uint8_t)(0x80 | (x & 0x3F));
 	} else {
-		*ptr++ = 0xF0 | (x >> 18);
-		*ptr++ = 0x80 | ((x >> 12) & 0x3F);
-		*ptr++ = 0x80 | ((x >> 6) & 0x3F);
-		*ptr++ = 0x80 | (x & 0x3F);
+		*ptr++ = (uint8_t)(0xF0 | (x >> 18));
+		*ptr++ = (uint8_t)(0x80 | ((x >> 12) & 0x3F));
+		*ptr++ = (uint8_t)(0x80 | ((x >> 6) & 0x3F));
+		*ptr++ = (uint8_t)(0x80 | (x & 0x3F));
 	}
 
 	*bufptr = ptr;
@@ -331,18 +331,18 @@ static void casefold(int type, uint32_t code, uint32_t **bufp)
 		*dst++ = code;
 		*bufp = dst;
 	} else if (length == 1) {
-		unicode_map(type, c.data, bufp);
+		corpus_unicode_map(type, c.data, bufp);
 	} else {
 		src = &casefold_mapping[c.data];
 		while (length-- > 0) {
-			unicode_map(type, *src, bufp);
+			corpus_unicode_map(type, *src, bufp);
 			src++;
 		}
 	}
 }
 
 
-void unicode_map(int type, uint32_t code, uint32_t **bufptr)
+void corpus_unicode_map(int type, uint32_t code, uint32_t **bufptr)
 {
 	const uint32_t block_size = DECOMPOSITION_BLOCK_SIZE;
 	unsigned i = decomposition_stage1[code / block_size];
@@ -352,7 +352,7 @@ void unicode_map(int type, uint32_t code, uint32_t **bufptr)
 	uint32_t *dst;
 
 	if (length == 0 || (d.type > 0 && !(type & (1 << (d.type - 1))))) {
-		if (type & UCASEFOLD_ALL) {
+		if (type & CORPUS_UCASEFOLD_ALL) {
 			casefold(type, code, bufptr);
 		} else {
 			dst = *bufptr;
@@ -360,11 +360,11 @@ void unicode_map(int type, uint32_t code, uint32_t **bufptr)
 			*bufptr = dst;
 		}
 	} else if (length == 1) {
-		unicode_map(type, d.data, bufptr);
+		corpus_unicode_map(type, d.data, bufptr);
 	} else if (d.type >= 0) {
 		src = &decomposition_mapping[d.data];
 		while (length-- > 0) {
-			unicode_map(type, *src, bufptr);
+			corpus_unicode_map(type, *src, bufptr);
 			src++;
 		}
 	} else {
@@ -373,7 +373,7 @@ void unicode_map(int type, uint32_t code, uint32_t **bufptr)
 }
 
 
-void unicode_order(uint32_t *ptr, size_t len)
+void corpus_unicode_order(uint32_t *ptr, size_t len)
 {
 	uint32_t *end = ptr + len;
 	uint32_t *c_begin, *c_end, *c_tail, *c_ptr;
@@ -414,11 +414,11 @@ void unicode_order(uint32_t *ptr, size_t len)
 		for (c_tail = c_begin + 1; c_tail != c_end; c_tail++) {
 			c_ptr = c_tail;
 			code = *c_ptr;
-			cl = code & (0xFF << 24);
+			cl = code & (0xFFU << 24);
 
 			while (c_ptr != c_begin) {
 				code_prev = c_ptr[-1];
-				cl_prev = code_prev & (0xFF << 24);
+				cl_prev = code_prev & (0xFFU << 24);
 
 				if (cl_prev <= cl) {
 					break;
@@ -438,7 +438,7 @@ void unicode_order(uint32_t *ptr, size_t len)
 		// remove the combining mark annotations
 		while (c_begin != c_end) {
 			code = *c_begin;
-			*c_begin = code & (~(0xFF << 24));
+			*c_begin = code & (~(0xFFU << 24));
 			c_begin++;
 		}
 	}
@@ -460,7 +460,7 @@ static int has_compose(uint32_t code, int *offsetptr, int *lengthptr)
 }
 
 
-int code_cmp(const void *x1, const void *x2)
+static int code_cmp(const void *x1, const void *x2)
 {
 	uint32_t y1 = *(const uint32_t *)x1;
 	uint32_t y2 = *(const uint32_t *)x2;
@@ -488,7 +488,7 @@ static int combiner_find(int offset, int length, uint32_t code)
 	}
 
 	// handle general case
-	ptr = bsearch(&code, base, length, sizeof(*base), code_cmp);
+	ptr = bsearch(&code, base, (size_t)length, sizeof(*base), code_cmp);
 
 	if (ptr == NULL) {
 		return -1;
@@ -525,7 +525,7 @@ static int has_combiner(uint32_t left, int offset, int length, uint32_t code,
 }
 
 
-void unicode_compose(uint32_t *ptr, size_t *lenptr)
+void corpus_unicode_compose(uint32_t *ptr, size_t *lenptr)
 {
 	size_t len = *lenptr;
 	uint32_t *begin = ptr;
@@ -597,7 +597,7 @@ void unicode_compose(uint32_t *ptr, size_t *lenptr)
 				*dst++ = code;
 			}
 		}
-		len = dst - begin;
+		len = (size_t)(dst - begin);
 	}
 
 out:

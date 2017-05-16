@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef TOKEN_H
-#define TOKEN_H
+#ifndef CORPUS_TOKEN_H
+#define CORPUS_TOKEN_H
 
 /**
  * \file token.h
@@ -33,10 +33,10 @@ struct sb_stemmer;
  * composed normal form (NFC). Optionally, apply compatibility maps for
  * NFKC normal and/or apply other transformations:
  *
- *  + #TYPE_COMPAT: apply all compatibility maps required for
+ *  + #CORPUS_TYPE_COMPAT: apply all compatibility maps required for
  *  	[NFKC normal form](http://unicode.org/reports/tr15/#Norm_Forms)
  *
- *  + #TYPE_CASEFOLD: perform case folding, in most languages (including
+ *  + #CORPUS_TYPE_CASEFOLD: perform case folding, in most languages (including
  *  	English) mapping uppercase characters to their lowercase equivalents,
  *  	but also performing other normalizations like mapping the
  *  	German Eszett (&szlig;) to "ss"; see
@@ -45,46 +45,46 @@ struct sb_stemmer;
  *  	[Case Mapping FAQ](http://unicode.org/faq/casemap_charprop.html)
  *  	for more information
  *
- *  + #TYPE_DASHFOLD: dash fold, replace em-dashes, negative signs, and
+ *  + #CORPUS_TYPE_DASHFOLD: dash fold, replace em-dashes, negative signs, and
  *  	anything with the [Dash=Yes](http://unicode.org/reports/tr44/#Dash)
  *  	property with a dash (`-`)
  *
- *  + #TYPE_QUOTFOLD: quote fold, replace double quotes, apostrophes, and
+ *  + #CORPUS_TYPE_QUOTFOLD: quote fold, replace double quotes, apostrophes, and
  *      anything with the
  *  	[Quotation Mark=Yes](http://unicode.org/reports/tr44/#Quotation_Mark)
  *  	property with a single quote (`'`)
  *
- *  + #TYPE_RMCC: remove non-white-space control codes (Cc) like
+ *  + #CORPUS_TYPE_RMCC: remove non-white-space control codes (Cc) like
  *  	non-printable ASCII codes; these are defined in
  *  	_The Unicode Standard_ Sec. 23.1 "Control Codes"
  *
- *  + #TYPE_RMDI: remove default ignorables (DI) like soft hyphens and
+ *  + #CORPUS_TYPE_RMDI: remove default ignorables (DI) like soft hyphens and
  *  	zero-width spaces, anything with the
  *  	[Default_Ignorable_Code_Point=Yes]
  *  	(http://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point)
  *  	property
  *
- *  + #TYPE_RMWS: remove white space (WS), anything with the
+ *  + #CORPUS_TYPE_RMWS: remove white space (WS), anything with the
  *  	[White_Space=Yes](http://www.unicode.org/reports/tr44/#White_Space)
  *  	property
  */
-enum type_kind {
-	TYPE_NORMAL   = 0,        /**< transform to composed normal form */
-	TYPE_COMPAT   = (1 << 0), /**< apply compatibility mappings */
-	TYPE_CASEFOLD = (1 << 1), /**< perform case folding */
-	TYPE_DASHFOLD = (1 << 2), /**< replace dashes with `-` */
-	TYPE_QUOTFOLD = (1 << 3), /**< replace quotes with `'` */
-	TYPE_RMCC     = (1 << 4), /**< remove non-white-space control
-				    characters */
-	TYPE_RMDI     = (1 << 5), /**< remove default ignorables */
-	TYPE_RMWS     = (1 << 6)  /**< remove white space */
+enum corpus_type_kind {
+	CORPUS_TYPE_NORMAL   = 0, /**< transform to composed normal form */
+	CORPUS_TYPE_COMPAT   = (1 << 0), /**< apply compatibility mappings */
+	CORPUS_TYPE_CASEFOLD = (1 << 1), /**< perform case folding */
+	CORPUS_TYPE_DASHFOLD = (1 << 2), /**< replace dashes with `-` */
+	CORPUS_TYPE_QUOTFOLD = (1 << 3), /**< replace quotes with `'` */
+	CORPUS_TYPE_RMCC     = (1 << 4), /**< remove non-white-space control
+					   characters */
+	CORPUS_TYPE_RMDI     = (1 << 5), /**< remove default ignorables */
+	CORPUS_TYPE_RMWS     = (1 << 6)  /**< remove white space */
 };
 
 /**
  * Type map, for normalizing tokens to types.
  */
-struct typemap {
-	struct text type;	/**< type of the token given to the most
+struct corpus_typemap {
+	struct corpus_text type;/**< type of the token given to the most
 				  recent typemap_set() call */
 	int8_t ascii_map[128];	/**< a lookup table for the mappings of ASCII
 				  characters; -1 indicates deletion */
@@ -94,9 +94,10 @@ struct typemap {
 	size_t size_max;	/**< token size maximum; normalizing a larger
 				 	token will force a reallocation */
 	int kind;		/**< the type map kind descriptor, a bit mask
-				  of #type_kind values */
+				  of #corpus_type_kind values */
 	int charmap_type;	/**< the unicode map type, a bit mask of
-				  #udecomp_type and #ucasefold_type values */
+				  #corpus_udecomp_type and
+				  #corpus_ucasefold_type values */
 };
 
 /**
@@ -104,25 +105,45 @@ struct typemap {
  *
  * \returns a NULL-terminated array of algorithm names
  */
-const char **stemmer_list(void);
+const char **corpus_stemmer_names(void);
+
+/**
+ * Get a list of stop words (common function words) encoded as
+ * NULL-terminated UTF-8 strings.
+ *
+ * \param name the stop word list name
+ * \param lenptr if non-NULL, a location to store the word list length
+ *
+ * \returns a list of stop words for the given language, or NULL if no
+ * 	stop word list exists for the given language
+ */
+const uint8_t **corpus_stopwords(const char *name, int *lenptr);
+
+/**
+ * Get a list of the stop word list names.
+ *
+ * \returns a NULL-terminated array of list names
+ */
+const char **corpus_stopword_names(void);
 
 /**
  * Initialize a new type map of the specified kind.
  *
  * \param map the type map
- * \param kind a bitmask of #type_kind values, specifying the map type
+ * \param kind a bitmask of #corpus_type_kind values, specifying the map type
  * \param stemmer the stemming algorithm name, or NULL to disable stemming
  *
  * \returns 0 on success
  */
-int typemap_init(struct typemap *map, int kind, const char *stemmer);
+int corpus_typemap_init(struct corpus_typemap *map, int kind,
+			const char *stemmer);
 
 /**
  * Release the resources associated with a type map.
  * 
  * \param map the type map
  */
-void typemap_destroy(struct typemap *map);
+void corpus_typemap_destroy(struct corpus_typemap *map);
 
 /**
  * Given a token, set a map to the corresponding type.
@@ -132,7 +153,8 @@ void typemap_destroy(struct typemap *map);
  *
  * \returns 0 on success
  */
-int typemap_set(struct typemap *map, const struct text *tok);
+int corpus_typemap_set(struct corpus_typemap *map,
+		       const struct corpus_text *tok);
 
 /**
  * Compute a hash code from a token.
@@ -141,7 +163,7 @@ int typemap_set(struct typemap *map, const struct text *tok);
  *
  * \returns the hash code.
  */
-unsigned token_hash(const struct text *tok);
+unsigned corpus_token_hash(const struct corpus_text *tok);
 
 /**
  * Test whether two tokens are equal (bitwise). Bitwise equality is more
@@ -152,7 +174,8 @@ unsigned token_hash(const struct text *tok);
  *
  * \returns non-zero if the tokens are equal, zero otherwise
  */
-int token_equals(const struct text *tok1, const struct text *tok2);
+int corpus_token_equals(const struct corpus_text *tok1,
+			const struct corpus_text *tok2);
 
 /**
  * Compare two types.
@@ -164,6 +187,7 @@ int token_equals(const struct text *tok1, const struct text *tok2);
  * 	if the first value is less than the second; a positive value
  * 	if the first value is greater than the second
  */
-int compare_type(const struct text *typ1, const struct text *typ2);
+int corpus_compare_type(const struct corpus_text *typ1,
+			const struct corpus_text *typ2);
 
-#endif /* TOKEN_H */
+#endif /* CORPUS_TOKEN_H */

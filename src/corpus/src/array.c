@@ -19,18 +19,18 @@
 #include <limits.h>
 #include <stdint.h>
 #include "error.h"
-#include "xalloc.h"
+#include "memory.h"
 #include "array.h"
 
 
 /* Default initial size for nonempty dynamic arrays. Must be positive. */
-#define ARRAY_SIZE_INIT	32
+#define CORPUS_ARRAY_SIZE_INIT	32
 
 /* Growth factor for dynamic arrays. Must be greater than 1.
  *
  *     https://en.wikipedia.org/wiki/Dynamic_array#Growth_factor
  */
-#define ARRAY_GROW 1.618 /* Golden Ratio, (1 + sqrt(5)) / 2 */
+#define CORPUS_ARRAY_GROW 1.618 /* Golden Ratio, (1 + sqrt(5)) / 2 */
 
 
 /**
@@ -41,19 +41,19 @@
  *
  * \returns the new capacity
  */
-static int array_grow_size(int count, int size)
+static int corpus_array_grow_size(int count, int size)
 {
 	double n1;
 
-	assert(ARRAY_SIZE_INIT > 0);
-	assert(ARRAY_GROW > 1);
+	assert(CORPUS_ARRAY_SIZE_INIT > 0);
+	assert(CORPUS_ARRAY_GROW > 1);
 
-	if (size < ARRAY_SIZE_INIT && count > 0) {
-		size = ARRAY_SIZE_INIT;
+	if (size < CORPUS_ARRAY_SIZE_INIT && count > 0) {
+		size = CORPUS_ARRAY_SIZE_INIT;
 	}
 
 	while (size < count) {
-		n1 = ARRAY_GROW * size;
+		n1 = CORPUS_ARRAY_GROW * size;
 		if (n1 > INT_MAX) {
 			size = INT_MAX;
 		} else {
@@ -65,7 +65,8 @@ static int array_grow_size(int count, int size)
 }
 
 
-int array_grow(void **baseptr, int *sizeptr, size_t width, int count, int nadd)
+int corpus_array_grow(void **baseptr, int *sizeptr, size_t width, int count,
+		      int nadd)
 {
 	void *base = *baseptr;
 	int size = *sizeptr;
@@ -80,8 +81,8 @@ int array_grow(void **baseptr, int *sizeptr, size_t width, int count, int nadd)
 	}
 
 	if (count > INT_MAX - nadd) {
-		err = ERROR_OVERFLOW;
-		logmsg(err, "array count exceeds maximum (%d)", INT_MAX);
+		err = CORPUS_ERROR_OVERFLOW;
+		corpus_log(err, "array count exceeds maximum (%d)", INT_MAX);
 		return err;
 	}
 	count = count + nadd;
@@ -91,21 +92,21 @@ int array_grow(void **baseptr, int *sizeptr, size_t width, int count, int nadd)
 	}
 
 	if ((size_t)count > SIZE_MAX / width) {
-		err = ERROR_OVERFLOW;
-		logmsg(err, "array size (%d) exceeds maximum (%"PRIu64")",
-		       count, (uint64_t)SIZE_MAX / width);
+		err = CORPUS_ERROR_OVERFLOW;
+		corpus_log(err, "array size (%d) exceeds maximum (%"PRIu64")",
+			   count, (uint64_t)SIZE_MAX / width);
 		return err;
 	}
 
-	size = array_grow_size(count, size);
+	size = corpus_array_grow_size(count, size);
 	if ((size_t)size > SIZE_MAX / width) {
 		size = count;
 		assert((size_t)size <= SIZE_MAX / width);
 	}
 
-	if (!(base = xrealloc(base, ((size_t)size) * width))) {
-		err = ERROR_NOMEM;
-		logmsg(err, "failed allocating array");
+	if (!(base = corpus_realloc(base, ((size_t)size) * width))) {
+		err = CORPUS_ERROR_NOMEM;
+		corpus_log(err, "failed allocating array");
 		return err;
 	}
 

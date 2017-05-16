@@ -25,7 +25,7 @@
 #include <string.h>
 
 #include "error.h"
-#include "xalloc.h"
+#include "memory.h"
 #include "filebuf.h"
 
 
@@ -34,7 +34,7 @@
 #include <windows.h>
 
 
-int filebuf_init(struct filebuf *buf, const char *file_name)
+int corpus_filebuf_init(struct corpus_filebuf *buf, const char *file_name)
 {
 	HANDLE handle, mapping;
 	DWORD lo, hi;
@@ -43,9 +43,9 @@ int filebuf_init(struct filebuf *buf, const char *file_name)
 
 	assert(file_name);
 
-	if (!(buf->file_name = xstrdup(file_name))) {
-		err = ERROR_NOMEM;
-		logmsg(err, "failed copying file name (%s)", file_name);
+	if (!(buf->file_name = corpus_strdup(file_name))) {
+		err = CORPUS_ERROR_NOMEM;
+		corpus_log(err, "failed copying file name (%s)", file_name);
 		goto strdup_fail;
 	}
 
@@ -55,8 +55,8 @@ int filebuf_init(struct filebuf *buf, const char *file_name)
 
 	if (handle == INVALID_HANDLE_VALUE) {
 		// GetLastError()
-		err = ERROR_OS;
-		logmsg(err, "failed opening file (%s)", buf->file_name);
+		err = CORPUS_ERROR_OS;
+		corpus_log(err, "failed opening file (%s)", buf->file_name);
 		goto open_fail;
 	}
 	buf->handle = (intptr_t)handle;
@@ -65,10 +65,10 @@ int filebuf_init(struct filebuf *buf, const char *file_name)
 	buf->file_size = (uint64_t)lo + ((uint64_t)hi << 32);
 
 	if (buf->file_size > SIZE_MAX) {
-		err = ERROR_OVERFLOW;
-		logmsg(err, "file size (%"PRIu64" bytes)"
-			"exceeds maximum (%"PRIu64" bytes)",
-			buf->file_size, (uint64_t)SIZE_MAX);
+		err = CORPUS_ERROR_OVERFLOW;
+		corpus_log(err, "file size (%"PRIu64" bytes)"
+			   "exceeds maximum (%"PRIu64" bytes)",
+			   buf->file_size, (uint64_t)SIZE_MAX);
 		goto mapping_fail;
 	}
 	buf->map_size = (size_t)(buf->file_size);
@@ -78,18 +78,20 @@ int filebuf_init(struct filebuf *buf, const char *file_name)
 					    lo, NULL);
 		if (mapping == NULL) {
 			// GetLastError()
-			err = ERROR_OS;
-			logmsg(err, "failed creating mapping for file (%s)",
-				buf->file_name);
+			err = CORPUS_ERROR_OS;
+			corpus_log(err,
+				   "failed creating mapping for file (%s)",
+				   buf->file_name);
 			goto mapping_fail;
 		}
 
 		addr = MapViewOfFile(mapping, FILE_MAP_READ, 0, 0, 0);
 		if (addr == NULL) {
 			// GetLastError()
-			err = ERROR_OS;
-			logmsg(err, "failed creating mapping for file (%s)",
-				buf->file_name);
+			err = CORPUS_ERROR_OS;
+			corpus_log(err,
+				   "failed creating mapping for file (%s)",
+				   buf->file_name);
 			goto view_fail;
 		}
 		buf->map_addr = addr;
@@ -106,21 +108,21 @@ view_fail:
 mapping_fail:
 	CloseHandle(handle);
 open_fail:
-	free(buf->file_name);
+	corpus_free(buf->file_name);
 strdup_fail:
-	logmsg(err, "failed initializing file buffer");
+	corpus_log(err, "failed initializing file buffer");
 out:
 	return err;
 }
 
 
-void filebuf_destroy(struct filebuf *buf)
+void corpus_filebuf_destroy(struct corpus_filebuf *buf)
 {
 	if (buf->map_addr) {
 		UnmapViewOfFile(buf->map_addr);
 	}
 	CloseHandle((HANDLE)buf->handle);
-	free(buf->file_name);
+	corpus_free(buf->file_name);
 }
 
 
@@ -133,16 +135,16 @@ void filebuf_destroy(struct filebuf *buf)
 #include <unistd.h>	// close
 
 
-int filebuf_init(struct filebuf *buf, const char *file_name)
+int corpus_filebuf_init(struct corpus_filebuf *buf, const char *file_name)
 {
 	struct stat stat;
 	int access, err;
 
 	assert(file_name);
 
-	if (!(buf->file_name = xstrdup(file_name))) {
-		err = ERROR_NOMEM;
-		logmsg(err, "failed copying file name (%s)", file_name);
+	if (!(buf->file_name = corpus_strdup(file_name))) {
+		err = CORPUS_ERROR_NOMEM;
+		corpus_log(err, "failed copying file name (%s)", file_name);
 		goto strdup_fail;
 	}
 
@@ -152,25 +154,25 @@ int filebuf_init(struct filebuf *buf, const char *file_name)
 #endif
 
 	if ((buf->handle = (intptr_t)open(buf->file_name, access)) < 0) {
-		err = ERROR_OS;
-		logmsg(err, "failed opening file (%s): %s",
-		       buf->file_name, strerror(errno));
+		err = CORPUS_ERROR_OS;
+		corpus_log(err, "failed opening file (%s): %s",
+			   buf->file_name, strerror(errno));
 		goto open_fail;
 	}
 
 	if (fstat((int)buf->handle, &stat) < 0) {
-		err = ERROR_OS;
-		logmsg(err, "failed determining size of file (%s): %s",
-		       buf->file_name, strerror(errno));
+		err = CORPUS_ERROR_OS;
+		corpus_log(err, "failed determining size of file (%s): %s",
+			   buf->file_name, strerror(errno));
 		goto fstat_fail;
 	}
 	buf->file_size = (uint64_t)stat.st_size;
 
 	if (buf->file_size > SIZE_MAX) {
-		err = ERROR_OVERFLOW;
-		logmsg(err, "file size (%"PRIu64" bytes)"
-			"exceeds maximum (%"PRIu64" bytes)",
-			buf->file_size, (uint64_t)SIZE_MAX);
+		err = CORPUS_ERROR_OVERFLOW;
+		corpus_log(err, "file size (%"PRIu64" bytes)"
+			   "exceeds maximum (%"PRIu64" bytes)",
+			   buf->file_size, (uint64_t)SIZE_MAX);
 		goto mmap_fail;
 	}
 
@@ -179,9 +181,9 @@ int filebuf_init(struct filebuf *buf, const char *file_name)
 		buf->map_addr = mmap(NULL, buf->map_size, PROT_READ,
 				     MAP_SHARED, (int)buf->handle, 0);
 		if (buf->map_addr == MAP_FAILED) {
-			err = ERROR_OS;
-			logmsg(err, "failed memory-mapping file (%s): %s",
-			       file_name, strerror(errno));
+			err = CORPUS_ERROR_OS;
+			corpus_log(err, "failed memory-mapping file (%s): %s",
+				   file_name, strerror(errno));
 			goto mmap_fail;
 		}
 	} else {
@@ -195,15 +197,15 @@ mmap_fail:
 fstat_fail:
 	close((int)buf->handle);
 open_fail:
-	free(buf->file_name);
+	corpus_free(buf->file_name);
 strdup_fail:
-	logmsg(err, "failed initializing file buffer");
+	corpus_log(err, "failed initializing file buffer");
 out:
 	return err;
 }
 
 
-void filebuf_destroy(struct filebuf *buf)
+void corpus_filebuf_destroy(struct corpus_filebuf *buf)
 {
 	if (buf->map_addr) {
 		//fprintf(stderr, "unmaping %"PRIu64" bytes from address %p\n",
@@ -213,22 +215,23 @@ void filebuf_destroy(struct filebuf *buf)
 	}
 
 	close((int)buf->handle);
-	free(buf->file_name);
+	corpus_free(buf->file_name);
 }
 
 
 #endif /* end of platform-specific code */ 
 
 
-void filebuf_iter_make(struct filebuf_iter *it, const struct filebuf *buf)
+void corpus_filebuf_iter_make(struct corpus_filebuf_iter *it,
+			      const struct corpus_filebuf *buf)
 {
 	it->begin = (uint8_t *)buf->map_addr;
 	it->end = it->begin + (size_t)buf->file_size;
-	filebuf_iter_reset(it);
+	corpus_filebuf_iter_reset(it);
 }
 
 
-void filebuf_iter_reset(struct filebuf_iter *it)
+void corpus_filebuf_iter_reset(struct corpus_filebuf_iter *it)
 {
 	it->ptr = it->begin;
 	it->current.ptr = NULL;
@@ -236,7 +239,7 @@ void filebuf_iter_reset(struct filebuf_iter *it)
 }
 
 
-int filebuf_iter_advance(struct filebuf_iter *it)
+int corpus_filebuf_iter_advance(struct corpus_filebuf_iter *it)
 {
 	const uint8_t *ptr = it->ptr;
 	const uint8_t *end = it->end;

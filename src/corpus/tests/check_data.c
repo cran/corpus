@@ -31,17 +31,15 @@
 #include "../src/datatype.h"
 #include "testutil.h"
 
-#define STR_VALUE(x) #x
-#define STRING(x) STR_VALUE(x)
 
-struct schema schema;
+struct corpus_schema schema;
 
-const int Null = DATATYPE_NULL;
-const int Boolean = DATATYPE_BOOLEAN;
-const int Integer = DATATYPE_INTEGER;
-const int Real = DATATYPE_REAL;
-const int Text = DATATYPE_TEXT;
-const int Any = DATATYPE_ANY;
+const int Null = CORPUS_DATATYPE_NULL;
+const int Boolean = CORPUS_DATATYPE_BOOLEAN;
+const int Integer = CORPUS_DATATYPE_INTEGER;
+const int Real = CORPUS_DATATYPE_REAL;
+const int Text = CORPUS_DATATYPE_TEXT;
+const int Any = CORPUS_DATATYPE_ANY;
 
 
 void ignore_message(int code, const char *message)
@@ -54,22 +52,22 @@ void ignore_message(int code, const char *message)
 void setup_data(void)
 {
 	setup();
-	schema_init(&schema);
+	corpus_schema_init(&schema);
 }
 
 
 void teardown_data(void)
 {
-	schema_destroy(&schema);
+	corpus_schema_destroy(&schema);
 	teardown();
-	logmsg_func = NULL;
+	corpus_log_func = NULL;
 }
 
 
 int get_name(const char *str)
 {
 	int id;
-	ck_assert(!schema_name(&schema, S(str), &id));
+	ck_assert(!corpus_schema_name(&schema, S(str), &id));
 	return id;
 }
 
@@ -78,7 +76,7 @@ int get_type(const char *str)
 {
 	size_t n = strlen(str);
 	int id;
-	ck_assert(!schema_scan(&schema, (const uint8_t *)str, n, &id));
+	ck_assert(!corpus_schema_scan(&schema, (const uint8_t *)str, n, &id));
 	return id;
 }
 
@@ -87,32 +85,32 @@ int is_error(const char *str)
 {
 	size_t n = strlen(str);
 	int err, id;
-	err = schema_scan(&schema, (const uint8_t *)str, n, &id);
-	ck_assert(err == ERROR_INVAL || err == 0);
+	err = corpus_schema_scan(&schema, (const uint8_t *)str, n, &id);
+	ck_assert(err == CORPUS_ERROR_INVAL || err == 0);
 	return (err != 0);
 }
 
 
 int is_null(const char *str)
 {
-	return (get_type(str) == DATATYPE_NULL);
+	return (get_type(str) == CORPUS_DATATYPE_NULL);
 }
 
 
 int is_boolean(const char *str)
 {
-	return (get_type(str) == DATATYPE_BOOLEAN);
+	return (get_type(str) == CORPUS_DATATYPE_BOOLEAN);
 }
 
 
 int decode_boolean(const char *str)
 {
 	size_t n = strlen(str);
-	struct data data;
+	struct corpus_data data;
 	int val;
 
-	ck_assert(!data_assign(&data, &schema, (uint8_t *)str, n));
-	ck_assert(!data_bool(&data, &val));
+	ck_assert(!corpus_data_assign(&data, &schema, (const uint8_t *)str, n));
+	ck_assert(!corpus_data_bool(&data, &val));
 
 	return val;
 }
@@ -120,19 +118,19 @@ int decode_boolean(const char *str)
 
 int is_integer(const char *str)
 {
-	return (get_type(str) == DATATYPE_INTEGER);
+	return (get_type(str) == CORPUS_DATATYPE_INTEGER);
 }
 
 
 int decode_int(const char *str)
 {
 	size_t n = strlen(str);
-	struct data data;
+	struct corpus_data data;
 	int err, val;
 
-	ck_assert(!data_assign(&data, &schema, (uint8_t *)str, n));
-	err = data_int(&data, &val);
-	ck_assert(err == 0 || err == ERROR_OVERFLOW);
+	ck_assert(!corpus_data_assign(&data, &schema, (const uint8_t *)str, n));
+	err = corpus_data_int(&data, &val);
+	ck_assert(err == 0 || err == CORPUS_ERROR_OVERFLOW);
 
 	return val;
 }
@@ -140,27 +138,27 @@ int decode_int(const char *str)
 
 int is_real(const char *str)
 {
-	return (get_type(str) == DATATYPE_REAL);
+	return (get_type(str) == CORPUS_DATATYPE_REAL);
 }
 
 
 int is_numeric(const char *str)
 {
 	int id = get_type(str);
-	return (id == DATATYPE_INTEGER || id == DATATYPE_REAL);
+	return (id == CORPUS_DATATYPE_INTEGER || id == CORPUS_DATATYPE_REAL);
 }
 
 
 double decode_double(const char *str)
 {
 	size_t n = strlen(str);
-	struct data data;
+	struct corpus_data data;
 	double val;
 	int err;
 
-	ck_assert(!data_assign(&data, &schema, (uint8_t *)str, n));
-	err = data_double(&data, &val);
-	ck_assert(err == 0 || err == ERROR_OVERFLOW);
+	ck_assert(!corpus_data_assign(&data, &schema, (const uint8_t *)str, n));
+	err = corpus_data_double(&data, &val);
+	ck_assert(err == 0 || err == CORPUS_ERROR_OVERFLOW);
 
 	return val;
 }
@@ -168,7 +166,7 @@ double decode_double(const char *str)
 
 int is_text(const char *str)
 {
-	return (get_type(str) == DATATYPE_TEXT);
+	return (get_type(str) == CORPUS_DATATYPE_TEXT);
 }
 
 
@@ -176,9 +174,9 @@ int assert_types_equal(int id1, int id2)
 {
 	if (id1 != id2) {
 		printf("unequal types: ");
-		write_datatype(stdout, &schema, id1);
+		corpus_write_datatype(stdout, &schema, id1);
 		printf(" != ");
-		write_datatype(stdout, &schema, id2);
+		corpus_write_datatype(stdout, &schema, id2);
 		printf("\n");
 		return 0;
 	}
@@ -193,15 +191,15 @@ int assert_types_equal(int id1, int id2)
 int Array(int length, int element_id)
 {
 	int id;
-	ck_assert(!schema_array(&schema, element_id, length, &id));
+	ck_assert(!corpus_schema_array(&schema, element_id, length, &id));
 	return id;
 }
 
 
 int Record(int nfield, ...)
 {
-	int *name_ids = alloc(nfield * sizeof(*name_ids));
-	int *type_ids = alloc(nfield * sizeof(*type_ids));
+	int *name_ids = alloc((size_t)nfield * sizeof(*name_ids));
+	int *type_ids = alloc((size_t)nfield * sizeof(*type_ids));
 	const char *name_str;
 	int i, id;
 	va_list ap;
@@ -216,7 +214,8 @@ int Record(int nfield, ...)
 
 	va_end(ap);
 
-	ck_assert(!schema_record(&schema, type_ids, name_ids, nfield, &id));
+	ck_assert(!corpus_schema_record(&schema, type_ids, name_ids, nfield,
+					&id));
 
 	return id;
 }
@@ -225,7 +224,7 @@ int Record(int nfield, ...)
 int Union (int id1, int id2)
 {
 	int id;
-	ck_assert(!schema_union(&schema, id1, id2, &id));
+	ck_assert(!corpus_schema_union(&schema, id1, id2, &id));
 	return id;
 }
 
@@ -244,7 +243,7 @@ END_TEST
 
 START_TEST(test_invalid_null)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(is_error("n"));
 	ck_assert(is_error("nulll"));
@@ -267,7 +266,7 @@ END_TEST
 
 START_TEST(test_invalid_boolean)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(is_error("tru"));
 	ck_assert(is_error("true1"));
@@ -328,7 +327,7 @@ END_TEST
 
 START_TEST(test_invalid_number)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(is_error("1a"));
 	ck_assert(is_error("-"));
@@ -394,9 +393,9 @@ START_TEST(test_decode_number)
 	ck_assert(decode_double("-1.0") == -1.0);
 	ck_assert(decode_double("314E-2") == 314E-2);
 
-	ck_assert(decode_double(STRING(DBL_MAX)) == DBL_MAX);
-	ck_assert(decode_double(STRING(DBL_MIN)) == DBL_MIN);
-	ck_assert(decode_double(STRING(DBL_EPSILON)) == DBL_EPSILON);
+	ck_assert(decode_double("1.797693134862315708145e+308") == DBL_MAX);
+	ck_assert(decode_double("2.22507385850720138309e-308") == DBL_MIN);
+	ck_assert(decode_double("2.220446049250313080847e-16") == DBL_EPSILON);
 }
 END_TEST
 
@@ -405,7 +404,7 @@ START_TEST(test_decode_zero)
 {
 	ck_assert(decode_double("0") == 0);
 	ck_assert(decode_double("-0") == 0);
-	ck_assert(copysign(1, decode_double("-0") == -1));
+	ck_assert(copysign(1, decode_double("-0")) == -1);
 
 	// https://bugs.r-project.org/bugzilla/show_bug.cgi?id=15976
 	ck_assert(decode_double("0E4932") == 0);
@@ -514,7 +513,7 @@ END_TEST
 
 START_TEST(test_invalid_text)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(is_error("hello"));
 	ck_assert(is_error("\"hello\" world"));
@@ -547,7 +546,7 @@ END_TEST
 
 START_TEST(test_invalid_array)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(is_error("[null, ]"));
 }
@@ -557,33 +556,33 @@ END_TEST
 START_TEST(test_decode_record_array)
 {
 	const uint8_t *ptr = (uint8_t *)"[{}]";
-	size_t size = strlen((char *)ptr);
-	struct data val;
-	struct data_items items;
-	struct data_fields fields;
+	size_t size = strlen((const char *)ptr);
+	struct corpus_data val;
+	struct corpus_data_items items;
+	struct corpus_data_fields fields;
 	int nitem, nfield;
 
 	// parse the value
-	ck_assert(!data_assign(&val, &schema, ptr, size));
+	ck_assert(!corpus_data_assign(&val, &schema, ptr, size));
 
 	// check that it is an array of length 1
-	ck_assert(!data_nitem(&val, &schema, &nitem));
+	ck_assert(!corpus_data_nitem(&val, &schema, &nitem));
 	ck_assert_int_eq(nitem, 1);
 
 	// parse the first item
-	ck_assert(!data_items(&val, &schema, &items));
-	ck_assert(data_items_advance(&items));
+	ck_assert(!corpus_data_items(&val, &schema, &items));
+	ck_assert(corpus_data_items_advance(&items));
 
 	// check that it is a record of length 0
-	ck_assert(!data_nfield(&items.current, &schema, &nfield));
+	ck_assert(!corpus_data_nfield(&items.current, &schema, &nfield));
 	ck_assert_int_eq(nfield, 0);
 
 	// check that iterating over the fields works
-	ck_assert(!data_fields(&items.current, &schema, &fields));
-	ck_assert(!data_fields_advance(&fields));
+	ck_assert(!corpus_data_fields(&items.current, &schema, &fields));
+	ck_assert(!corpus_data_fields_advance(&fields));
 
 	// check that there are no more items
-	ck_assert(!data_items_advance(&items));
+	ck_assert(!corpus_data_items_advance(&items));
 }
 END_TEST
 
@@ -626,7 +625,7 @@ END_TEST
 
 START_TEST(test_invalid_record)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(is_error("{ \"hello\": }"));
 	ck_assert(is_error("{ \"a\":1, }"));

@@ -15,28 +15,29 @@
  */
 
 #include <math.h>
-#include <stdlib.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include "array.h"
 #include "error.h"
+#include "memory.h"
 #include "table.h"
-#include "xalloc.h"
 #include "census.h"
 
 
-static int census_find(const struct census *c, int item, int *indexptr);
-static int census_grow(struct census *c, int nadd);
-static void census_rehash(struct census *c);
+static int corpus_census_find(const struct corpus_census *c, int item,
+			      int *indexptr);
+static int corpus_census_grow(struct corpus_census *c, int nadd);
+static void corpus_census_rehash(struct corpus_census *c);
 
 static unsigned item_hash(int item);
 
 
-int census_init(struct census *c)
+int corpus_census_init(struct corpus_census *c)
 {
 	int err;
 
-	if ((err = table_init(&c->table))) {
-		logmsg(err, "failed initializing census");
+	if ((err = corpus_table_init(&c->table))) {
+		corpus_log(err, "failed initializing census");
 		goto out;
 	}
 
@@ -50,34 +51,35 @@ out:
 }
 
 
-void census_destroy(struct census *c)
+void corpus_census_destroy(struct corpus_census *c)
 {
-	free(c->weights);
-	free(c->items);
-	table_destroy(&c->table);
+	corpus_free(c->weights);
+	corpus_free(c->items);
+	corpus_table_destroy(&c->table);
 }
 
 
-void census_clear(struct census *c)
+void corpus_census_clear(struct corpus_census *c)
 {
-	table_clear(&c->table);
+	corpus_table_clear(&c->table);
 	c->nitem = 0;
 }
 
 
-int census_add(struct census *c, int item, double weight)
+int corpus_census_add(struct corpus_census *c, int item, double weight)
 {
 	int err, pos, i, rehash;
 
 	rehash = 0;
 
 	if (isnan(weight)) {
-		err = ERROR_INVAL;
-		logmsg(err, "invalid weight for census item %d (NaN)", item);
+		err = CORPUS_ERROR_INVAL;
+		corpus_log(err, "invalid weight for census item %d (NaN)",
+			   item);
 		goto error;
 	}
 
-	if (census_find(c, item, &i)) {
+	if (corpus_census_find(c, item, &i)) {
 		c->weights[i] += weight;
 		err = 0;
 		goto out;
@@ -87,14 +89,14 @@ int census_add(struct census *c, int item, double weight)
 
 	// grow the arrays if necessary
 	if (c->nitem == c->nitem_max) {
-		if ((err = census_grow(c, 1))) {
+		if ((err = corpus_census_grow(c, 1))) {
 			goto error;
 		}
 	}
 
 	// grow the table if necessary
 	if (c->nitem == c->table.capacity) {
-		if ((err = table_reinit(&c->table, c->nitem + 1))) {
+		if ((err = corpus_table_reinit(&c->table, c->nitem + 1))) {
 			goto error;
 		}
 		rehash = 1;
@@ -106,7 +108,7 @@ int census_add(struct census *c, int item, double weight)
 	c->nitem++;
 
 	if (rehash) {
-		census_rehash(c);
+		corpus_census_rehash(c);
 	} else {
 		c->table.items[pos] = i;
 	}
@@ -115,21 +117,22 @@ int census_add(struct census *c, int item, double weight)
 	goto out;
 
 error:
-	logmsg(err, "failed adding item to census");
+	corpus_log(err, "failed adding item to census");
 	if (rehash) {
-		census_rehash(c);
+		corpus_census_rehash(c);
 	}
 out:
 	return err;
 }
 
 
-int census_has(const struct census *c, int item, double *weightptr)
+int corpus_census_has(const struct corpus_census *c, int item,
+		      double *weightptr)
 {
 	double weight;
 	int i, found;
 
-	if (census_find(c, item, &i)) {
+	if (corpus_census_find(c, item, &i)) {
 		found = 1;
 		weight = c->weights[i];
 	} else {
@@ -145,7 +148,7 @@ int census_has(const struct census *c, int item, double *weightptr)
 }
 
 
-struct census_item {
+struct corpus_census_item {
 	int item;
 	double weight;
 };
@@ -175,10 +178,10 @@ static int double_cmp(double x1, double x2)
 }
 
 
-static int census_item_cmp(const void *x1, const void *x2)
+static int corpus_census_item_cmp(const void *x1, const void *x2)
 {
-	const struct census_item *y1 = x1;
-	const struct census_item *y2 = x2;
+	const struct corpus_census_item *y1 = x1;
+	const struct corpus_census_item *y2 = x2;
 	int cmp;
 
 	cmp = -double_cmp(y1->weight, y2->weight); // weight descending
@@ -190,22 +193,23 @@ static int census_item_cmp(const void *x1, const void *x2)
 }
 
 
-int census_sort(struct census *c)
+int corpus_census_sort(struct corpus_census *c)
 {
-	struct census_item *array;
+	struct corpus_census_item *array;
 	int i, n = c->nitem;
 	int err;
 
 	if ((size_t)n > SIZE_MAX / sizeof(*array)) {
-		err = ERROR_OVERFLOW;
-		logmsg(err, "census items array size (%d)"
-		       " is too large to sort", n);
+		err = CORPUS_ERROR_OVERFLOW;
+		corpus_log(err, "census items array size (%d)"
+			   " is too large to sort", n);
 		goto out;
 	}
 
-	if (!(array = xmalloc(n * sizeof(*array)))) {
-		err = ERROR_NOMEM;
-		logmsg(err, "failed allocating memory to sort census items");
+	if (!(array = corpus_malloc((size_t)n * sizeof(*array)))) {
+		err = CORPUS_ERROR_NOMEM;
+		corpus_log(err,
+			   "failed allocating memory to sort census items");
 		goto out;
 	}
 
@@ -214,31 +218,31 @@ int census_sort(struct census *c)
 		array[i].weight = c->weights[i];
 	}
 
-	qsort(array, n, sizeof(*array), census_item_cmp);
+	qsort(array, (size_t)n, sizeof(*array), corpus_census_item_cmp);
 
 	for (i = 0; i < n; i++) {
 		c->items[i] = array[i].item;
 		c->weights[i] = array[i].weight;
 	}
 
-	census_rehash(c);
+	corpus_census_rehash(c);
 
-	free(array);
+	corpus_free(array);
 	err = 0;
 out:
 	return err;
 }
 
 
-int census_find(const struct census *c, int item, int *indexptr)
+int corpus_census_find(const struct corpus_census *c, int item, int *indexptr)
 {
-	struct table_probe probe;
+	struct corpus_table_probe probe;
 	unsigned hash = item_hash(item);
 	int index = -1;
 	int found;
 
-	table_probe_make(&probe, &c->table, hash);
-	while (table_probe_advance(&probe)) {
+	corpus_table_probe_make(&probe, &c->table, hash);
+	while (corpus_table_probe_advance(&probe)) {
 		index = probe.current;
 		if (c->items[index] == item) {
 			found = 1;
@@ -254,7 +258,7 @@ out:
 }
 
 
-int census_grow(struct census *c, int nadd)
+int corpus_census_grow(struct corpus_census *c, int nadd)
 {
 	void *ibase, *wbase;
 	int err, size;
@@ -265,18 +269,18 @@ int census_grow(struct census *c, int nadd)
 
 	wbase = c->weights;
 	size = c->nitem_max;
-	err = array_grow(&wbase, &size, sizeof(*c->weights), c->nitem,
+	err = corpus_array_grow(&wbase, &size, sizeof(*c->weights), c->nitem,
 			 nadd);
 	if (err) {
-		logmsg(err, "failed growing census weight array");
+		corpus_log(err, "failed growing census weight array");
 		goto out;
 	}
 	c->weights = wbase;
 
-	ibase = xrealloc(c->items, size * sizeof(*c->items));
+	ibase = corpus_realloc(c->items, (size_t)size * sizeof(*c->items));
 	if (!ibase) {
-		err = ERROR_NOMEM;
-		logmsg(err, "failed growing census items array");
+		err = CORPUS_ERROR_NOMEM;
+		corpus_log(err, "failed growing census items array");
 		goto out;
 	}
 	c->items = ibase;
@@ -288,16 +292,16 @@ out:
 }
 
 
-void census_rehash(struct census *c)
+void corpus_census_rehash(struct corpus_census *c)
 {
 	int item, i, n = c->nitem;
 	unsigned hash;
 
-	table_clear(&c->table);
+	corpus_table_clear(&c->table);
 	for (i = 0; i < n; i++) {
 		item = c->items[i];
 		hash = item_hash(item);
-		table_add(&c->table, hash, i);
+		corpus_table_add(&c->table, hash, i);
 	}
 }
 

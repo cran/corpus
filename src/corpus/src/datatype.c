@@ -22,45 +22,50 @@
 #include <string.h>
 #include "array.h"
 #include "error.h"
+#include "memory.h"
 #include "render.h"
 #include "table.h"
 #include "text.h"
 #include "token.h"
 #include "symtab.h"
-#include "xalloc.h"
 #include "data.h"
 #include "datatype.h"
 
-#define NUM_ATOMIC	5
+#define CORPUS_NUM_ATOMIC	5
 
-static int schema_buffer_init(struct schema_buffer *buf);
-static void schema_buffer_destroy(struct schema_buffer *buf);
-static int schema_buffer_grow(struct schema_buffer *buf, int nadd);
+static int corpus_schema_buffer_init(struct corpus_schema_buffer *buf);
+static void corpus_schema_buffer_destroy(struct corpus_schema_buffer *buf);
+static int corpus_schema_buffer_grow(struct corpus_schema_buffer *buf,
+				     int nadd);
 
-static int sorter_init(struct schema_sorter *sort);
-static void sorter_destroy(struct schema_sorter *sort);
-static int sorter_sort(struct schema_sorter *sort, const int *ptr, int n);
-static int sorter_reserve(struct schema_sorter *sort, int nfield);
+static int sorter_init(struct corpus_schema_sorter *sort);
+static void sorter_destroy(struct corpus_schema_sorter *sort);
+static int sorter_sort(struct corpus_schema_sorter *sort, const int *ptr,
+		       int n);
+static int sorter_reserve(struct corpus_schema_sorter *sort, int nfield);
 
-static int schema_has_array(const struct schema *s, int type_id, int length,
-			    int *idptr);
-static int schema_has_record(const struct schema *s, const int *type_ids,
-			     const int *name_ids, int nfield, int *idptr);
+static int corpus_schema_has_array(const struct corpus_schema *s, int type_id,
+				   int length, int *idptr);
+static int corpus_schema_has_record(const struct corpus_schema *s,
+				    const int *type_ids, const int *name_ids,
+				    int nfield, int *idptr);
 
-static int schema_union_array(struct schema *s, int id1, int id2, int *idptr);
-static int schema_union_record(struct schema *s, int id1, int id2, int *idptr);
-static int schema_grow_types(struct schema *s, int nadd);
-static void schema_rehash_arrays(struct schema *s);
-static void schema_rehash_records(struct schema *s);
+static int corpus_schema_union_array(struct corpus_schema *s, int id1,
+				     int id2, int *idptr);
+static int corpus_schema_union_record(struct corpus_schema *s, int id1,
+				      int id2, int *idptr);
+static int corpus_schema_grow_types(struct corpus_schema *s, int nadd);
+static void corpus_schema_rehash_arrays(struct corpus_schema *s);
+static void corpus_schema_rehash_records(struct corpus_schema *s);
 
 // compound types
-static int scan_field(struct schema *s, const uint8_t **bufptr,
+static int scan_field(struct corpus_schema *s, const uint8_t **bufptr,
 		      const uint8_t *end, int *name_idptr, int *type_idptr);
-static int scan_value(struct schema *s, const uint8_t **bufptr,
+static int scan_value(struct corpus_schema *s, const uint8_t **bufptr,
 		      const uint8_t *end, int *idptr);
-static int scan_array(struct schema *s, const uint8_t **bufptr,
+static int scan_array(struct corpus_schema *s, const uint8_t **bufptr,
 		      const uint8_t *end, int *idptr);
-static int scan_record(struct schema *s, const uint8_t **bufptr,
+static int scan_record(struct corpus_schema *s, const uint8_t **bufptr,
 		       const uint8_t *end, int *idptr);
 
 // literals
@@ -68,8 +73,9 @@ static int scan_null(const uint8_t **bufptr, const uint8_t *end);
 static int scan_false(const uint8_t **bufptr, const uint8_t *end);
 static int scan_true(const uint8_t **bufptr, const uint8_t *end);
 static int scan_text(const uint8_t **bufptr, const uint8_t *end,
-		     struct text *text);
-static int scan_numeric(const uint8_t **bufptr, const uint8_t *end, int *idptr);
+		     struct corpus_text *text);
+static int scan_numeric(const uint8_t **bufptr, const uint8_t *end,
+			int *idptr);
 static int scan_infinity(const uint8_t **bufptr, const uint8_t *end);
 static int scan_nan(const uint8_t **bufptr, const uint8_t *end);
 
@@ -80,17 +86,17 @@ static int scan_chars(const char *str, unsigned len, const uint8_t **bufptr,
 		      const uint8_t *end);
 static int scan_char(char c, const uint8_t **bufptr, const uint8_t *end);
 
-static int array_equals(const struct datatype_array *t1,
-			 const struct datatype_array *t2);
-static int record_equals(const struct datatype_record *t1,
-			 const struct datatype_record *t2);
+static int array_equals(const struct corpus_datatype_array *t1,
+			 const struct corpus_datatype_array *t2);
+static int record_equals(const struct corpus_datatype_record *t1,
+			 const struct corpus_datatype_record *t2);
 
-static unsigned array_hash(const struct datatype_array *t);
-static unsigned record_hash(const struct datatype_record *t);
+static unsigned array_hash(const struct corpus_datatype_array *t);
+static unsigned record_hash(const struct corpus_datatype_record *t);
 static unsigned hash_combine(unsigned seed, unsigned hash);
 
 
-int schema_buffer_init(struct schema_buffer *buf)
+int corpus_schema_buffer_init(struct corpus_schema_buffer *buf)
 {
 	buf->type_ids = NULL;
 	buf->name_ids = NULL;
@@ -100,31 +106,32 @@ int schema_buffer_init(struct schema_buffer *buf)
 }
 
 
-void schema_buffer_destroy(struct schema_buffer *buf)
+void corpus_schema_buffer_destroy(struct corpus_schema_buffer *buf)
 {
-	free(buf->name_ids);
-	free(buf->type_ids);
+	corpus_free(buf->name_ids);
+	corpus_free(buf->type_ids);
 }
 
 
-int schema_buffer_grow(struct schema_buffer *buf, int nadd)
+int corpus_schema_buffer_grow(struct corpus_schema_buffer *buf, int nadd)
 {
 	void *tbase = buf->type_ids;
 	int *nbase = buf->name_ids;
 	int size = buf->nfield_max;
 	int err;
 
-	if ((err = array_grow(&tbase, &size, sizeof(*buf->type_ids),
-			      buf->nfield, nadd))) {
-		logmsg(err, "failed allocating schema buffer");
+	if ((err = corpus_array_grow(&tbase, &size, sizeof(*buf->type_ids),
+				     buf->nfield, nadd))) {
+		corpus_log(err, "failed allocating schema buffer");
 		return err;
 	}
 	buf->type_ids = tbase;
 
 	if (size) {
-		if (!(nbase = xrealloc(nbase, size * sizeof(*nbase)))) {
-			err = ERROR_NOMEM;
-			logmsg(err, "failed allocating schema buffer");
+		nbase = corpus_realloc(nbase, (size_t)size * sizeof(*nbase));
+		if (!nbase) {
+			err = CORPUS_ERROR_NOMEM;
+			corpus_log(err, "failed allocating schema buffer");
 			return err;
 		}
 		buf->name_ids = nbase;
@@ -135,7 +142,7 @@ int schema_buffer_grow(struct schema_buffer *buf, int nadd)
 }
 
 
-int sorter_init(struct schema_sorter *sort)
+int sorter_init(struct corpus_schema_sorter *sort)
 {
 	sort->idptrs = NULL;
 	sort->size = 0;
@@ -143,24 +150,26 @@ int sorter_init(struct schema_sorter *sort)
 }
 
 
-void sorter_destroy(struct schema_sorter *sort)
+void sorter_destroy(struct corpus_schema_sorter *sort)
 {
-	free(sort->idptrs);
+	corpus_free(sort->idptrs);
 }
 
 
 static int idptr_cmp(const void *x1, const void *x2)
 {
-	int id1 = **(const int **)x1;
-	int id2 = **(const int **)x2;
+	int id1 = **(int * const *)x1;
+	int id2 = **(int * const *)x2;
 	return id1 - id2;
 }
 
 
-int sorter_sort(struct schema_sorter *sort, const int *ptr, int n)
+int sorter_sort(struct corpus_schema_sorter *sort, const int *ptr, int n)
 {
 	int i;
 	int err;
+
+	assert(n >= 0);
 
 	if ((err = sorter_reserve(sort, n))) {
 		goto out;
@@ -170,13 +179,13 @@ int sorter_sort(struct schema_sorter *sort, const int *ptr, int n)
 		sort->idptrs[i] = ptr + i;
 	}
 
-	qsort(sort->idptrs, n, sizeof(*sort->idptrs), idptr_cmp);
+	qsort(sort->idptrs, (size_t)n, sizeof(*sort->idptrs), idptr_cmp);
 out:
 	return err;
 }
 
 
-int sorter_reserve(struct schema_sorter *sort, int length)
+int sorter_reserve(struct corpus_schema_sorter *sort, int length)
 {
 	void *base = sort->idptrs;
 	int n = sort->size;
@@ -189,8 +198,9 @@ int sorter_reserve(struct schema_sorter *sort, int length)
 
 	nadd = length - n;
 
-	if ((err = array_grow(&base, &n, sizeof(*sort->idptrs), n, nadd))) {
-		logmsg(err, "failed allocating schema sorter");
+	err = corpus_array_grow(&base, &n, sizeof(*sort->idptrs), n, nadd);
+	if (err) {
+		corpus_log(err, "failed allocating schema sorter");
 		return err;
 	}
 
@@ -200,12 +210,12 @@ int sorter_reserve(struct schema_sorter *sort, int length)
 }
 
 
-int schema_init(struct schema *s)
+int corpus_schema_init(struct corpus_schema *s)
 {
 	int i, n;
 	int err;
 
-	if ((err = schema_buffer_init(&s->buffer))) {
+	if ((err = corpus_schema_buffer_init(&s->buffer))) {
 		goto error_buffer;
 	}
 
@@ -213,21 +223,21 @@ int schema_init(struct schema *s)
 		goto error_sorter;
 	}
 
-	if ((err = symtab_init(&s->names, 0, NULL))) {
+	if ((err = corpus_symtab_init(&s->names, 0, NULL))) {
 		goto error_names;
 	}
 
-	if ((err = table_init(&s->arrays))) {
+	if ((err = corpus_table_init(&s->arrays))) {
 		goto error_arrays;
 	}
 
-	if ((err = table_init(&s->records))) {
+	if ((err = corpus_table_init(&s->records))) {
 		goto error_records;
 	}
 
 	// initialize primitive types
-	n = NUM_ATOMIC;
-	if (!(s->types = xmalloc(n * sizeof(*s->types)))) {
+	n = CORPUS_NUM_ATOMIC;
+	if (!(s->types = corpus_malloc((size_t)n * sizeof(*s->types)))) {
 		goto error_types;
 	}
 	s->ntype = n;
@@ -242,61 +252,62 @@ int schema_init(struct schema *s)
 	return 0;
 
 error_types:
-	table_destroy(&s->records);
+	corpus_table_destroy(&s->records);
 error_records:
-	table_destroy(&s->arrays);
+	corpus_table_destroy(&s->arrays);
 error_arrays:
-	symtab_destroy(&s->names);
+	corpus_symtab_destroy(&s->names);
 error_names:
 	sorter_destroy(&s->sorter);
 error_sorter:
-	schema_buffer_destroy(&s->buffer);
+	corpus_schema_buffer_destroy(&s->buffer);
 error_buffer:
 	return err;
 }
 
 
-void schema_destroy(struct schema *s)
+void corpus_schema_destroy(struct corpus_schema *s)
 {
-	schema_clear(s);
+	corpus_schema_clear(s);
 
-	free(s->types);
-	symtab_destroy(&s->names);
-	table_destroy(&s->records);
-	table_destroy(&s->arrays);
+	corpus_free(s->types);
+	corpus_symtab_destroy(&s->names);
+	corpus_table_destroy(&s->records);
+	corpus_table_destroy(&s->arrays);
 	sorter_destroy(&s->sorter);
-	schema_buffer_destroy(&s->buffer);
+	corpus_schema_buffer_destroy(&s->buffer);
 }
 
 
-void schema_clear(struct schema *s)
+void corpus_schema_clear(struct corpus_schema *s)
 {
-	const struct datatype *t;
+	const struct corpus_datatype *t;
 	int i = s->ntype;
 
 	while (i-- > 0) {
 		t = &s->types[i];
-		if (t->kind == DATATYPE_RECORD) {
-			free(t->meta.record.name_ids);
-			free(t->meta.record.type_ids);
+		if (t->kind == CORPUS_DATATYPE_RECORD) {
+			corpus_free(t->meta.record.name_ids);
+			corpus_free(t->meta.record.type_ids);
 		}
 	}
-	s->ntype = NUM_ATOMIC;
+	s->ntype = CORPUS_NUM_ATOMIC;
 	s->narray = 0;
 	s->nrecord = 0;
 
-	table_clear(&s->arrays);
-	table_clear(&s->records);
-	symtab_clear(&s->names);
+	corpus_table_clear(&s->arrays);
+	corpus_table_clear(&s->records);
+	corpus_symtab_clear(&s->names);
 }
 
 
-int schema_name(struct schema *s, const struct text *name, int *idptr)
+int corpus_schema_name(struct corpus_schema *s,
+		       const struct corpus_text *name, int *idptr)
 {
 	int tokid, id;
 	int err;
 
-	if ((err = symtab_add_token(&s->names, name, &tokid))) {
+	if ((err = corpus_symtab_add_token(&s->names, name, &tokid))) {
 		goto error;
 	}
 
@@ -305,7 +316,7 @@ int schema_name(struct schema *s, const struct text *name, int *idptr)
 	goto out;
 
 error:
-	logmsg(err, "failed adding name to schema");
+	corpus_log(err, "failed adding name to schema");
 	id = -1;
 
 out:
@@ -317,15 +328,16 @@ out:
 }
 
 
-int schema_array(struct schema *s, int type_id, int length, int *idptr)
+int corpus_schema_array(struct corpus_schema *s, int type_id, int length,
+			int *idptr)
 {
-	struct datatype *t;
+	struct corpus_datatype *t;
 	int id, pos, rehash;
 	int err;
 
 	rehash = 0;
 
-	if (schema_has_array(s, type_id, length, &id)) {
+	if (corpus_schema_has_array(s, type_id, length, &id)) {
 		err = 0;
 		goto out;
 	}
@@ -334,14 +346,14 @@ int schema_array(struct schema *s, int type_id, int length, int *idptr)
 
 	// grow types array if necessary
 	if (s->ntype == s->ntype_max) {
-		if ((err = schema_grow_types(s, 1))) {
+		if ((err = corpus_schema_grow_types(s, 1))) {
 			goto error;
 		}
 	}
 
 	// grow array table if necessary
 	if (s->narray == s->arrays.capacity) {
-		if ((err = table_reinit(&s->arrays, s->narray + 1))) {
+		if ((err = corpus_table_reinit(&s->arrays, s->narray + 1))) {
 			goto error;
 		}
 		rehash = 1;
@@ -349,7 +361,7 @@ int schema_array(struct schema *s, int type_id, int length, int *idptr)
 
 	// add the new type
 	t = &s->types[id];
-	t->kind = DATATYPE_ARRAY;
+	t->kind = CORPUS_DATATYPE_ARRAY;
 	t->meta.array.type_id = type_id;
 	t->meta.array.length = length;
 	s->ntype++;
@@ -357,7 +369,7 @@ int schema_array(struct schema *s, int type_id, int length, int *idptr)
 
 	// set the table entry
 	if (rehash) {
-		schema_rehash_arrays(s);
+		corpus_schema_rehash_arrays(s);
 	} else {
 		s->arrays.items[pos] = id;
 	}
@@ -366,10 +378,10 @@ int schema_array(struct schema *s, int type_id, int length, int *idptr)
 	goto out;
 
 error:
-	logmsg(err, "failed adding array type");
-	id = DATATYPE_ANY;
+	corpus_log(err, "failed adding array type");
+	id = CORPUS_DATATYPE_ANY;
 	if (rehash) {
-		schema_rehash_arrays(s);
+		corpus_schema_rehash_arrays(s);
 	}
 
 out:
@@ -380,11 +392,11 @@ out:
 }
 
 
-int schema_has_array(const struct schema *s, int type_id, int length,
-		     int *idptr)
+int corpus_schema_has_array(const struct corpus_schema *s, int type_id,
+			    int length, int *idptr)
 {
-	struct table_probe probe;
-	struct datatype_array key = {
+	struct corpus_table_probe probe;
+	struct corpus_datatype_array key = {
 		.type_id = type_id,
 		.length = length
 	};
@@ -392,8 +404,8 @@ int schema_has_array(const struct schema *s, int type_id, int length,
 	int id = -1;
 	int found = 0;
 
-	table_probe_make(&probe, &s->arrays, hash);
-	while (table_probe_advance(&probe)) {
+	corpus_table_probe_make(&probe, &s->arrays, hash);
+	while (corpus_table_probe_advance(&probe)) {
 		id = probe.current;
 		if (array_equals(&key, &s->types[id].meta.array)) {
 			found = 1;
@@ -424,48 +436,48 @@ static int is_sorted(const int *ids, int n)
 }
 
 
-void schema_rehash_arrays(struct schema *s)
+void corpus_schema_rehash_arrays(struct corpus_schema *s)
 {
-	const struct datatype_array *t;
+	const struct corpus_datatype_array *t;
 	int i, n = s->ntype;
 	unsigned hash;
 
-	table_clear(&s->arrays);
+	corpus_table_clear(&s->arrays);
 
 	for (i = 0; i < n; i++) {
-		if (s->types[i].kind != DATATYPE_ARRAY) {
+		if (s->types[i].kind != CORPUS_DATATYPE_ARRAY) {
 			continue;
 		}
 		t = &s->types[i].meta.array;
 		hash = array_hash(t);
-		table_add(&s->arrays, hash, i);
+		corpus_table_add(&s->arrays, hash, i);
 	}
 }
 
 
-void schema_rehash_records(struct schema *s)
+void corpus_schema_rehash_records(struct corpus_schema *s)
 {
-	const struct datatype_record *t;
+	const struct corpus_datatype_record *t;
 	int i, n = s->ntype;
 	unsigned hash;
 
-	table_clear(&s->records);
+	corpus_table_clear(&s->records);
 
 	for (i = 0; i < n; i++) {
-		if (s->types[i].kind != DATATYPE_RECORD) {
+		if (s->types[i].kind != CORPUS_DATATYPE_RECORD) {
 			continue;
 		}
 		t = &s->types[i].meta.record;
 		hash = record_hash(t);
-		table_add(&s->records, hash, i);
+		corpus_table_add(&s->records, hash, i);
 	}
 }
 
 
-int schema_record(struct schema *s, const int *type_ids, const int *name_ids,
-		  int nfield, int *idptr)
+int corpus_schema_record(struct corpus_schema *s, const int *type_ids,
+			 const int *name_ids, int nfield, int *idptr)
 {
-	struct datatype *t;
+	struct corpus_datatype *t;
 	int i, id, index, fstart, did_copy, pos, rehash;
 	int err;
 
@@ -492,7 +504,7 @@ int schema_record(struct schema *s, const int *type_ids, const int *name_ids,
 			argstart = -1;
 		}
 
-		if ((err = schema_buffer_grow(&s->buffer, nfield))) {
+		if ((err = corpus_schema_buffer_grow(&s->buffer, nfield))) {
 			goto error;
 		}
 		if (on_stack && s->buffer.type_ids != base) {
@@ -529,7 +541,7 @@ int schema_record(struct schema *s, const int *type_ids, const int *name_ids,
 	name_ids = s->buffer.name_ids + fstart;
 
 sorted:
-	if (schema_has_record(s, type_ids, name_ids, nfield, &id)) {
+	if (corpus_schema_has_record(s, type_ids, name_ids, nfield, &id)) {
 		err = 0;
 		goto out;
 	}
@@ -538,14 +550,14 @@ sorted:
 
 	// grow types array if necessary
 	if (s->ntype == s->ntype_max) {
-		if ((err = schema_grow_types(s, 1))) {
+		if ((err = corpus_schema_grow_types(s, 1))) {
 			goto error;
 		}
 	}
 
 	// grow the record table if necessary
 	if (s->nrecord == s->records.capacity) {
-		if ((err = table_reinit(&s->records, s->nrecord + 1))) {
+		if ((err = corpus_table_reinit(&s->records, s->nrecord + 1))) {
 			goto error;
 		}
 		rehash = 1;
@@ -553,23 +565,25 @@ sorted:
 
 	// add the new type
 	t = &s->types[id];
-	t->kind = DATATYPE_RECORD;
+	t->kind = CORPUS_DATATYPE_RECORD;
 	if (nfield == 0) {
 		t->meta.record.type_ids = NULL;
 		t->meta.record.name_ids = NULL;
 	} else {
-		t->meta.record.type_ids = xmalloc(nfield * sizeof(*type_ids));
-		t->meta.record.name_ids = xmalloc(nfield * sizeof(*name_ids));
+		t->meta.record.type_ids = corpus_malloc((size_t)nfield
+							* sizeof(*type_ids));
+		t->meta.record.name_ids = corpus_malloc((size_t)nfield
+							* sizeof(*name_ids));
 		if (!t->meta.record.type_ids || !t->meta.record.type_ids) {
-			free(t->meta.record.type_ids);
-			free(t->meta.record.name_ids);
-			err = ERROR_NOMEM;
+			corpus_free(t->meta.record.type_ids);
+			corpus_free(t->meta.record.name_ids);
+			err = CORPUS_ERROR_NOMEM;
 			goto error;
 		}
 		memcpy(t->meta.record.type_ids, type_ids,
-			nfield * sizeof(*type_ids));
+			(size_t)nfield * sizeof(*type_ids));
 		memcpy(t->meta.record.name_ids, name_ids,
-			nfield * sizeof(*name_ids));
+			(size_t)nfield * sizeof(*name_ids));
 	}
 	t->meta.record.nfield = nfield;
 	s->ntype++;
@@ -577,7 +591,7 @@ sorted:
 
 	// set the table entry
 	if (rehash) {
-		schema_rehash_records(s);
+		corpus_schema_rehash_records(s);
 	} else {
 		s->records.items[pos] = id;
 	}
@@ -586,17 +600,17 @@ sorted:
 	goto out;
 
 error_duplicate:
-	err = ERROR_INVAL;
-	logmsg(err, "duplicate field name \"%.*s\" in record",
-		(int)TEXT_SIZE(&s->names.types[name_ids[index]].text),
-		s->names.types[name_ids[index]].text.ptr);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "duplicate field name \"%.*s\" in record",
+		   (int)CORPUS_TEXT_SIZE(&s->names.types[name_ids[index]].text),
+		   s->names.types[name_ids[index]].text.ptr);
 	goto error;
 
 error:
-	logmsg(err, "failed adding record type");
-	id = DATATYPE_ANY;
+	corpus_log(err, "failed adding record type");
+	id = CORPUS_DATATYPE_ANY;
 	if (rehash) {
-		schema_rehash_records(s);
+		corpus_schema_rehash_records(s);
 	}
 
 out:
@@ -610,11 +624,12 @@ out:
 }
 
 
-int schema_has_record(const struct schema *s, const int *type_ids,
-		      const int *name_ids, int nfield, int *idptr)
+int corpus_schema_has_record(const struct corpus_schema *s,
+			     const int *type_ids, const int *name_ids,
+			     int nfield, int *idptr)
 {
-	struct table_probe probe;
-	struct datatype_record key = {
+	struct corpus_table_probe probe;
+	struct corpus_datatype_record key = {
 		.type_ids = (int *)type_ids,
 		.name_ids = (int *)name_ids,
 		.nfield = nfield
@@ -623,8 +638,8 @@ int schema_has_record(const struct schema *s, const int *type_ids,
 	int id = -1;
 	int found = 0;
 
-	table_probe_make(&probe, &s->records, hash);
-	while (table_probe_advance(&probe)) {
+	corpus_table_probe_make(&probe, &s->records, hash);
+	while (corpus_table_probe_advance(&probe)) {
 		id = probe.current;
 		if (record_equals(&key, &s->types[id].meta.record)) {
 			found = 1;
@@ -639,37 +654,37 @@ out:
 }
 
 
-int schema_union(struct schema *s, int id1, int id2, int *idptr)
+int corpus_schema_union(struct corpus_schema *s, int id1, int id2, int *idptr)
 {
 	int kind1, kind2;
 	int id;
 	int err = 0;
 
-	if (id1 == id2 || id2 == DATATYPE_NULL) {
+	if (id1 == id2 || id2 == CORPUS_DATATYPE_NULL) {
 		id = id1;
 		goto out;
 	}
 
-	if (id1 == DATATYPE_ANY || id2 == DATATYPE_ANY) {
-		id = DATATYPE_ANY;
+	if (id1 == CORPUS_DATATYPE_ANY || id2 == CORPUS_DATATYPE_ANY) {
+		id = CORPUS_DATATYPE_ANY;
 		goto out;
 	}
 
 	switch (id1) {
-	case DATATYPE_NULL:
+	case CORPUS_DATATYPE_NULL:
 		id = id2;
 		goto out;
 
-	case DATATYPE_INTEGER:
-		if (id2 == DATATYPE_REAL) {
-			id = DATATYPE_REAL;
+	case CORPUS_DATATYPE_INTEGER:
+		if (id2 == CORPUS_DATATYPE_REAL) {
+			id = CORPUS_DATATYPE_REAL;
 			goto out;
 		}
 		break;
 
-	case DATATYPE_REAL:
-		if (id2 == DATATYPE_INTEGER) {
-			id = DATATYPE_REAL;
+	case CORPUS_DATATYPE_REAL:
+		if (id2 == CORPUS_DATATYPE_INTEGER) {
+			id = CORPUS_DATATYPE_REAL;
 			goto out;
 		}
 		break;
@@ -680,13 +695,13 @@ int schema_union(struct schema *s, int id1, int id2, int *idptr)
 	kind2 = s->types[id2].kind;
 
 	if (kind1 != kind2) {
-		id = DATATYPE_ANY;
-	} else if (kind1 == DATATYPE_ARRAY) {
-		err = schema_union_array(s, id1, id2, &id);
-	} else if (kind1 == DATATYPE_RECORD) {
-		err = schema_union_record(s, id1, id2, &id);
+		id = CORPUS_DATATYPE_ANY;
+	} else if (kind1 == CORPUS_DATATYPE_ARRAY) {
+		err = corpus_schema_union_array(s, id1, id2, &id);
+	} else if (kind1 == CORPUS_DATATYPE_RECORD) {
+		err = corpus_schema_union_record(s, id1, id2, &id);
 	} else {
-		id = DATATYPE_ANY;
+		id = CORPUS_DATATYPE_ANY;
 	}
 
 out:
@@ -698,9 +713,10 @@ out:
 
 
 
-int schema_union_array(struct schema *s, int id1, int id2, int *idptr)
+int corpus_schema_union_array(struct corpus_schema *s, int id1, int id2,
+			      int *idptr)
 {
-	const struct datatype_array *t1, *t2;
+	const struct corpus_datatype_array *t1, *t2;
 	int len;
 	int elt, id;
 	int err;
@@ -708,7 +724,7 @@ int schema_union_array(struct schema *s, int id1, int id2, int *idptr)
 	t1 = &s->types[id1].meta.array;
 	t2 = &s->types[id2].meta.array;
 
-	if ((err = schema_union(s, t1->type_id, t2->type_id, &elt))) {
+	if ((err = corpus_schema_union(s, t1->type_id, t2->type_id, &elt))) {
 		goto error;
 	}
 
@@ -718,15 +734,15 @@ int schema_union_array(struct schema *s, int id1, int id2, int *idptr)
 		len = -1;
 	}
 
-	if ((err = schema_array(s, elt, len, &id))) {
+	if ((err = corpus_schema_array(s, elt, len, &id))) {
 		goto error;
 	}
 
 	goto out;
 
 error:
-	logmsg(err, "failed computing union of array types");
-	id = DATATYPE_ANY;
+	corpus_log(err, "failed computing union of array types");
+	id = CORPUS_DATATYPE_ANY;
 
 out:
 	if (idptr) {
@@ -737,13 +753,14 @@ out:
 }
 
 
-int schema_union_record(struct schema *s, int id1, int id2, int *idptr)
+int corpus_schema_union_record(struct corpus_schema *s, int id1, int id2,
+			       int *idptr)
 {
-	const struct datatype_record t1 = s->types[id1].meta.record;
-	const struct datatype_record t2 = s->types[id2].meta.record;
+	const struct corpus_datatype_record t1 = s->types[id1].meta.record;
+	const struct corpus_datatype_record t2 = s->types[id2].meta.record;
 	int fstart = s->buffer.nfield;
 	int i1, i2, n1, n2, name_id, type_id, nfield;
-	int id = DATATYPE_ANY;
+	int id = CORPUS_DATATYPE_ANY;
 	int err;
 
 	n1 = t1.nfield;
@@ -756,7 +773,7 @@ int schema_union_record(struct schema *s, int id1, int id2, int *idptr)
 	while (i1 < n1 && i2 < n2) {
 		if (t1.name_ids[i1] == t2.name_ids[i2]) {
 			name_id = t1.name_ids[i1];
-			if ((err = schema_union(s, t1.type_ids[i1],
+			if ((err = corpus_schema_union(s, t1.type_ids[i1],
 						t2.type_ids[i2], &type_id))) {
 				goto error;
 			}
@@ -771,7 +788,7 @@ int schema_union_record(struct schema *s, int id1, int id2, int *idptr)
 			type_id = t2.type_ids[i2];
 			i2++;
 		}
-		if ((err = schema_buffer_grow(&s->buffer, 1))) {
+		if ((err = corpus_schema_buffer_grow(&s->buffer, 1))) {
 			goto error;
 		}
 
@@ -782,30 +799,34 @@ int schema_union_record(struct schema *s, int id1, int id2, int *idptr)
 	}
 
 	if (i1 < n1) {
-		if ((err = schema_buffer_grow(&s->buffer, n1 - i1))) {
+		if ((err = corpus_schema_buffer_grow(&s->buffer, n1 - i1))) {
 			goto error;
 		}
 		s->buffer.nfield += n1 - i1;
 		memcpy(s->buffer.name_ids + fstart + nfield,
-			t1.name_ids + i1, (n1 - i1) * sizeof(*t1.name_ids));
+			t1.name_ids + i1,
+			(size_t)(n1 - i1) * sizeof(*t1.name_ids));
 		memcpy(s->buffer.type_ids + fstart + nfield,
-			t1.type_ids + i1, (n1 - i1) * sizeof(*t1.type_ids));
+			t1.type_ids + i1,
+			(size_t)(n1 - i1) * sizeof(*t1.type_ids));
 		nfield += n1 - i1;
 	}
 
 	if (i2 < n2) {
-		if ((err = schema_buffer_grow(&s->buffer, n2 - i2))) {
+		if ((err = corpus_schema_buffer_grow(&s->buffer, n2 - i2))) {
 			goto error;
 		}
 		s->buffer.nfield += n2 - i2;
 		memcpy(s->buffer.name_ids + fstart + nfield,
-			t2.name_ids + i2, (n2 - i2) * sizeof(*t2.name_ids));
+			t2.name_ids + i2,
+			(size_t)(n2 - i2) * sizeof(*t2.name_ids));
 		memcpy(s->buffer.type_ids + fstart + nfield,
-			t2.type_ids + i2, (n2 - i2) * sizeof(*t2.type_ids));
+			t2.type_ids + i2,
+			(size_t)(n2 - i2) * sizeof(*t2.type_ids));
 		nfield += n2 - i2;
 	}
 
-	if ((err = schema_record(s, s->buffer.type_ids + fstart,
+	if ((err = corpus_schema_record(s, s->buffer.type_ids + fstart,
 				 s->buffer.name_ids + fstart, nfield, &id))) {
 		goto error;
 	}
@@ -813,8 +834,8 @@ int schema_union_record(struct schema *s, int id1, int id2, int *idptr)
 	goto out;
 
 error:
-	logmsg(err, "failed computing union of record types");
-	id = DATATYPE_ANY;
+	corpus_log(err, "failed computing union of record types");
+	id = CORPUS_DATATYPE_ANY;
 	goto out;
 
 out:
@@ -826,15 +847,15 @@ out:
 }
 
 
-int schema_grow_types(struct schema *s, int nadd)
+int corpus_schema_grow_types(struct corpus_schema *s, int nadd)
 {
 	void *base = s->types;
 	int size = s->ntype_max;
 	int err;
 
-	if ((err = array_grow(&base, &size, sizeof(*s->types),
-			      s->ntype, nadd))) {
-		logmsg(err, "failed allocating type array");
+	if ((err = corpus_array_grow(&base, &size, sizeof(*s->types),
+				     s->ntype, nadd))) {
+		corpus_log(err, "failed allocating type array");
 		return err;
 	}
 
@@ -844,101 +865,104 @@ int schema_grow_types(struct schema *s, int nadd)
 }
 
 
-void render_datatype(struct render *r, const struct schema *s, int id)
+void corpus_render_datatype(struct corpus_render *r,
+			    const struct corpus_schema *s, int id)
 {
-	const struct text *name;
-	const struct datatype *t;
+	const struct corpus_text *name;
+	const struct corpus_datatype *t;
 	int name_id, type_id;
 	int i, n;
 
 	if (id < 0) {
-		render_string(r, "any");
+		corpus_render_string(r, "any");
 		return;
 	}
 
 	t = &s->types[id];
 
 	switch (t->kind) {
-	case DATATYPE_NULL:
-		render_string(r, "null");
+	case CORPUS_DATATYPE_NULL:
+		corpus_render_string(r, "null");
 		break;
 
-	case DATATYPE_BOOLEAN:
-		render_string(r, "boolean");
+	case CORPUS_DATATYPE_BOOLEAN:
+		corpus_render_string(r, "boolean");
 		break;
 
-	case DATATYPE_INTEGER:
-		render_string(r, "integer");
+	case CORPUS_DATATYPE_INTEGER:
+		corpus_render_string(r, "integer");
 		break;
 
-	case DATATYPE_REAL:
-		render_string(r, "real");
+	case CORPUS_DATATYPE_REAL:
+		corpus_render_string(r, "real");
 		break;
 
-	case DATATYPE_TEXT:
-		render_string(r, "text");
+	case CORPUS_DATATYPE_TEXT:
+		corpus_render_string(r, "text");
 		break;
 
-	case DATATYPE_ARRAY:
-		render_char(r, '[');
-		render_datatype(r, s, t->meta.array.type_id);
+	case CORPUS_DATATYPE_ARRAY:
+		corpus_render_char(r, '[');
+		corpus_render_datatype(r, s, t->meta.array.type_id);
 		if (t->meta.array.length >= 0) {
-			render_printf(r, "; %d", t->meta.array.length);
+			corpus_render_printf(r, "; %d", t->meta.array.length);
 		}
-		render_char(r, ']');
+		corpus_render_char(r, ']');
 		break;
 
-	case DATATYPE_RECORD:
-		render_char(r, '{');
-		render_indent(r, +1);
+	case CORPUS_DATATYPE_RECORD:
+		corpus_render_char(r, '{');
+		corpus_render_indent(r, +1);
 
 		n = t->meta.record.nfield;
 		for (i = 0; i < n; i++) {
 			if (i > 0) {
-				render_string(r, ",");
+				corpus_render_string(r, ",");
 			}
-			render_newlines(r, 1);
+			corpus_render_newlines(r, 1);
 
 			name_id = t->meta.record.name_ids[i];
 			name = &s->names.types[name_id].text;
-			render_char(r, '"');
-			render_text(r, name);
-			render_string(r, "\": ");
+			corpus_render_char(r, '"');
+			corpus_render_text(r, name);
+			corpus_render_string(r, "\": ");
 
 			type_id = t->meta.record.type_ids[i];
-			render_datatype(r, s, type_id);
+			corpus_render_datatype(r, s, type_id);
 		}
 
-		render_indent(r, -1);
-		render_newlines(r, 1);
-		render_char(r, '}');
+		corpus_render_indent(r, -1);
+		corpus_render_newlines(r, 1);
+		corpus_render_char(r, '}');
 		break;
 
 	default:
-		logmsg(ERROR_INTERNAL, "internal error: invalid datatype kind");
+		corpus_log(CORPUS_ERROR_INTERNAL,
+			   "internal error: invalid datatype kind");
 	}
 }
 
 
-int write_datatype(FILE *stream, const struct schema *s, int id)
+int corpus_write_datatype(FILE *stream, const struct corpus_schema *s, int id)
 {
-	struct render r;
+	struct corpus_render r;
 	int err;
 
-	if ((err = render_init(&r, ESCAPE_CONTROL | ESCAPE_UTF8))) {
+	if ((err = corpus_render_init(&r, CORPUS_ESCAPE_CONTROL
+					  | CORPUS_ESCAPE_UTF8))) {
 		goto error_init;
 	}
 
-	render_datatype(&r, s, id);
+	corpus_render_datatype(&r, s, id);
 	if (r.error) {
 		goto error_render;
 	}
 
-	if (fwrite(r.string, 1, r.length, stream) < (size_t)r.length
+	if (fwrite(r.string, 1, (size_t)r.length, stream) < (size_t)r.length
 			&& r.length) {
-		err = ERROR_OS;
-		logmsg(err, "failed writing to output stream: %s",
-		       strerror(errno));
+		err = CORPUS_ERROR_OS;
+		corpus_log(err, "failed writing to output stream: %s",
+			   strerror(errno));
 		goto error_fwrite;
 	}
 
@@ -946,10 +970,10 @@ int write_datatype(FILE *stream, const struct schema *s, int id)
 
 error_fwrite:
 error_render:
-	render_destroy(&r);
+	corpus_render_destroy(&r);
 error_init:
 	if (err) {
-		logmsg(err, "failed writing datatype to output stream");
+		corpus_log(err, "failed writing datatype to output stream");
 	}
 
 	return err;
@@ -957,9 +981,10 @@ error_init:
 
 
 
-int schema_scan(struct schema *s, const uint8_t *ptr, size_t size, int *idptr)
+int corpus_schema_scan(struct corpus_schema *s, const uint8_t *ptr,
+		       size_t size, int *idptr)
 {
-	struct text text;
+	struct corpus_text text;
 	const uint8_t *input = ptr;
 	const uint8_t *end = ptr + size;
 	uint_fast8_t ch;
@@ -970,7 +995,7 @@ int schema_scan(struct schema *s, const uint8_t *ptr, size_t size, int *idptr)
 
 	// treat the empty string as null
 	if (ptr == end) {
-		id = DATATYPE_NULL;
+		id = CORPUS_DATATYPE_NULL;
 		goto success;
 	}
 
@@ -980,28 +1005,28 @@ int schema_scan(struct schema *s, const uint8_t *ptr, size_t size, int *idptr)
 		if ((err = scan_null(&ptr, end))) {
 			goto error;
 		}
-		id = DATATYPE_NULL;
+		id = CORPUS_DATATYPE_NULL;
 		break;
 
 	case 'f':
 		if ((err = scan_false(&ptr, end))) {
 			goto error;
 		}
-		id = DATATYPE_BOOLEAN;
+		id = CORPUS_DATATYPE_BOOLEAN;
 		break;
 
 	case 't':
 		if ((err = scan_true(&ptr, end))) {
 			goto error;
 		}
-		id = DATATYPE_BOOLEAN;
+		id = CORPUS_DATATYPE_BOOLEAN;
 		break;
 
 	case '"':
 		if ((err = scan_text(&ptr, end, &text))) {
 			goto error;
 		}
-		id = DATATYPE_TEXT;
+		id = CORPUS_DATATYPE_TEXT;
 		break;
 
 	case '[':
@@ -1026,8 +1051,8 @@ int schema_scan(struct schema *s, const uint8_t *ptr, size_t size, int *idptr)
 
 	scan_spaces(&ptr, end);
 	if (ptr != end) {
-		err = ERROR_INVAL;
-		logmsg(err, "unexpected trailing characters");
+		err = CORPUS_ERROR_INVAL;
+		corpus_log(err, "unexpected trailing characters");
 		goto error;
 	}
 
@@ -1036,8 +1061,8 @@ success:
 	goto out;
 
 error:
-	logmsg(err, "failed parsing value (%.*s)", (unsigned)size, input);
-	id = DATATYPE_ANY;
+	corpus_log(err, "failed parsing value (%.*s)", (unsigned)size, input);
+	id = CORPUS_DATATYPE_ANY;
 	goto out;
 
 out:
@@ -1050,10 +1075,10 @@ out:
 
 
 
-int scan_value(struct schema *s, const uint8_t **bufptr, const uint8_t *end,
-	       int *idptr)
+int scan_value(struct corpus_schema *s, const uint8_t **bufptr,
+	       const uint8_t *end, int *idptr)
 {
-	struct text text;
+	struct corpus_text text;
 	const uint8_t *ptr = *bufptr;
 	uint_fast8_t ch;
 	int err, id;
@@ -1064,28 +1089,28 @@ int scan_value(struct schema *s, const uint8_t **bufptr, const uint8_t *end,
 		if ((err = scan_null(&ptr, end))) {
 			goto error;
 		}
-		id = DATATYPE_NULL;
+		id = CORPUS_DATATYPE_NULL;
 		break;
 
 	case 'f':
 		if ((err = scan_false(&ptr, end))) {
 			goto error;
 		}
-		id = DATATYPE_BOOLEAN;
+		id = CORPUS_DATATYPE_BOOLEAN;
 		break;
 
 	case 't':
 		if ((err = scan_true(&ptr, end))) {
 			goto error;
 		}
-		id = DATATYPE_BOOLEAN;
+		id = CORPUS_DATATYPE_BOOLEAN;
 		break;
 
 	case '"':
 		if ((err = scan_text(&ptr, end, &text))) {
 			goto error;
 		}
-		id = DATATYPE_TEXT;
+		id = CORPUS_DATATYPE_TEXT;
 		break;
 
 	case '[':
@@ -1123,7 +1148,7 @@ out:
 }
 
 
-int scan_array(struct schema *s, const uint8_t **bufptr,
+int scan_array(struct corpus_schema *s, const uint8_t **bufptr,
 	       const uint8_t *end, int *idptr)
 {
 	const uint8_t *ptr = *bufptr;
@@ -1132,7 +1157,7 @@ int scan_array(struct schema *s, const uint8_t **bufptr,
 	int err;
 
 	length = 0;
-	cur_id = DATATYPE_NULL;
+	cur_id = CORPUS_DATATYPE_NULL;
 
 	// handle empty array
 	scan_spaces(&ptr, end);
@@ -1169,7 +1194,7 @@ int scan_array(struct schema *s, const uint8_t **bufptr,
 				goto error_inval_val;
 			}
 
-			if ((err = schema_union(s, cur_id, next_id,
+			if ((err = corpus_schema_union(s, cur_id, next_id,
 							&cur_id))) {
 				goto error;
 			}
@@ -1182,27 +1207,27 @@ int scan_array(struct schema *s, const uint8_t **bufptr,
 	}
 close:
 	ptr++;
-	err = schema_array(s, cur_id, length, &id);
+	err = corpus_schema_array(s, cur_id, length, &id);
 	goto out;
 
 error_inval_noclose:
-	err = ERROR_INVAL;
-	logmsg(err, "no closing bracket (]) at end of array");
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "no closing bracket (]) at end of array");
 	goto error;
 
 error_inval_noval:
-	err = ERROR_INVAL;
-	logmsg(err, "missing value at index %d in array", length);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing value at index %d in array", length);
 	goto error;
 
 error_inval_val:
-	err = ERROR_INVAL;
-	logmsg(err, "failed parsing value at index %d in array", length);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "failed parsing value at index %d in array", length);
 	goto error;
 
 error_inval_nocomma:
-	err = ERROR_INVAL;
-	logmsg(err, "missing comma (,) after index %d in array",
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing comma (,) after index %d in array",
 	       length);
 	goto error;
 
@@ -1216,7 +1241,7 @@ out:
 }
 
 
-int scan_record(struct schema *s, const uint8_t **bufptr,
+int scan_record(struct corpus_schema *s, const uint8_t **bufptr,
 		const uint8_t *end, int *idptr)
 {
 	const uint8_t *ptr = *bufptr;
@@ -1243,7 +1268,7 @@ int scan_record(struct schema *s, const uint8_t **bufptr,
 	}
 
 	if (s->buffer.nfield == s->buffer.nfield_max) {
-		if ((err = schema_buffer_grow(&s->buffer, 1))) {
+		if ((err = corpus_schema_buffer_grow(&s->buffer, 1))) {
 			goto error;
 		}
 	}
@@ -1273,7 +1298,9 @@ int scan_record(struct schema *s, const uint8_t **bufptr,
 			}
 
 			if (s->buffer.nfield == s->buffer.nfield_max) {
-				if ((err = schema_buffer_grow(&s->buffer, 1))) {
+				err = corpus_schema_buffer_grow(&s->buffer,
+								1);
+				if (err) {
 					goto error;
 				}
 			}
@@ -1292,18 +1319,18 @@ int scan_record(struct schema *s, const uint8_t **bufptr,
 close:
 	ptr++; // skip over closing bracket (})
 
-	err = schema_record(s, s->buffer.type_ids + fstart,
+	err = corpus_schema_record(s, s->buffer.type_ids + fstart,
 			    s->buffer.name_ids + fstart, nfield, &id);
 	goto out;
 
 error_inval_noclose:
-	err = ERROR_INVAL;
-	logmsg(err, "no closing bracket (}) at end of record");
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "no closing bracket (}) at end of record");
 	goto error;
 
 error_inval_nocomma:
-	err = ERROR_INVAL;
-	logmsg(err, "missing comma (,) in record");
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing comma (,) in record");
 	goto error;
 
 error:
@@ -1317,10 +1344,10 @@ out:
 }
 
 
-int scan_field(struct schema *s, const uint8_t **bufptr, const uint8_t *end,
-	       int *name_idptr, int *type_idptr)
+int scan_field(struct corpus_schema *s, const uint8_t **bufptr,
+	       const uint8_t *end, int *name_idptr, int *type_idptr)
 {
-	struct text name;
+	struct corpus_text name;
 	const uint8_t *ptr = *bufptr;
 	int err, name_id, type_id;
 
@@ -1334,7 +1361,7 @@ int scan_field(struct schema *s, const uint8_t **bufptr, const uint8_t *end,
 	if ((err = scan_text(&ptr, end, &name))) {
 		goto error;
 	}
-	if ((err = schema_name(s, &name, &name_id))) {
+	if ((err = corpus_schema_name(s, &name, &name_id))) {
 		goto error;
 	}
 
@@ -1358,26 +1385,26 @@ int scan_field(struct schema *s, const uint8_t **bufptr, const uint8_t *end,
 	goto out;
 
 error_inval_noname:
-	err = ERROR_INVAL;
-	logmsg(err, "missing field name in record");
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing field name in record");
 	goto error;
 
 error_inval_nocolon:
-	err = ERROR_INVAL;
-	logmsg(err, "missing colon after field name \"%.*s\" in record",
-	       (unsigned)TEXT_SIZE(&name), name.ptr);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing colon after field name \"%.*s\" in record",
+		   (unsigned)CORPUS_TEXT_SIZE(&name), name.ptr);
 	goto error;
 
 error_inval_noval:
-	err = ERROR_INVAL;
-	logmsg(err, "missing value for field \"%.*s\" in record",
-	       (unsigned)TEXT_SIZE(&name), name.ptr);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing value for field \"%.*s\" in record",
+		   (unsigned)CORPUS_TEXT_SIZE(&name), name.ptr);
 	goto error;
 
 error_inval_val:
-	err = ERROR_INVAL;
-	logmsg(err, "failed parsing value for field \"%.*s\" in record",
-	       (unsigned)TEXT_SIZE(&name), name.ptr);
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "failed parsing value for field \"%.*s\" in record",
+		   (unsigned)CORPUS_TEXT_SIZE(&name), name.ptr);
 	goto error;
 
 error:
@@ -1399,15 +1426,15 @@ int scan_numeric(const uint8_t **bufptr, const uint8_t *end, int *idptr)
 	int id;
 	int err;
 
-	id = DATATYPE_INTEGER;
+	id = CORPUS_DATATYPE_INTEGER;
 	ch = *ptr++;
 
 	// skip over optional sign
 	if (ch == '-' || ch == '+') {
 		if (ptr == end) {
-			err = ERROR_INVAL;
-			logmsg(err, "missing number after (%c) sign",
-			       (char)ch);
+			err = CORPUS_ERROR_INVAL;
+			corpus_log(err, "missing number after (%c) sign",
+				   (char)ch);
 			goto error_inval;
 		}
 		ch = *ptr++;
@@ -1433,14 +1460,14 @@ int scan_numeric(const uint8_t **bufptr, const uint8_t *end, int *idptr)
 		break;
 
 	case 'I':
-		id = DATATYPE_REAL;
+		id = CORPUS_DATATYPE_REAL;
 		if ((err = scan_infinity(&ptr, end))) {
 			goto error_inval;
 		}
 		break;
 
 	case 'N':
-		id = DATATYPE_REAL;
+		id = CORPUS_DATATYPE_REAL;
 		if ((err = scan_nan(&ptr, end))) {
 			goto error_inval;
 		}
@@ -1457,7 +1484,7 @@ int scan_numeric(const uint8_t **bufptr, const uint8_t *end, int *idptr)
 
 	// look ahead for optional fractional part
 	if (*ptr == '.') {
-		id = DATATYPE_REAL;
+		id = CORPUS_DATATYPE_REAL;
 		ptr++;
 		scan_digits(&ptr, end);
 	}
@@ -1469,7 +1496,7 @@ int scan_numeric(const uint8_t **bufptr, const uint8_t *end, int *idptr)
 
 	// look ahead for optional exponent
 	if (*ptr == 'e' || *ptr == 'E') {
-		id = DATATYPE_REAL;
+		id = CORPUS_DATATYPE_REAL;
 		ptr++;
 		if (ptr == end) {
 			goto error_inval_exp;
@@ -1495,34 +1522,34 @@ int scan_numeric(const uint8_t **bufptr, const uint8_t *end, int *idptr)
 	goto out;
 
 error_inval_start:
-	err = ERROR_INVAL;
+	err = CORPUS_ERROR_INVAL;
 	if (isprint(ch)) {
-		logmsg(err, "invalid character (%c) at start of value",
-		       (char)ch);
+		corpus_log(err, "invalid character (%c) at start of value",
+			   (char)ch);
 	} else {
-		logmsg(err, "invalid character (0x%02x) at start of value",
-		       (unsigned char)ch);
+		corpus_log(err, "invalid character (0x%02x) at start of value",
+			   (unsigned char)ch);
 	}
 	goto error_inval;
 
 error_inval_char:
-	err = ERROR_INVAL;
+	err = CORPUS_ERROR_INVAL;
 	if (isprint(ch)) {
-		logmsg(err, "invalid character (%c) in number",
-		       (char)ch);
+		corpus_log(err, "invalid character (%c) in number",
+			   (char)ch);
 	} else {
-		logmsg(err, "invalid character (0x%02x) in number",
-		       (unsigned char)ch);
+		corpus_log(err, "invalid character (0x%02x) in number",
+			   (unsigned char)ch);
 	}
 	goto error_inval;
 
 error_inval_exp:
-	err = ERROR_INVAL;
-	logmsg(err, "missing exponent at end of number");
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "missing exponent at end of number");
 	goto error_inval;
 
 error_inval:
-	//logmsg(err, "failed attempting to parse numeric value");
+	//corpus_log(err, "failed attempting to parse numeric value");
 
 out:
 	*bufptr = ptr;
@@ -1546,14 +1573,14 @@ int scan_infinity(const uint8_t **bufptr, const uint8_t *end)
 
 
 int scan_text(const uint8_t **bufptr, const uint8_t *end,
-	      struct text *text)
+	      struct corpus_text *text)
 {
 	const uint8_t *input = *bufptr;
 	const uint8_t *ptr = input;
 	uint_fast8_t ch;
 	int err, flags;
 
-	flags = TEXT_NOESCAPE;
+	flags = CORPUS_TEXT_NOESCAPE;
 	while (ptr != end) {
 		ch = *ptr;
 		if (ch == '"') {
@@ -1569,13 +1596,14 @@ int scan_text(const uint8_t **bufptr, const uint8_t *end,
 	}
 
 error_noclose:
-	err = ERROR_INVAL;
-	logmsg(err, "no trailing quote (\") at end of text value");
+	err = CORPUS_ERROR_INVAL;
+	corpus_log(err, "no trailing quote (\") at end of text value");
 	goto out;
 
 close:
-	if ((err = text_assign(text, input, ptr - input, flags))) {
-		err = ERROR_INVAL;
+	if ((err = corpus_text_assign(text, input, (size_t)(ptr - input),
+				      flags))) {
+		err = CORPUS_ERROR_INVAL;
 		goto out;
 	}
 
@@ -1625,7 +1653,7 @@ void scan_digits(const uint8_t **bufptr, const uint8_t *end)
 
 /**
  * Skip over ASCII whitespace characters. This is more permissive than
- * strict JSON, which only allows ' ', '\t', '\r', and '\n'.
+ * strict JSON, which only allows ' ', '\\t', '\\r', and '\\n'.
  */
 void scan_spaces(const uint8_t **bufptr, const uint8_t *end)
 {
@@ -1667,20 +1695,20 @@ int scan_char(char c, const uint8_t **bufptr, const uint8_t *end)
 	int err;
 
 	if (ptr == end) {
-		err = ERROR_INVAL;
-		logmsg(err, "expecting '%c' but input ended", c);
+		err = CORPUS_ERROR_INVAL;
+		corpus_log(err, "expecting '%c' but input ended", c);
 		return err;
 	}
 
 	ch = *ptr;
 	if (ch != c) {
-		err = ERROR_INVAL;
+		err = CORPUS_ERROR_INVAL;
 		if (isprint(ch)) {
-			logmsg(err, "expecting '%c' but got '%c'", c,
-			       (char)ch);
+			corpus_log(err, "expecting '%c' but got '%c'", c,
+				   (char)ch);
 		} else {
-			logmsg(err, "expecting '%c' but got '0x%02x'", c,
-			       (unsigned char)ch);
+			corpus_log(err, "expecting '%c' but got '0x%02x'", c,
+				   (unsigned char)ch);
 		}
 		return err;
 	}
@@ -1690,8 +1718,8 @@ int scan_char(char c, const uint8_t **bufptr, const uint8_t *end)
 }
 
 
-int array_equals(const struct datatype_array *t1,
-		 const struct datatype_array *t2)
+int array_equals(const struct corpus_datatype_array *t1,
+		 const struct corpus_datatype_array *t2)
 {
 	int eq = 0;
 
@@ -1707,8 +1735,8 @@ int array_equals(const struct datatype_array *t1,
 }
 
 
-int record_equals(const struct datatype_record *t1,
-		  const struct datatype_record *t2)
+int record_equals(const struct corpus_datatype_record *t1,
+		  const struct corpus_datatype_record *t2)
 {
 	int n = t1->nfield;
 	int eq = 0;
@@ -1716,10 +1744,10 @@ int record_equals(const struct datatype_record *t1,
 	if (t1->nfield != t2->nfield) {
 		eq = 0;
 	} else if (memcmp(t1->type_ids, t2->type_ids,
-				n * sizeof(*t1->type_ids))) {
+			  (size_t)n * sizeof(*t1->type_ids))) {
 		eq = 0;
 	} else if (memcmp(t1->name_ids, t2->name_ids,
-				  n * sizeof(*t1->name_ids))) {
+			  (size_t)n * sizeof(*t1->name_ids))) {
 		eq = 0;
 	} else {
 		eq = 1;
@@ -1729,7 +1757,7 @@ int record_equals(const struct datatype_record *t1,
 }
 
 
-unsigned array_hash(const struct datatype_array *t)
+unsigned array_hash(const struct corpus_datatype_array *t)
 {
 	unsigned hash = 0;
 
@@ -1740,7 +1768,7 @@ unsigned array_hash(const struct datatype_array *t)
 }
 
 
-unsigned record_hash(const struct datatype_record *t)
+unsigned record_hash(const struct corpus_datatype_record *t)
 {
 	int i;
 	unsigned hash = 0;

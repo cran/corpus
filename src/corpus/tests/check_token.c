@@ -23,16 +23,25 @@
 #include "testutil.h"
 
 
-struct text *get_type_stem(const struct text *tok, int flags,
-			   const char *stemmer)
+#define TYPE_CASEFOLD	CORPUS_TYPE_CASEFOLD
+#define TYPE_COMPAT	CORPUS_TYPE_COMPAT
+#define TYPE_DASHFOLD	CORPUS_TYPE_DASHFOLD
+#define TYPE_QUOTFOLD	CORPUS_TYPE_QUOTFOLD
+#define TYPE_RMCC	CORPUS_TYPE_RMCC
+#define TYPE_RMDI	CORPUS_TYPE_RMDI
+#define TYPE_RMWS	CORPUS_TYPE_RMWS
+
+
+struct corpus_text *get_type_stem(const struct corpus_text *tok, int flags,
+				  const char *stemmer)
 {
-	struct text *typ;
-	struct typemap map;
+	struct corpus_text *typ;
+	struct corpus_typemap map;
 	size_t size;
 
-	ck_assert(!typemap_init(&map, flags, stemmer));
-	ck_assert(!typemap_set(&map, tok));
-	size = TEXT_SIZE(&map.type);
+	ck_assert(!corpus_typemap_init(&map, flags, stemmer));
+	ck_assert(!corpus_typemap_set(&map, tok));
+	size = CORPUS_TEXT_SIZE(&map.type);
 
 	typ = alloc(sizeof(*typ));
 
@@ -41,25 +50,25 @@ struct text *get_type_stem(const struct text *tok, int flags,
 	typ->ptr[size] = '\0';
 	typ->attr = map.type.attr;
 
-	typemap_destroy(&map);
+	corpus_typemap_destroy(&map);
 
 	return typ;
 }
 
 
-struct text *get_type(const struct text *tok, int flags)
+struct corpus_text *get_type(const struct corpus_text *tok, int flags)
 {
 	return get_type_stem(tok, flags, NULL);
 }
 
 
-struct text *casefold(const struct text *tok)
+struct corpus_text *casefold(const struct corpus_text *tok)
 {
 	return get_type(tok, TYPE_CASEFOLD);
 }
 
 
-struct text *stem_en(const struct text *tok)
+struct corpus_text *stem_en(const struct corpus_text *tok)
 {
 	return get_type_stem(tok, 0, "english");
 }
@@ -67,26 +76,26 @@ struct text *stem_en(const struct text *tok)
 
 START_TEST(test_equals)
 {
-	ck_assert(token_equals(S("hello"), S("hello")));
-	ck_assert(token_equals(S("hello"), T("hello")));
+	ck_assert_tok_eq(S("hello"), S("hello"));
+	ck_assert_tok_eq(S("hello"), T("hello"));
 
-	ck_assert(token_equals(S(""), S("")));
-	ck_assert(token_equals(S(""), T("")));
+	ck_assert_tok_eq(S(""), S(""));
+	ck_assert_tok_eq(S(""), T(""));
 }
 END_TEST
 
 
 START_TEST(test_not_equals)
 {
-	ck_assert(!token_equals(S("foo"), S("bar")));
+	ck_assert_tok_ne(S("foo"), S("bar"));
 }
 END_TEST
 
 
 START_TEST(test_equals_esc)
 {
-	ck_assert(!token_equals(S("\n"), T("\\n")));
-	ck_assert(!token_equals(S("\\n"), T("\\n")));
+	ck_assert_tok_ne(S("\n"), T("\\n"));
+	ck_assert_tok_ne(S("\\n"), T("\\n"));
 }
 END_TEST
 
@@ -186,7 +195,7 @@ END_TEST
 
 START_TEST(test_keep_control_ascii)
 {
-	const struct text *js, *t;
+	const struct corpus_text *js, *t;
 	char str[256];
 	uint8_t i;
 
@@ -216,7 +225,7 @@ END_TEST
 
 START_TEST(test_keep_control_utf8)
 {
-	const struct text *t, *js;
+	const struct corpus_text *t, *js;
 	uint8_t str[256];
 	uint8_t i;
 
@@ -264,7 +273,7 @@ END_TEST
 
 START_TEST(test_keep_ws_utf8)
 {
-	const struct text *t, *js, *typ;
+	const struct corpus_text *t, *js, *typ;
 	uint8_t str[256];
 	uint8_t *buf;
 	unsigned ws[] = { 0x0009, 0x000A, 0x000B, 0x000C, 0x000D,
@@ -311,7 +320,7 @@ START_TEST(test_keep_ws_utf8)
 		}
 
 		buf = str;
-		encode_utf8(ws[i], &buf);
+		corpus_encode_utf8(ws[i], &buf);
 		*buf = '\0';
 		t = S((char *)str);
 		ck_assert_tok_eq(get_type(t, TYPE_COMPAT), typ);
@@ -326,7 +335,7 @@ END_TEST
 
 START_TEST(test_rm_ws_utf8)
 {
-	const struct text *t, *js;
+	const struct corpus_text *t, *js;
 	uint8_t str[256];
 	uint8_t *buf;
 	uint32_t ws[] = { 0x0009, 0x000A, 0x000B, 0x000C, 0x000D,
@@ -338,7 +347,7 @@ START_TEST(test_rm_ws_utf8)
 
 	for (i = 0; i < n; i++) {
 		buf = str;
-		encode_utf8(ws[i], &buf);
+		corpus_encode_utf8(ws[i], &buf);
 		*buf = '\0';
 		t = S((char *)str);
 		ck_assert_tok_eq(get_type(t, TYPE_RMWS), S(""));
@@ -353,7 +362,7 @@ END_TEST
 
 START_TEST(test_casefold_ascii)
 {
-	const struct text *tok;
+	const struct corpus_text *tok;
 	uint8_t buf[2] = { 0, 0 };
 	uint8_t i;
 
@@ -458,6 +467,19 @@ START_TEST(test_stem_en)
 END_TEST
 
 
+START_TEST(test_stopwords_en)
+{
+	int len;
+	const uint8_t **words = corpus_stopwords("english", &len);
+
+	ck_assert_int_eq(len, 174);
+	ck_assert_tok_eq(S((char *)words[0]), S("a"));
+	ck_assert_tok_eq(S((char *)words[173]), S("yourselves"));
+	ck_assert(words[len] == NULL);
+}
+END_TEST
+
+
 Suite *token_suite(void)
 {
 	Suite *s;
@@ -493,6 +515,11 @@ Suite *token_suite(void)
 	tc = tcase_create("stem");
 	tcase_add_checked_fixture(tc, setup, teardown);
 	tcase_add_test(tc, test_stem_en);
+	suite_add_tcase(s, tc);
+
+	tc = tcase_create("stem");
+	tcase_add_checked_fixture(tc, setup, teardown);
+	tcase_add_test(tc, test_stopwords_en);
 	suite_add_tcase(s, tc);
 
 	return s;

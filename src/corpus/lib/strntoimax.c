@@ -20,7 +20,7 @@
 #include <stddef.h>
 
 
-intmax_t strntoimax(const char *string, size_t maxlen, char **endptr)
+intmax_t corpus_strntoimax(const char *string, size_t maxlen, char **endptr)
 {
 	const char *ptr = string;
 	const char *end = ptr + maxlen;
@@ -50,7 +50,7 @@ intmax_t strntoimax(const char *string, size_t maxlen, char **endptr)
 	overflow = 0;
 
 	while (ptr < end && isdigit(*ptr)) {
-		dig = (*ptr) - '0';
+		dig = (unsigned)((*ptr) - '0');
 		uval1 = 10 * uval + dig;
 		if (uval1 < uval) {
 			overflow = 1;

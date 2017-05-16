@@ -24,7 +24,7 @@
 #include "testutil.h"
 
 #define SENT_BREAK_TEST "data/ucd/auxiliary/SentenceBreakTest.txt"
-struct sentscan scan;
+struct corpus_sentscan scan;
 
 
 void setup_scan(void)
@@ -39,16 +39,16 @@ void teardown_scan(void)
 }
 
 
-void start(const struct text *text)
+void start(const struct corpus_text *text)
 {
-	sentscan_make(&scan, text);
+	corpus_sentscan_make(&scan, text);
 }
 
 
-const struct text *next(void)
+const struct corpus_text *next(void)
 {
-	struct text *sent;
-	if (!sentscan_advance(&scan)) {
+	struct corpus_text *sent;
+	if (!corpus_sentscan_advance(&scan)) {
 		return NULL;
 	}
 	sent = alloc(sizeof(*sent));
@@ -110,7 +110,7 @@ struct unitest {
 	unsigned line;
 	int is_ascii;
 
-	struct text text;
+	struct corpus_text text;
 	uint8_t buf[4096];
 
 	uint32_t code[256];
@@ -170,7 +170,7 @@ void setup_unicode(void)
 		case '#':
 			comment = &test->comment[0];
 			do {
-				*comment++ = ch;
+				*comment++ = (char)ch;
 				ch = fgetc(file);
 			} while (ch != EOF && ch != '\n');
 			*comment = '\0';
@@ -184,9 +184,9 @@ void setup_unicode(void)
 
 			test->line = line;
 			test->is_ascii = is_ascii;
-			test->text.attr = dst - test->text.ptr;
+			test->text.attr = (size_t)(dst - test->text.ptr);
 			if (!is_ascii) {
-				test->text.attr |= TEXT_UTF8_BIT;
+				test->text.attr |= CORPUS_TEXT_UTF8_BIT;
 			}
 
 			if (ncode > 0) {
@@ -232,7 +232,7 @@ void setup_unicode(void)
 				if (code > 0x7F) {
 					is_ascii = 0;
 				}
-				encode_utf8((uint32_t)code, &dst);
+				corpus_encode_utf8((uint32_t)code, &dst);
 				test->code_end[ncode] = dst;
 				ncode++;
 			} else {
@@ -266,18 +266,18 @@ START_TEST(test_unicode)
 
 		//fprintf(stderr, "[%u]: ", i);
 		//write_unitest(stderr, test);
-		sentscan_make(&scan, &test->text);
+		corpus_sentscan_make(&scan, &test->text);
 
 		for (j = 0; j < test->nbreak; j++) {
 			//fprintf(stderr, "Break %u\n", j);
-			ck_assert(sentscan_advance(&scan));
+			ck_assert(corpus_sentscan_advance(&scan));
 			ck_assert_ptr_eq(scan.current.ptr,
 					 test->break_begin[j]);
 			ck_assert_ptr_eq(scan.current.ptr
-					 + TEXT_SIZE(&scan.current),
+					 + CORPUS_TEXT_SIZE(&scan.current),
 					 test->break_end[j]);
 		}
-		ck_assert(!sentscan_advance(&scan));
+		ck_assert(!corpus_sentscan_advance(&scan));
 	}
 }
 END_TEST

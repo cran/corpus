@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef WORDSCAN_H
-#define WORDSCAN_H
+#ifndef CORPUS_WORDSCAN_H
+#define CORPUS_WORDSCAN_H
 
 /**
  * \file wordscan.h
@@ -29,19 +29,17 @@
 /**
  * The type of the first character in a word type.
  */
-enum word_type {
-	WORD_NONE = -1,		/**< no letter, at start or end of text */
-	WORD_NEWLINE = 0,	/**< newline */
-	WORD_ZWJ,		/**< emoji zero-width-joiner */
-	WORD_EBASE,		/**< emoji modifier base */
-	WORD_ALETTER,		/**< alphabetic letter */
-	WORD_NUMERIC,		/**< numeric character */
-	WORD_EXTEND,		/**< connector punctuation */
-	WORD_HEBREW,		/**< Hebrew or general category
-				  "Other Letter" */
-	WORD_KATAKANA,		/**< Katakana letter */
-	WORD_REGIONAL,		/**< Regional indicator */
-	WORD_OTHER		/**< other character */
+enum corpus_word_type {
+	CORPUS_WORD_NONE = 0,	/**< words that do not fit into any of
+				  the other categories; includes spaces
+				  and most punctuation */
+	CORPUS_WORD_NUMBER,	/**< words that appear to be numbers */
+	CORPUS_WORD_LETTER,	/**< words that contain letters, excluding
+				  hiragana, katakana, and ideographic
+				  characters */
+	CORPUS_WORD_KANA,	/**< words containing kana characters */
+	CORPUS_WORD_IDEO	/**< words containing ideographic
+				  characters */
 };
 
 /**
@@ -53,8 +51,8 @@ enum word_type {
  * [demo]: http://unicode.org/cldr/utility/breaks.jsp
  * [uax29]: http://unicode.org/reports/tr29/
  */
-struct wordscan {
-	struct text text;	/**< the input text */
+struct corpus_wordscan {
+	struct corpus_text text;/**< the input text */
 	size_t text_attr;	/**< the input text attributes */
 
 	uint32_t code;		/**< next code point */
@@ -62,13 +60,13 @@ struct wordscan {
 	int prop;		/**< next code's word break property */
 	const uint8_t *ptr;	/**< next code's start */
 
-	struct text_iter iter;	/**< an iterator over the input,
+	struct corpus_text_iter iter;	/**< an iterator over the input,
 				  positioned past next code */
 	int iter_prop;		/**< iterator code's word break property */
 	const uint8_t *iter_ptr;/**< iterator code's start */
 
-	struct text current;	/**< the current word */
-	enum word_type type;	/**< the type of the current word */
+	struct corpus_text current;	/**< the current word */
+	enum corpus_word_type type;	/**< the type of the current word */
 };
 
 /**
@@ -77,7 +75,8 @@ struct wordscan {
  * \param scan the scanner to initialize
  * \param text the text
  */
-void wordscan_make(struct wordscan *scan, const struct text *text);
+void corpus_wordscan_make(struct corpus_wordscan *scan,
+			  const struct corpus_text *text);
 
 /**
  * Advance a scanner to the next word.
@@ -86,13 +85,13 @@ void wordscan_make(struct wordscan *scan, const struct text *text);
  *
  * \returns nonzero on success, zero if at the end of the text
  */
-int wordscan_advance(struct wordscan *scan);
+int corpus_wordscan_advance(struct corpus_wordscan *scan);
 
 /**
  * Reset a scanner to the beginning of the text.
  *
  * \param scan the scanner
  */
-void wordscan_reset(struct wordscan *scan);
+void corpus_wordscan_reset(struct corpus_wordscan *scan);
 
-#endif /* WORDSCAN_H */
+#endif /* CORPUS_WORDSCAN_H */

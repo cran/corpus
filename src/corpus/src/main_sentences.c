@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define _POSIX_C_SOURCE 2 // for getopt
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -33,8 +35,11 @@
 
 #define PROGRAM_NAME	"corpus"
 
+int main_sentences(int argc, char * const argv[]);
+void usage_sentences(void);
 
-void usage_sentences(int status)
+
+void usage_sentences(void)
 {
 	printf("\
 Usage:\t%s sentences [options] <path>\n\
@@ -46,19 +51,17 @@ Options:\n\
 \t-f <field>\tGets text from the given field (defaults to \"text\").\n\
 \t-o <path>\tSaves output at the given path.\n\
 ", PROGRAM_NAME);
-
-	exit(status);
 }
 
 
 int main_sentences(int argc, char * const argv[])
 {
-	struct sentscan scan;
-	struct data data, val;
-	struct text name, text;
-	struct schema schema;
-	struct filebuf buf;
-	struct filebuf_iter it;
+	struct corpus_sentscan scan;
+	struct corpus_data data, val;
+	struct corpus_text name, text;
+	struct corpus_schema schema;
+	struct corpus_filebuf buf;
+	struct corpus_filebuf_iter it;
 	const char *output = NULL;
 	const char *field, *input;
 	FILE *stream;
@@ -76,7 +79,8 @@ int main_sentences(int argc, char * const argv[])
 			output = optarg;
 			break;
 		default:
-			usage_sentences(EXIT_FAILURE);
+			usage_sentences();
+			return EXIT_FAILURE;
 		}
 	}
 
@@ -85,10 +89,12 @@ int main_sentences(int argc, char * const argv[])
 
 	if (argc == 0) {
 		fprintf(stderr, "No input file specified.\n\n");
-		usage_sentences(EXIT_FAILURE);
+		usage_sentences();
+		return EXIT_FAILURE;
 	} else if (argc > 1) {
 		fprintf(stderr, "Too many input files specified.\n\n");
-		usage_sentences(EXIT_FAILURE);
+		usage_sentences();
+		return EXIT_FAILURE;
 	}
 
 	field_len = strlen(field);
@@ -99,44 +105,44 @@ int main_sentences(int argc, char * const argv[])
 
 	input = argv[0];
 
-	if (text_assign(&name, (uint8_t *)field, field_len, 0)) {
+	if (corpus_text_assign(&name, (const uint8_t *)field, field_len, 0)) {
 		fprintf(stderr, "Invalid field name (%s)\n", field);
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
-	if ((err = schema_init(&schema))) {
+	if ((err = corpus_schema_init(&schema))) {
 		goto error_schema;
 	}
 
-	if ((err = filebuf_init(&buf, input))) {
+	if ((err = corpus_filebuf_init(&buf, input))) {
 		goto error_filebuf;
 	}
 
 	if (output) {
 		if (!(stream = fopen(output, "w"))) {
 			perror("Failed opening output file");
-			err = ERROR_OS;
+			err = CORPUS_ERROR_OS;
 			goto error_output;
 		}
 	} else {
 		stream = stdout;
 	}
 
-	if ((err = schema_name(&schema, &name, &name_id))) {
+	if ((err = corpus_schema_name(&schema, &name, &name_id))) {
 		goto error;
 	}
 
-	filebuf_iter_make(&it, &buf);
-	while (filebuf_iter_advance(&it)) {
-		if ((err = data_assign(&data, &schema, it.current.ptr,
-					it.current.size))) {
+	corpus_filebuf_iter_make(&it, &buf);
+	while (corpus_filebuf_iter_advance(&it)) {
+		if ((err = corpus_data_assign(&data, &schema, it.current.ptr,
+					      it.current.size))) {
 				goto error;
 		}
 
-		if ((err = data_field(&data, &schema, name_id, &val))) {
-			err = data_text(&data, &text);
+		if ((err = corpus_data_field(&data, &schema, name_id, &val))) {
+			err = corpus_data_text(&data, &text);
 		} else {
-			err = data_text(&val, &text);
+			err = corpus_data_text(&val, &text);
 		}
 
 		if (err) {
@@ -145,9 +151,9 @@ int main_sentences(int argc, char * const argv[])
 		}
 
 		fprintf(stream, "[");
-		sentscan_make(&scan, &text);
+		corpus_sentscan_make(&scan, &text);
 		start = 1;
-		while (sentscan_advance(&scan)) {
+		while (corpus_sentscan_advance(&scan)) {
 			if (!start) {
 				fprintf(stream, ", ");
 			} else {
@@ -155,7 +161,7 @@ int main_sentences(int argc, char * const argv[])
 			}
 
 			fprintf(stream, "\"%.*s\"",
-				(int)TEXT_SIZE(&scan.current),
+				(int)CORPUS_TEXT_SIZE(&scan.current),
 				(char *)scan.current.ptr);
 		}
 		fprintf(stream, "]\n");
@@ -166,12 +172,12 @@ int main_sentences(int argc, char * const argv[])
 error:
 	if (output && fclose(stream) == EOF) {
 		perror("Failed closing output file");
-		err = ERROR_OS;
+		err = CORPUS_ERROR_OS;
 	}
 error_output:
-	filebuf_destroy(&buf);
+	corpus_filebuf_destroy(&buf);
 error_filebuf:
-	schema_destroy(&schema);
+	corpus_schema_destroy(&schema);
 error_schema:
 	if (err) {
 		fprintf(stderr, "An error occurred.\n");

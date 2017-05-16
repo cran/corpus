@@ -19,12 +19,12 @@
 
 #include <stddef.h>
 
-struct text;
+struct corpus_text;
 
 #define ck_assert_tok_eq(X, Y) do { \
-	const struct text * _ck_x = (X); \
-	const struct text * _ck_y = (Y); \
-	ck_assert_msg(token_equals(_ck_y, _ck_x), \
+	const struct corpus_text * _ck_x = (X); \
+	const struct corpus_text * _ck_y = (Y); \
+	ck_assert_msg(corpus_token_equals(_ck_y, _ck_x), \
 		"Assertion '%s == %s' failed: %s==\"%s\" (0x%zx)," \
 		" %s==\"%s\" (0x%zx)", \
 		#X, #Y, #X, _ck_x->ptr, _ck_x->attr, \
@@ -32,9 +32,9 @@ struct text;
 } while (0)
 
 #define ck_assert_tok_ne(X, Y) do { \
-	const struct text * _ck_x = (X); \
-	const struct text * _ck_y = (Y); \
-	ck_assert_msg(!token_equals(_ck_y, _ck_x), \
+	const struct corpus_text * _ck_x = (X); \
+	const struct corpus_text * _ck_y = (Y); \
+	ck_assert_msg(!corpus_token_equals(_ck_y, _ck_x), \
 		"Assertion '%s != %s' failed: %s==\"%s\" (0x%zx)," \
 		" %s==\"%s\" (0x%zx)", \
 		#X, #Y, #X, _ck_x->ptr, _ck_x->attr, \
@@ -60,11 +60,11 @@ void *alloc(size_t size);
 /**
  * Allocate a text object, interpreting escape codes.
  */
-struct text *T(const char *str);
+struct corpus_text *T(const char *str);
 
 /**
  * Cast a raw string as a text object, ignoring escape codes.
  */
-struct text *S(const char *str);
+struct corpus_text *S(const char *str);
 
 #endif /* TESTUTIL_H */

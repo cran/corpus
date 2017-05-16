@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define _POSIX_C_SOURCE 2 // for getopt
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -32,8 +34,11 @@
 
 #define PROGRAM_NAME	"corpus"
 
+int main_get(int argc, char * const argv[]);
+void usage_get(void);
 
-void usage_get(int status)
+
+void usage_get(void)
 {
 	printf("\
 Usage:\t%s get [options] <field> <path>\n\
@@ -44,18 +49,16 @@ Description:\n\
 Options:\n\
 \t-o <path>\tSaves output at the given path.\n\
 ", PROGRAM_NAME);
-
-	exit(status);
 }
 
 
 int main_get(int argc, char * const argv[])
 {
-	struct data data, val;
-	struct text name;
-	struct schema schema;
-	struct filebuf buf;
-	struct filebuf_iter it;
+	struct corpus_data data, val;
+	struct corpus_text name;
+	struct corpus_schema schema;
+	struct corpus_filebuf buf;
+	struct corpus_filebuf_iter it;
 	const char *output = NULL;
 	const char *field, *input;
 	FILE *stream;
@@ -68,7 +71,8 @@ int main_get(int argc, char * const argv[])
 			output = optarg;
 			break;
 		default:
-			usage_get(EXIT_FAILURE);
+			usage_get();
+			return EXIT_FAILURE;
 		}
 	}
 
@@ -77,13 +81,16 @@ int main_get(int argc, char * const argv[])
 
 	if (argc == 0) {
 		fprintf(stderr, "No field specified.\n\n");
-		usage_get(EXIT_FAILURE);
+		usage_get();
+		return EXIT_FAILURE;
 	} else if (argc == 1) {
 		fprintf(stderr, "No input file specified.\n\n");
-		usage_get(EXIT_FAILURE);
+		usage_get();
+		return EXIT_FAILURE;
 	} else if (argc > 2) {
 		fprintf(stderr, "Too many input files specified.\n\n");
-		usage_get(EXIT_FAILURE);
+		usage_get();
+		return EXIT_FAILURE;
 	}
 
 	field = argv[0];
@@ -95,44 +102,44 @@ int main_get(int argc, char * const argv[])
 		field_len -= 2;
 	}
 
-	if (text_assign(&name, (uint8_t *)field, field_len, 0)) {
+	if (corpus_text_assign(&name, (const uint8_t *)field, field_len, 0)) {
 		fprintf(stderr, "Invalid field name (%s)\n", field);
-		exit(EXIT_FAILURE);
+		return EXIT_FAILURE;
 	}
 
-	if ((err = schema_init(&schema))) {
+	if ((err = corpus_schema_init(&schema))) {
 		goto error_schema;
 	}
 
-	if ((err = filebuf_init(&buf, input))) {
+	if ((err = corpus_filebuf_init(&buf, input))) {
 		goto error_filebuf;
 	}
 
 	if (output) {
 		if (!(stream = fopen(output, "w"))) {
 			perror("Failed opening output file");
-			err = ERROR_OS;
+			err = CORPUS_ERROR_OS;
 			goto error_output;
 		}
 	} else {
 		stream = stdout;
 	}
 
-	if ((err = schema_name(&schema, &name, &name_id))) {
+	if ((err = corpus_schema_name(&schema, &name, &name_id))) {
 		goto error_get;
 	}
 
-	filebuf_iter_make(&it, &buf);
-	while (filebuf_iter_advance(&it)) {
-		if ((err = data_assign(&data, &schema, it.current.ptr,
-					it.current.size))) {
+	corpus_filebuf_iter_make(&it, &buf);
+	while (corpus_filebuf_iter_advance(&it)) {
+		if ((err = corpus_data_assign(&data, &schema, it.current.ptr,
+					      it.current.size))) {
 			goto error_get;
 		}
 
-		if (data_field(&data, &schema, name_id, &val) == 0) {
+		if (corpus_data_field(&data, &schema, name_id, &val) == 0) {
 			// field exists
 			fprintf(stream, "%.*s\n", (int)val.size,
-				(char *)val.ptr);
+				(const char *)val.ptr);
 		} else {
 			// field is null
 			fprintf(stream, "null\n");
@@ -144,12 +151,12 @@ int main_get(int argc, char * const argv[])
 error_get:
 	if (output && fclose(stream) == EOF) {
 		perror("Failed closing output file");
-		err = ERROR_OS;
+		err = CORPUS_ERROR_OS;
 	}
 error_output:
-	filebuf_destroy(&buf);
+	corpus_filebuf_destroy(&buf);
 error_filebuf:
-	schema_destroy(&schema);
+	corpus_schema_destroy(&schema);
 error_schema:
 	if (err) {
 		fprintf(stderr, "An error occurred.\n");

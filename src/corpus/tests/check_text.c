@@ -39,38 +39,39 @@ void setup_text(void)
 void teardown_text(void)
 {
 	teardown();
-	logmsg_func = NULL;
+	corpus_log_func = NULL;
 }
 
 
 int is_valid_text(const char *str)
 {
-	struct text text;
+	struct corpus_text text;
 	size_t n = strlen(str);
-	int err = text_assign(&text, (const uint8_t *)str, n, 0);
+	int err = corpus_text_assign(&text, (const uint8_t *)str, n, 0);
 	return !err;
 }
 
 
 int is_valid_raw(const char *str)
 {
-	struct text text;
+	struct corpus_text text;
 	size_t n = strlen(str);
-	int err = text_assign(&text, (const uint8_t *)str, n, TEXT_NOESCAPE);
+	int err = corpus_text_assign(&text, (const uint8_t *)str, n,
+				     CORPUS_TEXT_NOESCAPE);
 	return !err;
 }
 
 
-const char *unescape(const struct text *text)
+const char *unescape(const struct corpus_text *text)
 {
-	struct text_iter it;
-	size_t n = TEXT_SIZE(text);
+	struct corpus_text_iter it;
+	size_t n = CORPUS_TEXT_SIZE(text);
 	uint8_t *buf = alloc(n + 1);
 	uint8_t *ptr = buf;
 
-	text_iter_make(&it, text);
-	while (text_iter_advance(&it)) {
-		encode_utf8(it.current, &ptr);
+	corpus_text_iter_make(&it, text);
+	while (corpus_text_iter_advance(&it)) {
+		corpus_encode_utf8(it.current, &ptr);
 	}
 	*ptr = '\0';
 	return (const char *)buf;
@@ -90,7 +91,7 @@ END_TEST
 
 START_TEST(test_invalid_text)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(!is_valid_text("invalid utf-8 \xBF"));
 	ck_assert(!is_valid_text("invalid utf-8 \xC2\x7F"));
@@ -129,7 +130,7 @@ END_TEST
 
 START_TEST(test_invalid_raw)
 {
-	logmsg_func = ignore_message;
+	corpus_log_func = ignore_message;
 
 	ck_assert(!is_valid_raw("invalid utf-8 \xBF"));
 	ck_assert(!is_valid_raw("invalid utf-8 \xC2\x7F"));

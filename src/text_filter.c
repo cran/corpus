@@ -100,9 +100,26 @@ static int text_filter_logical(SEXP filter, const char *key, int nullval)
 }
 
 
-int text_filter_drop_empty(SEXP filter)
+int text_filter_ignore_empty(SEXP filter)
 {
-	return text_filter_logical(filter, "drop_empty", 0);
+	return text_filter_logical(filter, "ignore_empty", 0);
+}
+
+
+void text_filter_get_drop(SEXP filter,
+			  struct text_filter_drop *dropptr)
+{
+	struct text_filter_drop drop;
+
+	drop.symbol = text_filter_logical(filter, "drop_symbol", 0);
+	drop.number = text_filter_logical(filter, "drop_number", 0);
+	drop.letter = text_filter_logical(filter, "drop_letter", 0);
+	drop.kana = text_filter_logical(filter, "drop_kana", 0);
+	drop.ideo = text_filter_logical(filter, "drop_ideo", 0);
+
+	if (dropptr) {
+		*dropptr = drop;
+	}
 }
 
 
@@ -117,25 +134,25 @@ int text_filter_type_kind(SEXP filter)
 	kind = 0;
 
 	if (text_filter_logical(filter, "fold_case", 0)) {
-		kind |= TYPE_CASEFOLD;
+		kind |= CORPUS_TYPE_CASEFOLD;
 	}
 	if (text_filter_logical(filter, "fold_dash", 0)) {
-		kind |= TYPE_DASHFOLD;
+		kind |= CORPUS_TYPE_DASHFOLD;
 	}
 	if (text_filter_logical(filter, "fold_quote", 0)) {
-		kind |= TYPE_QUOTFOLD;
+		kind |= CORPUS_TYPE_QUOTFOLD;
 	}
 	if (text_filter_logical(filter, "map_compatible", 0)) {
-		kind |= TYPE_COMPAT;
+		kind |= CORPUS_TYPE_COMPAT;
 	}
 	if (text_filter_logical(filter, "remove_control", 0)) {
-		kind |= TYPE_RMCC;
+		kind |= CORPUS_TYPE_RMCC;
 	}
 	if (text_filter_logical(filter, "remove_ignorable", 0)) {
-		kind |= TYPE_RMDI;
+		kind |= CORPUS_TYPE_RMDI;
 	}
 	if (text_filter_logical(filter, "remove_whitespace", 0)) {
-		kind |= TYPE_RMWS;
+		kind |= CORPUS_TYPE_RMWS;
 	}
 
 	return kind;

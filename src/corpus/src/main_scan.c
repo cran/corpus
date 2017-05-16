@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#define _POSIX_C_SOURCE 2 // for getopt
+
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -32,8 +34,11 @@
 
 #define PROGRAM_NAME	"corpus"
 
+int main_scan(int argc, char * const argv[]);
+void usage_scan(void);
 
-void usage_scan(int status)
+
+void usage_scan(void)
 {
 	printf("\
 Usage:\t%s scan [options] <path>\n\
@@ -45,16 +50,14 @@ Options:\n\
 \t-l\t\tPrints type information for each line.\n\
 \t-o <path>\tSaves output at the given path.\n\
 ", PROGRAM_NAME);
-
-	exit(status);
 }
 
 
 int main_scan(int argc, char * const argv[])
 {
-	struct schema schema;
-	struct filebuf buf;
-	struct filebuf_iter it;
+	struct corpus_schema schema;
+	struct corpus_filebuf buf;
+	struct corpus_filebuf_iter it;
 	const char *output = NULL;
 	const char *input = NULL;
 	FILE *stream;
@@ -71,7 +74,8 @@ int main_scan(int argc, char * const argv[])
 			output = optarg;
 			break;
 		default:
-			usage_scan(EXIT_FAILURE);
+			usage_scan();
+			return EXIT_FAILURE;
 		}
 	}
 
@@ -80,26 +84,28 @@ int main_scan(int argc, char * const argv[])
 
 	if (argc == 0) {
 		fprintf(stderr, "No input file specified.\n\n");
-		usage_scan(EXIT_FAILURE);
+		usage_scan();
+		return EXIT_FAILURE;
 	} else if (argc > 1) {
 		fprintf(stderr, "Too many input files specified.\n\n");
-		usage_scan(EXIT_FAILURE);
+		usage_scan();
+		return EXIT_FAILURE;
 	}
 
 	input = argv[0];
 
-	if ((err = schema_init(&schema))) {
+	if ((err = corpus_schema_init(&schema))) {
 		goto error_schema;
 	}
 
-	if ((err = filebuf_init(&buf, input))) {
+	if ((err = corpus_filebuf_init(&buf, input))) {
 		goto error_filebuf;
 	}
 
 	if (output) {
 		if (!(stream = fopen(output, "w"))) {
 			perror("Failed opening output file");
-			err = ERROR_OS;
+			err = CORPUS_ERROR_OS;
 			goto error_output;
 		}
 	} else {
@@ -110,25 +116,26 @@ int main_scan(int argc, char * const argv[])
 	fprintf(stream, "format: %s\n", "newline-delimited JSON");
 	fprintf(stream, "--\n");
 
-	type_id = DATATYPE_NULL;
+	type_id = CORPUS_DATATYPE_NULL;
 
-	filebuf_iter_make(&it, &buf);
+	corpus_filebuf_iter_make(&it, &buf);
 	lineno = 0;
-	while (filebuf_iter_advance(&it)) {
+	while (corpus_filebuf_iter_advance(&it)) {
 		lineno++;
 
-		if ((err = schema_scan(&schema, it.current.ptr,
+		if ((err = corpus_schema_scan(&schema, it.current.ptr,
 					it.current.size, &id))) {
 			goto error_scan;
 		}
 
 		if (lines) {
 			fprintf(stream, "%"PRId64"\t", lineno);
-			write_datatype(stream, &schema, id);
+			corpus_write_datatype(stream, &schema, id);
 			fprintf(stream, "\n");
 		}
 
-		if ((err = schema_union(&schema, type_id, id, &type_id))) {
+		if ((err = corpus_schema_union(&schema, type_id, id,
+					       &type_id))) {
 			goto error_scan;
 		}
 	}
@@ -136,7 +143,7 @@ int main_scan(int argc, char * const argv[])
 	if (lines) {
 		fprintf(stream, "--\n");
 	}
-	write_datatype(stream, &schema, type_id);
+	corpus_write_datatype(stream, &schema, type_id);
 	fprintf(stream, "\n");
 	fprintf(stream, "%"PRId64" rows\n", lineno);
 	err = 0;
@@ -144,12 +151,12 @@ int main_scan(int argc, char * const argv[])
 error_scan:
 	if (output && fclose(stream) == EOF) {
 		perror("Failed closing output file");
-		err = ERROR_OS;
+		err = CORPUS_ERROR_OS;
 	}
 error_output:
-	filebuf_destroy(&buf);
+	corpus_filebuf_destroy(&buf);
 error_filebuf:
-	schema_destroy(&schema);
+	corpus_schema_destroy(&schema);
 error_schema:
 	if (err) {
 		fprintf(stderr, "An error occurred.\n");
