@@ -23,13 +23,15 @@
 
 #include "corpus/src/table.h"
 #include "corpus/src/text.h"
-#include "corpus/src/token.h"
+#include "corpus/src/textset.h"
+#include "corpus/src/typemap.h"
 #include "corpus/src/symtab.h"
 #include "corpus/src/datatype.h"
 #include "corpus/src/data.h"
 
 struct corpus_data;
 struct corpus_filebuf;
+struct corpus_filter;
 
 struct jsondata {
 	struct corpus_schema schema;
@@ -77,8 +79,10 @@ struct jsondata *as_jsondata(SEXP data);
 
 SEXP as_integer_jsondata(SEXP data);
 SEXP as_double_jsondata(SEXP data);
-SEXP as_list_jsondata(SEXP data);
+SEXP as_factor_jsondata(SEXP data);
+SEXP as_list_jsondata(SEXP data, SEXP text, SEXP stringsAsFactors);
 SEXP as_logical_jsondata(SEXP data);
+SEXP as_character_jsondata(SEXP data);
 SEXP as_text_jsondata(SEXP data);
 SEXP dim_jsondata(SEXP data);
 SEXP length_jsondata(SEXP data);
@@ -86,7 +90,7 @@ SEXP names_jsondata(SEXP data);
 SEXP print_jsondata(SEXP data);
 SEXP datatype_jsondata(SEXP data);
 SEXP datatypes_jsondata(SEXP data);
-SEXP simplify_jsondata(SEXP data);
+SEXP simplify_jsondata(SEXP data, SEXP text, SEXP stringsAsFactors);
 SEXP subscript_jsondata(SEXP data, SEXP i);
 SEXP subset_jsondata(SEXP data, SEXP i, SEXP j);
 
@@ -115,23 +119,16 @@ SEXP is_na_text(SEXP text);
 SEXP anyNA_text(SEXP text);
 
 /* text filter */
-struct text_filter_drop {
-	int symbol;
-	int number;
-	int letter;
-	int kana;
-	int ideo;
-};
-
-int is_text_filter(SEXP filter);
-int text_filter_type_kind(SEXP filter);
-int text_filter_ignore_empty(SEXP filter);
-void text_filter_get_drop(SEXP filter, struct text_filter_drop *dropptr);
-const char *text_filter_stemmer(SEXP filter);
+SEXP alloc_filter(SEXP props);
+int is_filter(SEXP filter);
+struct corpus_filter *as_filter(SEXP filter);
 
 /* text processing */
 SEXP sentences_text(SEXP x);
-SEXP tokens_text(SEXP x, SEXP filter);
+SEXP tokens_text(SEXP x, SEXP props);
+SEXP term_counts_text(SEXP x, SEXP props, SEXP weights);
+SEXP term_matrix_text(SEXP x, SEXP props, SEXP weights, SEXP group);
+SEXP stopwords(SEXP kind);
 
 /* data schema */
 SEXP alloc_schema(void);

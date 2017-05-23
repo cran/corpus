@@ -23,9 +23,11 @@
 #include "private/stopwords.h"
 #include "error.h"
 #include "memory.h"
+#include "table.h"
 #include "text.h"
+#include "textset.h"
 #include "unicode.h"
-#include "token.h"
+#include "typemap.h"
 
 
 static void corpus_typemap_clear_kind(struct corpus_typemap *map);
@@ -62,6 +64,11 @@ int corpus_typemap_init(struct corpus_typemap *map, int kind,
 			const char *stemmer)
 {
 	int err;
+
+	if ((err = corpus_textset_init(&map->excepts))) {
+		corpus_log(err, "failed initializing stem exception set");
+		goto out;
+	}
 
 	if (stemmer) {
 		errno = 0;
@@ -100,6 +107,7 @@ void corpus_typemap_destroy(struct corpus_typemap *map)
 	if (map->stemmer) {
 		sb_stemmer_delete(map->stemmer);
 	}
+	corpus_textset_destroy(&map->excepts);
 }
 
 
@@ -241,6 +249,19 @@ error:
 }
 
 
+int corpus_typemap_stem_except(struct corpus_typemap *map,
+			       const struct corpus_text *typ)
+{
+	int err;
+
+	if ((err = corpus_textset_add(&map->excepts, typ, NULL))) {
+		corpus_log(err, "failed adding type to stem exception set");
+	}
+
+	return err;
+}
+
+
 int corpus_typemap_stem(struct corpus_typemap *map)
 {
 	size_t size;
@@ -248,6 +269,10 @@ int corpus_typemap_stem(struct corpus_typemap *map)
 	int err;
 
 	if (!map->stemmer) {
+		return 0;
+	}
+
+	if (corpus_textset_has(&map->excepts, &map->type, NULL)) {
 		return 0;
 	}
 
@@ -553,40 +578,4 @@ int corpus_typemap_set_ascii(struct corpus_typemap *map,
 error:
 	corpus_log(err, "failed normalizing token");
 	return err;
-}
-
-
-// Dan Bernstein's djb2 XOR hash: http://www.cse.yorku.ca/~oz/hash.html
-unsigned corpus_token_hash(const struct corpus_text *tok)
-{
-	const uint8_t *ptr = tok->ptr;
-	const uint8_t *end = ptr + CORPUS_TEXT_SIZE(tok);
-	unsigned hash = 5381;
-	uint_fast8_t ch;
-
-	while (ptr != end) {
-		ch = *ptr++;
-		hash = ((hash << 5) + hash) ^ ch;
-	}
-
-	return hash;
-}
-
-
-int corpus_token_equals(const struct corpus_text *t1,
-			const struct corpus_text *t2)
-{
-	return ((t1->attr & ~CORPUS_TEXT_UTF8_BIT)
-			== (t2->attr & ~CORPUS_TEXT_UTF8_BIT)
-		&& !memcmp(t1->ptr, t2->ptr, CORPUS_TEXT_SIZE(t2)));
-}
-
-
-int corpus_compare_type(const struct corpus_text *typ1,
-			const struct corpus_text *typ2)
-{
-	size_t n1 = CORPUS_TEXT_SIZE(typ1);
-	size_t n2 = CORPUS_TEXT_SIZE(typ2);
-	size_t n = (n1 < n2) ? n1 : n2;
-	return memcmp(typ1->ptr, typ2->ptr, n);
 }

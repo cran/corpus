@@ -27,8 +27,10 @@
 #include "corpus/src/render.h"
 #include "corpus/src/table.h"
 #include "corpus/src/text.h"
-#include "corpus/src/token.h"
+#include "corpus/src/textset.h"
+#include "corpus/src/typemap.h"
 #include "corpus/src/symtab.h"
+#include "corpus/src/unicode.h"
 #include "corpus/src/data.h"
 #include "corpus/src/datatype.h"
 #include "rcorpus.h"
@@ -502,7 +504,7 @@ SEXP print_jsondata(SEXP sdata)
 	}
 
 	if (d->kind == CORPUS_DATATYPE_RECORD) {
-		Rprintf("JSON jsondata with %"PRIu64" rows"
+		Rprintf("JSON data set with %"PRIu64" rows"
 			" of the following type:\n%s\n",
 			(uint64_t)d->nrow, r.string);
 	} else {
@@ -857,7 +859,173 @@ SEXP as_logical_jsondata(SEXP sdata)
 }
 
 
-static SEXP as_list_jsondata_record(SEXP sdata)
+SEXP as_character_jsondata(SEXP sdata)
+{
+	SEXP ans;
+	const struct jsondata *d = as_jsondata(sdata);
+	struct mkchar mkchar;
+	struct corpus_text text;
+	R_xlen_t i, n = d->nrow;
+	int err;
+
+	PROTECT(ans = allocVector(STRSXP, n));
+
+	mkchar_init(&mkchar);
+
+	for (i = 0; i < n; i++) {
+		err = corpus_data_text(&d->rows[i], &text);
+		if (err == CORPUS_ERROR_INVAL) {
+			SET_STRING_ELT(ans, i, NA_STRING);
+		} else {
+			SET_STRING_ELT(ans, i, mkchar_get(&mkchar, &text));
+		}
+	}
+
+	mkchar_destroy(&mkchar);
+
+	UNPROTECT(1);
+	return ans;
+}
+
+
+SEXP as_factor_jsondata(SEXP sdata)
+{
+	SEXP ans, lev, levels;
+	const struct jsondata *d = as_jsondata(sdata);
+	struct corpus_text text;
+	struct corpus_text_iter it;
+	struct corpus_textset set;
+	struct mkchar mkchar;
+	R_xlen_t i, n = d->nrow;
+	int err, id, utf8, nprot = 0;
+	struct corpus_text buf;
+	uint8_t *ptr;
+	size_t nbuf;
+
+	buf.ptr = NULL;
+	buf.attr = 0;
+	nbuf = 0;
+
+	PROTECT(ans = allocVector(INTSXP, n)); nprot++;
+
+	if ((err = corpus_textset_init(&set))) {
+		goto error_init;
+	}
+
+	for (i = 0; i < n; i++) {
+		err = corpus_data_text(&d->rows[i], &text);
+		if (err == CORPUS_ERROR_INVAL) {
+			id = NA_INTEGER;
+		} else {
+			// decode escapes in the input
+			if (CORPUS_TEXT_HAS_ESC(&text)) {
+				if (CORPUS_TEXT_SIZE(&text) >= nbuf) {
+					nbuf = CORPUS_TEXT_SIZE(&text);
+					ptr = realloc(buf.ptr, nbuf);
+					if (!ptr) {
+						corpus_textset_destroy(&set);
+						free(buf.ptr);
+						error("failed allocating"
+						      " %"PRIu64" bytes",
+						      (uint64_t)nbuf);
+					}
+					buf.ptr = ptr;
+				}
+
+				utf8 = 0;
+				ptr = buf.ptr;
+				corpus_text_iter_make(&it, &text);
+
+				while (corpus_text_iter_advance(&it)) {
+					if (!CORPUS_IS_ASCII(it.current)) {
+						utf8 = 1;
+					}
+					corpus_encode_utf8(it.current,
+							   &ptr);
+				}
+
+				buf.attr = (size_t)(ptr - buf.ptr);
+				if (utf8) {
+					buf.attr |= CORPUS_TEXT_UTF8_BIT;
+				}
+
+				err = corpus_textset_add(&set, &buf, &id);
+			} else {
+				err = corpus_textset_add(&set, &text, &id);
+			}
+
+			if (err) {
+				goto error_add;
+			}
+			if (id == INT_MAX || id + 1 == NA_INTEGER) {
+				corpus_textset_destroy(&set);
+				free(buf.ptr);
+				error("number of factor levels (%d)"
+				      " exceeds maximum", id);
+			}
+		}
+		INTEGER(ans)[i] = id + 1;
+	}
+
+	PROTECT(levels = allocVector(STRSXP, set.nitem)); nprot++;
+
+	mkchar_init(&mkchar);
+
+	for (id = 0; id < set.nitem; id++) {
+		lev = mkchar_get(&mkchar, &set.items[id]);
+		SET_STRING_ELT(levels, id, lev);
+	}
+
+	mkchar_destroy(&mkchar);
+
+	setAttrib(ans, R_LevelsSymbol, levels);
+	setAttrib(ans, R_ClassSymbol, mkString("factor"));
+
+error_add:
+	corpus_textset_destroy(&set);
+	free(buf.ptr);
+error_init:
+	if (err) {
+		error("failed decoding JSON data to factor type");
+	}
+	UNPROTECT(nprot);
+	return ans;
+}
+
+
+static int in_string_set(SEXP strs, SEXP item)
+{
+	R_xlen_t i, n;
+	const char *s1, *s2;
+
+	if (strs == R_NilValue || item == NA_STRING) {
+		return 0;
+	}
+
+	n = XLENGTH(strs);
+	if (n == 0) {
+		return 0;
+	}
+
+	s2 = translateCharUTF8(item);
+
+	for (i = 0; i < n; i++) {
+		if (STRING_ELT(strs, i) == NA_STRING) {
+			continue;
+		}
+
+		s1 = translateCharUTF8(STRING_ELT(strs, i));
+		if (strcmp(s1, s2) == 0) {
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
+
+static SEXP as_list_jsondata_record(SEXP sdata, SEXP stext,
+				    SEXP stringsAsFactors)
 {
 	SEXP ans, ans_j, names, sbuffer, sfield, sfield2, srows,
 	     shandle, sname;
@@ -953,7 +1121,14 @@ static SEXP as_list_jsondata_record(SEXP sdata)
 			d_j->kind = schema[j]->types[type_id[j]].kind;
 		}
 
-		ans_j = simplify_jsondata(ans_j);
+		if (d_j->kind == CORPUS_DATATYPE_TEXT
+				&& in_string_set(stext,
+						 STRING_ELT(names, j))) {
+			ans_j = as_text_jsondata(ans_j);
+		} else {
+			ans_j = simplify_jsondata(ans_j, stext,
+						  stringsAsFactors);
+		}
 		SET_VECTOR_ELT(ans, j, ans_j);
 	}
 
@@ -962,7 +1137,7 @@ static SEXP as_list_jsondata_record(SEXP sdata)
 }
 
 
-SEXP as_list_jsondata(SEXP sdata)
+SEXP as_list_jsondata(SEXP sdata, SEXP stext, SEXP stringsAsFactors)
 {
 	SEXP ans, val;
 	const struct jsondata *d = as_jsondata(sdata);
@@ -971,7 +1146,7 @@ SEXP as_list_jsondata(SEXP sdata)
 	R_xlen_t i, n = d->nrow;
 
 	if (d->kind == CORPUS_DATATYPE_RECORD) {
-		return as_list_jsondata_record(sdata);
+		return as_list_jsondata_record(sdata, stext, stringsAsFactors);
 	}
 
 	PROTECT(ans = allocVector(VECSXP, n));
@@ -994,7 +1169,7 @@ SEXP as_list_jsondata(SEXP sdata)
 }
 
 
-SEXP simplify_jsondata(SEXP sdata)
+SEXP simplify_jsondata(SEXP sdata, SEXP stext, SEXP sstringsAsFactors)
 {
 	SEXP ans;
 	const struct jsondata *d = as_jsondata(sdata);
@@ -1018,11 +1193,15 @@ SEXP simplify_jsondata(SEXP sdata)
 		break;
 
 	case CORPUS_DATATYPE_TEXT:
-		ans = as_text_jsondata(sdata);
+		if (LOGICAL(sstringsAsFactors)[0] == TRUE) {
+			ans = as_factor_jsondata(sdata);
+		} else {
+			ans = as_character_jsondata(sdata);
+		}
 		break;
 
 	case CORPUS_DATATYPE_ARRAY:
-		ans = as_list_jsondata(sdata);
+		ans = as_list_jsondata(sdata, stext, sstringsAsFactors);
 		break;
 
 	default:

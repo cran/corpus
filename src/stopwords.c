@@ -14,41 +14,40 @@
  * limitations under the License.
  */
 
-#include <string.h>
-#include <Rdefines.h>
+#include <stdint.h>
+#include "corpus/src/table.h"
+#include "corpus/src/text.h"
+#include "corpus/src/textset.h"
+#include "corpus/src/typemap.h"
 #include "rcorpus.h"
 
 
-/* based on R-Exts Section 5.9.6 "handling lists" */
-int findListElement(SEXP list, const char *str)
+SEXP stopwords(SEXP skind)
 {
-	SEXP names;
+	SEXP ans;
+	const char **words;
+	const char *kind;
 	int i, n;
 
-	if (list == R_NilValue) {
-		return -1;
-	}
+        PROTECT(skind = coerceVector(skind, STRSXP));
 
-	names = getAttrib(list, R_NamesSymbol);
-	if (names == R_NilValue) {
-		return -1;
-	}
-
-	n = LENGTH(list);
-	for (i = 0; i < n; i++) {
-		if(strcmp(CHAR(STRING_ELT(names, i)), str) == 0) {
-			return i;
-		}
-	}
-	return -1;
-}
-
-
-SEXP getListElement(SEXP list, const char *str)
-{
-	int i = findListElement(list, str);
-	if (i < 0) {
+	if (STRING_ELT(skind, 0) == NA_STRING) {
+		UNPROTECT(1);
 		return R_NilValue;
 	}
-	return VECTOR_ELT(list, i);
+
+	kind = translateCharUTF8(STRING_ELT(skind, 0));
+	words = (const char **)corpus_stopwords(kind, &n);
+
+	if (!words) {
+		error("unknown stopwords kind: '%s'", kind);
+	}
+
+	PROTECT(ans = allocVector(STRSXP, n));
+	for (i = 0; i < n; i++) {
+		SET_STRING_ELT(ans, i, mkCharCE(words[i], CE_UTF8));
+	}
+
+	UNPROTECT(2);
+	return ans;
 }

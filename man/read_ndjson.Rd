@@ -6,7 +6,8 @@
     (NDJSON) format.
 }
 \usage{
-    read_ndjson(file, mmap = FALSE, simplify = TRUE)
+    read_ndjson(file, mmap = FALSE, simplify = TRUE, text = "text",
+                stringsAsFactors = default.stringsAsFactors())
 }
 \arguments{
     \item{file}{the name of the file which the data are to be read from,
@@ -22,16 +23,21 @@
        value. For example, if each line of the file stores an integer,
        if \code{simplify} is set to \code{TRUE} then the return value
        will be an integer vector rather than a \code{jsondata} object.}
+
+    \item{text}{a character vector of string fields to interpret as
+       \code{text} instead of \code{character} or \code{factor}.}
+
+    \item{stringsAsFactors}{a logical value indicating whether to interpret
+        JSON character strings as \code{factor} instead of \code{character}.}
 }
 \details{
-    This function is the principal means of reading data for processing
+    This function is the recommended means of reading data for processing
     by the corpus package.
 
-    In the default usage, with argument \code{simplify = TRUE}, when
-    the lines of the file are records (JSON object literals), the
-    return value from \code{read_ndjson} is a data frame. With
-    \code{simplify = FALSE}, the result is a \code{jsondata} object.
-
+    When the \code{text} argument is non-\code{NULL} string data
+    fields with names indicated by this argument are decoded as
+    \code{text} values, not as \code{character} values. The default behavior
+    is to decode fields named \code{"text"} as \code{text} values.
 }
 \section{Memory mapping}{
     When you specify \code{mmap = TRUE}, the function memory-maps the file
@@ -53,7 +59,7 @@
     Another danger in memory-mapping is that if you serialize a
     \code{jsondata} object or derived \code{text} object using
     \code{\link{saveRDS}} or another similar function, and then you
-    de-serialize the object, then R will attempt create a new memory-map
+    deserialize the object, then R will attempt create a new memory-map
     using the original \code{file} argument passed to the \code{read_ndjson}
     call. If \code{file} is a relative path, then your working directory
     at the time of deserialization must agree with your working directory
@@ -62,8 +68,16 @@
     (the \code{\link{normalizePath}} function will convert a relative
     to an absolute path).
 }
+\value{
+    In the default usage, with argument \code{simplify = TRUE}, when
+    the lines of the file are records (JSON object literals), the
+    return value from \code{read_ndjson} is a data frame. With
+    \code{simplify = FALSE}, the result is a \code{jsondata} object.
+}
+\seealso{
+    \code{\link{text}}.
+}
 \examples{
-
     # Memory mapping
     lines <- c('{ "a": 1, "b": true }',
                '{ "b": false, "nested": { "c": 100, "d": false }}',

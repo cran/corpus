@@ -13,7 +13,8 @@
 #  limitations under the License.
 
 
-read_ndjson <- function(file, mmap = FALSE, simplify = TRUE)
+read_ndjson <- function(file, mmap = FALSE, simplify = TRUE, text = "text",
+                        stringsAsFactors = default.stringsAsFactors())
 {
     if (mmap) {
         if (!is.character(file)) {
@@ -52,9 +53,12 @@ read_ndjson <- function(file, mmap = FALSE, simplify = TRUE)
     }
 
     if (simplify) {
-        ans <- .Call(C_simplify_jsondata, ans)
+        text <- as.character(text)
         if (length(dim(ans)) == 2) {
-            ans <- as.data.frame(ans)
+            ans <- as.data.frame(ans, text = text,
+                                 stringsAsFactors = stringsAsFactors)
+        } else {
+            ans <- .Call(C_simplify_jsondata, ans, text, stringsAsFactors)
         }
     }
     ans
@@ -164,7 +168,7 @@ print.jsondata <- function(x, ...)
     }
 
     ans <- .Call(C_subscript_jsondata, x, i)
-    ans <- .Call(C_simplify_jsondata, ans)
+    ans <- .Call(C_simplify_jsondata, ans, NULL, FALSE)
     ans
 }
 
@@ -252,14 +256,17 @@ print.jsondata <- function(x, ...)
 
 as.character.jsondata <- function(x, ...)
 {
-    as.character(as_text.jsondata(x, ...))
+    as.character(C_as_character_jsondata, x)
 }
 
 
-as.data.frame.jsondata <- function(x, ...)
+as.data.frame.jsondata <-
+    function(x, ..., text = "text",
+             stringsAsFactors = default.stringsAsFactors())
 {
-    l <- as.list(x)
-    as.data.frame(l, row.names=row.names(x), ...)
+    l <- as.list(x, text = text, stringsAsFactors = stringsAsFactors)
+    as.data.frame(l, row.names = row.names(x), ...,
+                  text = text, stringsAsFactors = stringsAsFactors)
 }
 
 
@@ -281,9 +288,11 @@ as.double.jsondata <- function(x, ...)
 }
 
 
-as.list.jsondata <- function(x, ...)
+as.list.jsondata <- function(x, ..., text = "text",
+                             stringsAsFactors = default.stringsAsFactors())
 {
-    .Call(C_as_list_jsondata, x)
+    text <- as.character(text)
+    .Call(C_as_list_jsondata, x, text, stringsAsFactors)
 }
 
 

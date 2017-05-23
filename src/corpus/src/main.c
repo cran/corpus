@@ -27,13 +27,14 @@
 #include "filebuf.h"
 #include "table.h"
 #include "text.h"
-#include "token.h"
+#include "textset.h"
+#include "typemap.h"
 #include "symtab.h"
 #include "datatype.h"
 #include "data.h"
 
 #define PROGRAM_NAME	"corpus"
-#define PROGRAM_VERSION	"0.4.0"
+#define PROGRAM_VERSION	"0.5.0"
 
 void usage(void);
 void usage_get(void);

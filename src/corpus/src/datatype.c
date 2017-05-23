@@ -26,7 +26,8 @@
 #include "render.h"
 #include "table.h"
 #include "text.h"
-#include "token.h"
+#include "textset.h"
+#include "typemap.h"
 #include "symtab.h"
 #include "data.h"
 #include "datatype.h"
@@ -1743,6 +1744,8 @@ int record_equals(const struct corpus_datatype_record *t1,
 
 	if (t1->nfield != t2->nfield) {
 		eq = 0;
+	} else if (n == 0) {
+		eq = 1;
 	} else if (memcmp(t1->type_ids, t2->type_ids,
 			  (size_t)n * sizeof(*t1->type_ids))) {
 		eq = 0;
