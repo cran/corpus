@@ -1,3 +1,13 @@
+Corpus (C Library)
+==================
+
+[![Build Status](https://api.travis-ci.org/patperry/corpus.svg?branch=master)](https://travis-ci.org/patperry/corpus)
+[![Coverage Status](https://codecov.io/github/patperry/corpus/coverage.svg?branch=master)](https://codecov.io/github/patperry/corpus?branch=master)
+
+
+Text corpus analysis.
+
+
 Overview
 --------
 
@@ -29,6 +39,9 @@ you can let the operating system move data between the hard drive and RAM
 whenever necessary.  You can process a large data set seamlessly without
 loading everything into RAM at the same time.
 
+For more information on JSON support in Corpus, see the notes on
+[JSON as understood by Corpus][corpus-json].
+
 
 ### Text segmentation
 
@@ -47,18 +60,11 @@ Corpus supports the following text normalization transformations:
  + performing Unicode case folding (using the default mappings, not
    the locale-specific ones);
 
- + performing dash folding, replacing dash characters like em dash
-   and en dash with ASCII dash (`-`);
-
  + performing quote folding, replacing quote characters like single
    quotes, double quotes, and apostrophes with ASCII single quote (`'`);
 
- + removing non-white-space control characters like the ASCII bell;
-
  + removing Unicode default ignorable characters like zero-width-space
    and soft hyphen;
-
- + removing white space characters;
 
  + stemming, using one of the algorithms supported by the [Snowball][snowball]
    stemming library.
@@ -108,6 +114,7 @@ subject to the terms of the [Unicode Licence][unicode].
 
 [apache]: https://www.apache.org/licenses/LICENSE-2.0.html
 [check]: https://libcheck.github.io/check/
+[corpus-json]: https://github.com/patperry/corpus/blob/master/doc/json.md
 [doxygen]: http://www.stack.nl/~dimitri/doxygen/
 [json]: http://www.json.org/
 [ndjson]: http://ndjson.org/

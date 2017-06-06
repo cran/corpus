@@ -17,28 +17,102 @@
 #ifndef TESTUTIL_H
 #define TESTUTIL_H
 
+#include <check.h>
 #include <stddef.h>
+#include <stdint.h>
 
 struct corpus_text;
+
+/**
+ * This macro is broken on the old version of check (0.9.8) that Travis CI
+ * uses, so we re-define it.
+ */
+#ifdef ck_assert_int_eq
+#  undef ck_assert_int_eq
+#endif
+#define ck_assert_int_eq(X, Y) do { \
+	intmax_t _ck_x = (X); \
+	intmax_t _ck_y = (Y); \
+	ck_assert_msg(_ck_x == _ck_y, \
+			"Assertion '%s' failed: %s == %jd, %s == %jd", \
+			#X " == " #Y, #X, _ck_x, #Y, _ck_y); \
+} while (0)
+
+
+/**
+ * This macro doesn't exist on check version 0.9.8.
+ */
+#ifdef ck_assert_uint_eq
+#  undef ck_assert_uint_eq
+#endif
+#define ck_assert_uint_eq(X, Y) do { \
+	uintmax_t _ck_x = (X); \
+	uintmax_t _ck_y = (Y); \
+	ck_assert_msg(_ck_x == _ck_y, \
+			"Assertion '%s' failed: %s == %ju, %s == %ju", \
+			#X " == " #Y, #X, _ck_x, #Y, _ck_y); \
+} while (0)
+
+
+/**
+ * Broken on check (0.9.8)
+ */
+#ifdef ck_assert_str_eq
+#  undef ck_assert_str_eq
+#endif
+#define ck_assert_str_eq(X, Y) do { \
+	const char* _ck_x = (X); \
+	const char* _ck_y = (Y); \
+	const char* _ck_x_s; \
+	const char* _ck_y_s; \
+	const char* _ck_x_q; \
+	const char* _ck_y_q; \
+	if (_ck_x != NULL) { \
+		_ck_x_q = "\""; \
+		_ck_x_s = _ck_x; \
+	} else { \
+		_ck_x_q = ""; \
+		_ck_x_s = "(null)"; \
+	} \
+	if (_ck_y != NULL) { \
+		_ck_y_q = "\""; \
+		_ck_y_s = _ck_y; \
+	} else { \
+		_ck_y_q = ""; \
+		_ck_y_s = "(null)"; \
+	} \
+	ck_assert_msg( \
+		((_ck_x != NULL) && (_ck_y != NULL) \
+		 && (0 == strcmp(_ck_y, _ck_x))), \
+		 "Assertion '%s' failed: %s == %s%s%s, %s == %s%s%s", \
+		#X" == "#Y, \
+		#X, _ck_x_q, _ck_x_s, _ck_x_q, \
+		#Y, _ck_y_q, _ck_y_s, _ck_y_q); \
+} while (0)
+
+
 
 #define assert_text_eq(X, Y) do { \
 	const struct corpus_text * _ck_x = (X); \
 	const struct corpus_text * _ck_y = (Y); \
 	ck_assert_msg(corpus_text_equals(_ck_y, _ck_x), \
-		"Assertion '%s == %s' failed: %s==\"%s\" (0x%zx)," \
-		" %s==\"%s\" (0x%zx)", \
-		#X, #Y, #X, _ck_x->ptr, _ck_x->attr, \
-		#Y, _ck_y->ptr, _ck_y->attr); \
+		"Assertion '%s == %s' failed: %s == \"%.*s\" (0x%zx)," \
+		" %s==\"%.*s\" (0x%zx)", \
+		#X, #Y, \
+		#X, (int)CORPUS_TEXT_SIZE(_ck_x), _ck_x->ptr, _ck_x->attr, \
+		#Y, (int)CORPUS_TEXT_SIZE(_ck_y), _ck_y->ptr, _ck_y->attr); \
 } while (0)
+
 
 #define assert_text_ne(X, Y) do { \
 	const struct corpus_text * _ck_x = (X); \
 	const struct corpus_text * _ck_y = (Y); \
 	ck_assert_msg(!corpus_text_equals(_ck_y, _ck_x), \
-		"Assertion '%s != %s' failed: %s==\"%s\" (0x%zx)," \
+		"Assertion '%s != %s' failed: %s == \"%s\" (0x%zx)," \
 		" %s==\"%s\" (0x%zx)", \
-		#X, #Y, #X, _ck_x->ptr, _ck_x->attr, \
-		#Y, _ck_y->ptr, _ck_y->attr); \
+		#X, #Y, \
+		#X, (int)CORPUS_TEXT_SIZE(_ck_x), _ck_x->ptr, _ck_x->attr, \
+		#Y, (int)CORPUS_TEXT_SIZE(_ck_y), _ck_y->ptr, _ck_y->attr); \
 } while (0)
 
 

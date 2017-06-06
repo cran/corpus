@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <assert.h>
+#include "error.h"
 #include "text.h"
 #include "unicode/wordbreakprop.h"
 #include "wordscan.h"
@@ -40,7 +42,7 @@ void corpus_wordscan_make(struct corpus_wordscan *scan,
 		if (corpus_text_iter_advance(&scan->iter)) { \
 			scan->iter_prop = word_break(scan->iter.current); \
 		} else { \
-			scan->iter_prop = -1; \
+			scan->iter_prop = WORD_BREAK_NONE; \
 		} \
 	} while (0)
 
@@ -59,7 +61,7 @@ void corpus_wordscan_make(struct corpus_wordscan *scan,
 				scan->iter_prop = \
 					word_break(scan->iter.current); \
 			} else { \
-				scan->iter_prop = -1; \
+				scan->iter_prop = WORD_BREAK_NONE; \
 			} \
 		} \
 	} while (0)
@@ -103,15 +105,15 @@ void corpus_wordscan_reset(struct corpus_wordscan *scan)
 		if (corpus_text_iter_advance(&scan->iter)) {
 			scan->iter_prop = word_break(scan->iter.current);
 		} else {
-			scan->iter_prop = -1;
+			scan->iter_prop = WORD_BREAK_NONE;
 		}
 		MAYBE_EXTEND();
 	} else {
 		scan->code = 0;
 		scan->attr = 0;
-		scan->prop = -1;
+		scan->prop = WORD_BREAK_NONE;
 		scan->iter_ptr = NULL;
-		scan->iter_prop = -1;
+		scan->iter_prop = WORD_BREAK_NONE;
 	}
 }
 
@@ -120,16 +122,18 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 {
 	scan->current.ptr = (uint8_t *)scan->ptr;
 	scan->current.attr = 0;
-	scan->type = CORPUS_WORD_NONE;
 
-	// Break at the start and end of text, unless the text is empty.
-	if (scan->prop < 0) {
+	switch ((enum word_break_prop)scan->prop) {
+	case WORD_BREAK_NONE:
+		scan->type = CORPUS_WORD_NONE;
+
+		// Break at the start and end of text unless the text is empty
 		// WB2: Any + eot
 		goto Break;
-	}
 
-	switch (scan->prop) {
 	case WORD_BREAK_CR:
+		scan->type = CORPUS_WORD_SPACE;
+		
 		if (scan->iter_prop == WORD_BREAK_LF) {
 			// Do not break within CRLF
 			// WB3: CR * LF
@@ -143,19 +147,27 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 
 	case WORD_BREAK_NEWLINE:
 	case WORD_BREAK_LF:
+		scan->type = CORPUS_WORD_SPACE;
+
 		// Break after Newlines
 		// WB3a: (Newline | LF) +
 		NEXT();
 		goto Break;
 
 	case WORD_BREAK_ZWJ:
+		scan->type = CORPUS_WORD_OTHER;
+
 		if (scan->iter_prop == WORD_BREAK_GLUE_AFTER_ZWJ) {
+			scan->type = CORPUS_WORD_SYMBOL;
+
 			// Do not break within emoji zwj sequences
 			// WB3c: ZWJ * (Glue_After_Zwj | EBG)
 			NEXT();
 			NEXT();
 			goto Break;
 		} else if (scan->iter_prop == WORD_BREAK_E_BASE_GAZ) {
+			scan->type = CORPUS_WORD_SYMBOL;
+
 			// WB3c: ZWJ * (Glue_After_Zwj | EBG)
 			NEXT();
 			NEXT();
@@ -177,7 +189,9 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 		goto Numeric;
 
 	case WORD_BREAK_EXTENDNUMLET:
+		scan->type = CORPUS_WORD_LETTER;
 		NEXT();
+
 		switch (scan->prop) {
 			case WORD_BREAK_EXTENDNUMLET:
 			case WORD_BREAK_ALETTER:
@@ -190,7 +204,7 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 				break;
 
 			case WORD_BREAK_KATAKANA:
-				scan->type = CORPUS_WORD_KANA;
+				scan->type = CORPUS_WORD_LETTER;
 				break;
 
 			default:
@@ -204,24 +218,70 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 		goto Hebrew_Letter;
 
 	case WORD_BREAK_KATAKANA:
-		scan->type = CORPUS_WORD_KANA;
+		scan->type = CORPUS_WORD_LETTER;
 		NEXT();
 		goto Katakana;
 
 	case WORD_BREAK_E_BASE:
 	case WORD_BREAK_E_BASE_GAZ:
+		scan->type = CORPUS_WORD_SYMBOL;
 		NEXT();
 		goto E_Base;
 
 	case WORD_BREAK_REGIONAL_INDICATOR:
+		scan->type = CORPUS_WORD_SYMBOL;
 		NEXT();
 		goto Regional_Indicator;
 
-	default:
+	case WORD_BREAK_LETTER:
+		scan->type = CORPUS_WORD_LETTER;
+		NEXT();
+		goto Break;
+
+	case WORD_BREAK_NUMBER:
+		scan->type = CORPUS_WORD_NUMBER;
+		NEXT();
+		goto Break;
+
+	case WORD_BREAK_DOUBLE_QUOTE:
+	case WORD_BREAK_MIDLETTER:
+	case WORD_BREAK_MIDNUM:
+	case WORD_BREAK_MIDNUMLET:
+	case WORD_BREAK_PUNCTUATION:
+	case WORD_BREAK_SINGLE_QUOTE:
+		scan->type = CORPUS_WORD_PUNCT;
+		NEXT();
+		goto Break;
+
+	case WORD_BREAK_E_MODIFIER:
+	case WORD_BREAK_GLUE_AFTER_ZWJ:
+	case WORD_BREAK_SYMBOL:
+		scan->type = CORPUS_WORD_SYMBOL;
+		NEXT();
+		goto Break;
+
+	case WORD_BREAK_EXTEND:
+	case WORD_BREAK_MARK:
+		scan->type = CORPUS_WORD_MARK;
+		NEXT();
+		goto Break;
+
+	case WORD_BREAK_FORMAT: // Cf format controls
+	case WORD_BREAK_OTHER:
+		scan->type = CORPUS_WORD_OTHER;
+		NEXT();
+		goto Break;
+
+	case WORD_BREAK_WHITE_SPACE:
+		scan->type = CORPUS_WORD_SPACE;
 		NEXT();
 		goto Break;
 	}
 
+	corpus_log(CORPUS_ERROR_INTERNAL,
+		   "Unhandled word break property (%d)", scan->prop);
+	assert(0);
+	return 0;
 
 ALetter:
 	//fprintf(stderr, "ALetter: code = U+%04X\n", code);

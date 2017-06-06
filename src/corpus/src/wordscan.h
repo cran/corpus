@@ -27,19 +27,17 @@
 #include <stdint.h>
 
 /**
- * The type of the first character in a word type.
+ * The word type as determined by the first character.
  */
 enum corpus_word_type {
-	CORPUS_WORD_NONE = 0,	/**< words that do not fit into any of
-				  the other categories; includes spaces
-				  and most punctuation */
-	CORPUS_WORD_NUMBER,	/**< words that appear to be numbers */
-	CORPUS_WORD_LETTER,	/**< words that contain letters, excluding
-				  hiragana, katakana, and ideographic
-				  characters */
-	CORPUS_WORD_KANA,	/**< words containing kana characters */
-	CORPUS_WORD_IDEO	/**< words containing ideographic
-				  characters */
+	CORPUS_WORD_NONE = 0,	/**< EOT */
+	CORPUS_WORD_SPACE,	/**< white space */
+	CORPUS_WORD_LETTER,	/**< word that contains letters */
+	CORPUS_WORD_MARK,	/**< mark */
+	CORPUS_WORD_NUMBER,	/**< word that appears to be a number */
+	CORPUS_WORD_PUNCT,	/**< punctuation */
+	CORPUS_WORD_SYMBOL,	/**< symbol */
+	CORPUS_WORD_OTHER	/**< other */
 };
 
 /**

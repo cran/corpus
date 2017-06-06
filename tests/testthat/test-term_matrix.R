@@ -18,8 +18,7 @@ test_that("'term_matrix' works", {
     expect_equal(dim(x), dim(x0))
 
     # column names should agree (but not necessarily be in same order)
-    expect_true(all(colnames(x) %in% colnames(x0)))
-    expect_true(all(colnames(x0) %in% colnames(x)))
+    expect_equal(sort(colnames(x)), sort(colnames(x0)))
     x0 <- x0[, colnames(x), drop = FALSE]
 
     # after re-ordering columns, the matrices should be equal
@@ -54,13 +53,14 @@ test_that("'term_maxtrix' group works", {
     x0 <- term_matrix(text)
     x <- term_matrix(text, group = g)
     gmat <- Matrix::sparseMatrix(i = as.integer(factor(g)),
-                                 j = seq_along(g), , x = 1,
+                                 j = seq_along(g), x = 1,
                                  dimnames = list(levels(factor(g)), NULL))
-    expect_equal(x,  gmat %*% x0)
+    expect_equal(sort(colnames(x)), sort(colnames(x0)))
+    expect_equal(x[, colnames(x0), drop = FALSE],  gmat %*% x0)
 })
 
 
-test_that("'term_maxtrix' weights and group works", {
+test_that("'term_matrix' weights and group works", {
     text <- c("A rose is a rose is a rose.",
               "A Rose is red, a violet is blue!",
               "A rose by any other name would smell as sweet.")
@@ -69,7 +69,22 @@ test_that("'term_maxtrix' weights and group works", {
     x0 <- term_matrix(text)
     x <- term_matrix(text, weights = w, group = g)
     gmat <- Matrix::sparseMatrix(i = as.integer(factor(g)),
-                                 j = seq_along(g), , x = 1,
+                                 j = seq_along(g), x = 1,
                                  dimnames = list(levels(factor(g)), NULL))
-    expect_equal(x,  gmat %*% (w * x0))
+    expect_equal(sort(colnames(x)), sort(colnames(x0)))
+    expect_equal(x[, colnames(x0), drop = FALSE],  gmat %*% (w * x0))
+})
+
+
+test_that("'term_matrix' can select stemmed bigrams", {
+    text <- "A sentence. Another sentence. Others..."
+    f <- token_filter(stemmer = "english", drop_punct = TRUE,
+                      drop = stopwords("english"))
+    select <- c("sentenc", "anoth", "anoth sentenc")
+    x0 <- term_matrix(text, f, select = select)
+    x <- Matrix::sparseMatrix(i = c(1, 1, 1),
+                              j = c(1, 2, 3),
+                              x = c(2, 1, 1),
+                              dimnames = list(NULL, select))
+    expect_equal(x, x0)
 })

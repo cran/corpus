@@ -16,21 +16,11 @@
 
 import operator
 import math
-import re
-
-UNICODE_DATA = 'data/ucd/UnicodeData.txt'
-UNICODE_MAX = 0x10FFFF
-
-decomp_pattern = re.compile(r"""^(<(\w+)>)?\s* # decomposition type
-                                 ((\s*[0-9A-Fa-f]+)+) # decomposition mapping
-                                 \s*$""", re.X)
-
-# Parse UnicodeData.txt
 
 try:
-    file = open(UNICODE_DATA, 'r')
-except FileNotFoundError:
-    file = open('../' + UNICODE_DATA, 'r')
+    import unicode_data
+except ModuleNotFoundError:
+    from util import unicode_data
 
 decomp_vals = {
     'hangul': -1, 'none': 0,
@@ -39,76 +29,38 @@ decomp_vals = {
     'wide': 11, 'narrow': 12, 'small': 13, 'square': 14, 'fraction': 15,
     'compat': 16 }
 
+
 decomp_map = []
 decomp = []
-decomp_len_max = 0
-ndecomp = 0
 
-with file:
-    for line in file:
-        fields = line.split(';')
-        code = int(fields[0], 16)
-        while code > len(decomp):
-            decomp.append(None)
-        assert code == len(decomp)
+for code in range(len(unicode_data.uchars)):
+    u = unicode_data.uchars[code]
 
-        f = fields[5]
-        if f != '':
-            m = decomp_pattern.match(f)
-            assert m
-            d_type = m.group(2)
-            if d_type:
-                assert d_type in decomp_vals
+    if u is None or u.decomp is None:
+        decomp.append(None)
+        continue
 
-            d_map = [int(x, 16) for x in m.group(3).split()]
-            d_len = len(d_map)
-            if d_len > decomp_len_max:
-                decomp_len_max = d_len
+    d = u.decomp
+    if d.map is not None:
+        d_len = len(d.map)
 
-            if d_len > 1:
-                d_data = len(decomp_map)
-                decomp_map.extend(d_map)
-            else:
-                d_data = d_map[0]
-
-            decomp.append((d_type, d_len, d_data))
-            ndecomp += 1
+        if d_len > 1:
+            d_data = len(decomp_map)
+            decomp_map.extend(d.map)
         else:
-            decomp.append(None)
+            d_data = d.map[0]
 
-for code in range(0xAC00, 0xD7A4):
-    decomp[code] = ('hangul', 2, 0)
+        decomp.append((d.type, d_len, d_data))
 
-while len(decomp) <= UNICODE_MAX:
-    decomp.append(None)
+    elif d.type == 'hangul':
+        decomp.append(('hangul', 2, 0))
 
-
-def compute_len(code):
-    d = decomp[code]
-    if d is None:
-        return 1
-    elif d[0] == 'hangul':
-        if (code - 0xAC00) % 0x1C == 0:
-            return 2
-        else:
-            return 3
     else:
-        if d[1] == 1:
-            x = [d[2]]
-        else:
-            x = decomp_map[d[2]:(d[2] + d[1])]
-        return sum([compute_len(y) for y in x])
-
-lmax = 0
-for code in range(UNICODE_MAX + 1):
-    l = compute_len(code)
-    if l > lmax:
-        lmax = l
-assert lmax == 18
+        decomp.append(None)
 
 
 def compute_tables(block_size):
-    nblock = (UNICODE_MAX + 1) // block_size
+    nblock = len(decomp) // block_size
     stage1 = [None] * nblock
     stage2 = []
     stage2_dict = {}
@@ -127,8 +79,8 @@ def compute_tables(block_size):
 
 
 def stage1_item_size(nstage2):
-    nbyte = math.ceil(math.log2(nstage2) / 8)
-    size = 2**math.ceil(math.log2(nbyte))
+    nbyte = math.ceil(math.log(nstage2, 2) / 8)
+    size = 2**math.ceil(math.log(nbyte, 2))
     return size
 
 page_size = 4096
@@ -137,7 +89,7 @@ block_size = 256
 nbytes = {}
 
 best_block_size = 1
-smallest_size = UNICODE_MAX + 1
+smallest_size = len(decomp)
 
 for i in range(1,17):
     block_size = 2**i

@@ -15,59 +15,112 @@
 # limitations under the License.
 
 import math
-import re
-
-WORD_BREAK_PROPERTY = "data/ucd/auxiliary/WordBreakProperty.txt"
-
-pattern = re.compile(r"""^([0-9A-Fa-f]+)        # (first code)
-                          (\.\.([0-9A-Fa-f]+))? # (.. last code)?
-                          \s*
-                          ;                     # ;
-                          \s*
-                          (\w+)                 # (property name)
-                          \s*
-                          (\#.*)?$              # (# comment)?""", re.X)
-
-UNICODE_MAX = 0x10FFFF
-
-# Parse WordBreakProperty.txt
 
 try:
-    file = open(WORD_BREAK_PROPERTY, "r")
-except FileNotFoundError:
-    file = open("../" + WORD_BREAK_PROPERTY, "r")
+    import property
+    import unicode_data
+except ModuleNotFoundError:
+    from util import property
+    from util import unicode_data
 
-code_props = ['Other'] * (UNICODE_MAX + 1)
-prop_names = set()
-code_max = 0
 
-properties = set({})
-with file:
-    for line in file:
-        line = line.split("#")[0] # remove comment
-        m = pattern.match(line)
-        if m:
-            first = int(m.group(1), 16)
-            if m.group(3):
-                last = int(m.group(3), 16)
-            else:
-                last = first
-            name = m.group(4)
-            for u in range(first, last + 1):
-                code_props[u] = name
-            prop_names.add(name)
-            if last > code_max:
-                code_max = last
+WORD_BREAK_PROPERTY = "data/ucd/auxiliary/WordBreakProperty.txt"
+PROP_LIST = "data/ucd/PropList.txt"
+DERIVED_CORE_PROPERTIES = "data/ucd/DerivedCoreProperties.txt"
+
+code_props = property.read(WORD_BREAK_PROPERTY)
+word_break_property = property.read(WORD_BREAK_PROPERTY, sets=True)
+
+prop_list = property.read(PROP_LIST, sets=True)
+white_space = prop_list['White_Space']
+
+derived_core_properties = property.read(DERIVED_CORE_PROPERTIES, sets=True)
+default_ignorable = derived_core_properties['Default_Ignorable_Code_Point']
+
+# add the default ignorables to the white space category
+white_space = white_space.union(default_ignorable)
+
+letter = set()
+mark = set()
+number = set()
+other = set()
+punctuation = set()
+symbol = set()
+letter_cats = set(('Ll', 'Lm', 'Lo', 'Lt', 'Lu', 'Nl')) # Note: Lm in mark
+mark_cats = set(('Lm', 'Mc', 'Me', 'Mn', 'Sk'))
+number_cats = set(('Nd', 'No')) # Note: Nl in 'letter'
+other_cats = set(('Cc', 'Cf', 'Cs', 'Co', 'Cn'))
+punctuation_cats = set(('Pc', 'Pd', 'Pe', 'Pf', 'Pi', 'Po', 'Ps'))
+symbol_cats = set(('Sc', 'Sm', 'So')) # Note: Sk in mark
+
+
+for code in range(len(unicode_data.uchars)):
+    u = unicode_data.uchars[code]
+    if u is None or u.category in other_cats:
+        other.add(code)
+    elif u.category in letter_cats:
+        letter.add(code)
+    elif u.category in mark_cats:
+        mark.add(code)
+    elif u.category in number_cats:
+        number.add(code)
+    elif u.category in punctuation_cats:
+        punctuation.add(code)
+    elif u.category in symbol_cats:
+        symbol.add(code)
+
+
+prop_names = set(code_props)
+prop_names.remove(None)
+
+assert 'Letter' not in prop_names
+assert 'Mark' not in prop_names
+assert 'Number' not in prop_names
+assert 'Other' not in prop_names
+assert 'Punctuation' not in prop_names
+assert 'Symbol' not in prop_names
+assert 'White_Space' not in prop_names
+prop_names.add('Letter')
+prop_names.add('Number')
+prop_names.add('Mark')
+prop_names.add('Other')
+prop_names.add('Punctuation')
+prop_names.add('Symbol')
+prop_names.add('White_Space')
+
+for code in range(len(code_props)):
+    if code_props[code] is None:
+        if code in white_space:
+            code_props[code] = 'White_Space'
+        elif code in letter:
+            code_props[code] = 'Letter'
+        elif code in mark:
+            code_props[code] = 'Mark'
+        elif code in number:
+            code_props[code] = 'Number'
+        elif code in other:
+            code_props[code] = 'Other'
+        elif code in punctuation:
+            code_props[code] = 'Punctuation'
+        elif code in symbol:
+            code_props[code] = 'Symbol'
+
+# make sure we didn't miss anything
+for code in range(len(code_props)):
+    if code_props[code] is None:
+        u = unicode_data.uchars[code]
+        print('Uncagetorized code point:')
+        print('U+{:04X}'.format(code), u.category, u.name)
+        assert False
 
 prop_vals = {}
-prop_vals['Other'] = 0;
-
+prop_vals['None'] = 0;
 for p in sorted(prop_names):
     prop_vals[p] = len(prop_vals)
 
 
 def compute_tables(block_size):
-    nblock = (UNICODE_MAX + 1) // block_size
+    nblock = len(code_props) // block_size
     stage1 = [None] * nblock
     stage2 = []
     stage2_dict = {}
@@ -86,8 +139,8 @@ def compute_tables(block_size):
 
 
 def stage1_item_size(nstage2):
-    nbyte = math.ceil(math.log2(nstage2) / 8)
-    size = 2**math.ceil(math.log2(nbyte))
+    nbyte = math.ceil(math.log(nstage2, 2) / 8)
+    size = 2**math.ceil(math.log(nbyte, 2))
     return size
 
 page_size = 4096
@@ -96,7 +149,7 @@ block_size = 256
 nbytes = {}
 
 best_block_size = 1
-smallest_size = UNICODE_MAX + 1
+smallest_size = len(code_props)
 
 for i in range(1,17):
     block_size = 2**i
@@ -132,7 +185,6 @@ else:
 type2 = 'int8_t'
 
 
-
 # Write wordbreakprop.h to stdout
 
 print("/* This file is automatically generated. DO NOT EDIT!")
@@ -160,7 +212,7 @@ print("")
 print("#include <stdint.h>")
 print("")
 print("enum word_break_prop {")
-print("\tWORD_BREAK_OTHER = 0", end="")
+print("\tWORD_BREAK_NONE = 0", end="")
 for prop in sorted(prop_names):
     print(",\n\tWORD_BREAK_" + prop.upper() + " = " + str(prop_vals[prop]),
           end="")

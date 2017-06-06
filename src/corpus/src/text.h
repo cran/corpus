@@ -64,6 +64,9 @@ struct corpus_text_iter {
 /** The encoded size of the text, in bytes */
 #define CORPUS_TEXT_SIZE(text)		((text)->attr & CORPUS_TEXT_SIZE_MASK)
 
+/** The text attribute bits */
+#define CORPUS_TEXT_BITS(text)		((text)->attr & ~CORPUS_TEXT_SIZE_MASK)
+
 /** Indicates whether the text definitely decodes to ASCII. For this to be true,
  *  the text must be encoded in ASCII and not have any escapes that decode to
  *  non-ASCII codepoints.
@@ -140,11 +143,28 @@ void corpus_text_iter_make(struct corpus_text_iter *it,
 int corpus_text_iter_advance(struct corpus_text_iter *it);
 
 /**
- * Reset an iterator to the beginning of the text.
+ * Retreat to the previous character in a text.
+ *
+ * \param it the text iterator
+ *
+ * \returns non-zero if the iterator successfully backed up; zero if
+ * 	the iterator has passed the start of the text.
+ */
+int corpus_text_iter_retreat(struct corpus_text_iter *it);
+
+/**
+ * Reset an iterator to the start of the text.
  *
  * \param it the text iterator
  */
 void corpus_text_iter_reset(struct corpus_text_iter *it);
+
+/**
+ * Skip an iterator to the end of the text.
+ *
+ * \param it the text iterator
+ */
+void corpus_text_iter_skip(struct corpus_text_iter *it);
 
 /**
  * Compute a hash code from a text.

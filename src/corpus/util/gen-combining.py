@@ -16,39 +16,28 @@
 
 import math
 
-UNICODE_DATA = 'data/ucd/UnicodeData.txt'
-UNICODE_MAX = 0x10FFFF
-
-
 try:
-    file = open(UNICODE_DATA, 'r')
-except FileNotFoundError:
-    file = open('../' + UNICODE_DATA, 'r')
+    import unicode_data
+except ModuleNotFoundError:
+    from util import unicode_data
+
 
 combin_vals = set([0])
 combin = []
 
-with file:
-    for line in file:
-        fields = line.split(';')
-        code = int(fields[0], 16)
-        while code > len(combin):
-            combin.append(0)
-        assert code == len(combin)
+for code in range(len(unicode_data.uchars)):
+    u = unicode_data.uchars[code]
 
-        f = fields[3]
-        if f != '':
-            val = int(f)
-            combin_vals.add(val)
-            combin.append(val)
-        else:
-            combin.append(0)
+    if u is None or u.ccc is None:
+        combin.append(0)
+    else:
+        ccc = u.ccc
+        combin_vals.add(ccc)
+        combin.append(ccc)
 
-while len(combin) <= UNICODE_MAX:
-    combin.append(0)
 
 def compute_tables(block_size):
-    nblock = (UNICODE_MAX + 1) // block_size
+    nblock = len(combin) // block_size
     stage1 = [None] * nblock
     stage2 = []
     stage2_dict = {}
@@ -67,8 +56,8 @@ def compute_tables(block_size):
 
 
 def stage1_item_size(nstage2):
-    nbyte = math.ceil(math.log2(nstage2) / 8)
-    size = 2**math.ceil(math.log2(nbyte))
+    nbyte = math.ceil(math.log(nstage2, 2) / 8)
+    size = 2**math.ceil(math.log(nbyte, 2))
     return size
 
 page_size = 4096
@@ -77,7 +66,7 @@ block_size = 256
 nbytes = {}
 
 best_block_size = 1
-smallest_size = UNICODE_MAX + 1
+smallest_size = len(combin)
 
 for i in range(1,17):
     block_size = 2**i

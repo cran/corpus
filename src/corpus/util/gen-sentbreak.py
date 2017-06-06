@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-# Copyright 2016 Patrick O. Perry.
+# Copyright 2017 Patrick O. Perry.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,49 +15,22 @@
 # limitations under the License.
 
 import math
-import re
-
-BREAK_PROPERTY = "data/ucd/auxiliary/SentenceBreakProperty.txt"
-
-pattern = re.compile(r"""^([0-9A-Fa-f]+)        # (first code)
-                          (\.\.([0-9A-Fa-f]+))? # (.. last code)?
-                          \s*
-                          ;                     # ;
-                          \s*
-                          (\w+)                 # (property name)
-                          \s*
-                          (\#.*)?$              # (# comment)?""", re.X)
-
-UNICODE_MAX = 0x10FFFF
-
-# Parse SentenceBreakProperty.txt
 
 try:
-    file = open(BREAK_PROPERTY, "r")
-except FileNotFoundError:
-    file = open("../" + BREAK_PROPERTY, "r")
+    import property
+except ModuleNotFoundError:
+    from util import property
 
-code_props = ['Other'] * (UNICODE_MAX + 1)
-prop_names = set()
-code_max = 0
+SENTENCE_BREAK_PROPERTY = "data/ucd/auxiliary/SentenceBreakProperty.txt"
+code_props = property.read(SENTENCE_BREAK_PROPERTY)
 
-properties = set({})
-with file:
-    for line in file:
-        line = line.split("#")[0] # remove comment
-        m = pattern.match(line)
-        if m:
-            first = int(m.group(1), 16)
-            if m.group(3):
-                last = int(m.group(3), 16)
-            else:
-                last = first
-            name = m.group(4)
-            for u in range(first, last + 1):
-                code_props[u] = name
-            prop_names.add(name)
-            if last > code_max:
-                code_max = last
+for i in range(len(code_props)):
+    if code_props[i] is None:
+        code_props[i] = 'Other'
+
+prop_names = set(code_props)
+prop_names.remove('Other')
+
 
 prop_vals = {}
 prop_vals['Other'] = 0;
@@ -67,7 +40,7 @@ for p in sorted(prop_names):
 
 
 def compute_tables(block_size):
-    nblock = (UNICODE_MAX + 1) // block_size
+    nblock = len(code_props) // block_size
     stage1 = [None] * nblock
     stage2 = []
     stage2_dict = {}
@@ -86,8 +59,8 @@ def compute_tables(block_size):
 
 
 def stage1_item_size(nstage2):
-    nbyte = math.ceil(math.log2(nstage2) / 8)
-    size = 2**math.ceil(math.log2(nbyte))
+    nbyte = math.ceil(math.log(nstage2, 2) / 8)
+    size = 2**math.ceil(math.log(nbyte, 2))
     return size
 
 page_size = 4096
@@ -96,7 +69,7 @@ block_size = 256
 nbytes = {}
 
 best_block_size = 1
-smallest_size = UNICODE_MAX + 1
+smallest_size = len(code_props)
 
 for i in range(1,17):
     block_size = 2**i

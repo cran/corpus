@@ -118,16 +118,21 @@ SEXP as_character_text(SEXP text);
 SEXP is_na_text(SEXP text);
 SEXP anyNA_text(SEXP text);
 
-/* text filter */
+/* token filter */
 SEXP alloc_filter(SEXP props);
 int is_filter(SEXP filter);
 struct corpus_filter *as_filter(SEXP filter);
 
 /* text processing */
-SEXP sentences_text(SEXP x);
+SEXP abbreviations(SEXP kind);
+SEXP text_split_sentences(SEXP x, SEXP size, SEXP crlf_break, SEXP suppress);
+SEXP text_split_tokens(SEXP x, SEXP size, SEXP filter);
+
 SEXP tokens_text(SEXP x, SEXP props);
-SEXP term_counts_text(SEXP x, SEXP props, SEXP weights);
-SEXP term_matrix_text(SEXP x, SEXP props, SEXP weights, SEXP group);
+SEXP term_counts_text(SEXP x, SEXP props, SEXP weights, SEXP ngrams,
+		      SEXP min_count, SEXP max_count, SEXP output_types);
+SEXP term_matrix_text(SEXP x, SEXP props, SEXP weights, SEXP ngrams,
+		      SEXP select, SEXP group);
 SEXP stopwords(SEXP kind);
 
 /* data schema */

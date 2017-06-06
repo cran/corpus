@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 Patrick O. Perry.
+ * Copyright 2017 Patrick O. Perry.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <check.h>
+#include "../src/table.h"
 #include "../src/tree.h"
 #include "testutil.h"
 
@@ -41,25 +42,14 @@ char *random_keys(void)
 
 int get_parent(int id, int *keyptr)
 {
-	int i, n = tree.nnode;
-	int j, m;
-
-	for (i = 0; i < n; i++) {
-		m = tree.nodes[i].nitem;
-		for (j = 0; j < m; j++) {
-			if (tree.nodes[i].ids[j] == id) {
-				if (keyptr) {
-					*keyptr = tree.nodes[i].keys[j];
-				}
-				return i;
-			}
-		}
-	}
+	const struct corpus_tree_node *node = &tree.nodes[id];
+	int parent_id = node->parent_id;
+	int key = node->key;
 
 	if (keyptr) {
-		*keyptr = -1;
+		*keyptr = key;
 	}
-	return -1;
+	return parent_id;
 }
 
 
@@ -68,12 +58,12 @@ int get_depth(int id)
 	int parent_id;
 	int n;
 
-	ck_assert_int_le(0, id);
-	ck_assert_int_lt(id, tree.nnode);
+	ck_assert(0 <= id);
+	ck_assert(id < tree.nnode);
 
 	n = 0;
 	parent_id = id;
-	while (parent_id > 0) {
+	while (parent_id >= 0) {
 		parent_id = get_parent(parent_id, NULL);
 		n++;
 	}
@@ -135,9 +125,10 @@ void teardown_tree(void)
 
 int has(const char *keys)
 {
+	const struct corpus_tree_node *parent;
 	int i, nkey = (int)strlen(keys);
 	int j, m;
-	int id, parent_id;
+	int id, child_id, parent_id;
 	int found;
 
 	if (tree.nnode == 0) {
@@ -148,27 +139,41 @@ int has(const char *keys)
 		return 1;
 	}
 
-	id = 0;
+	id = CORPUS_TREE_NONE;
 	found = 0;
 
 	for (i = 0; i < nkey; i++) {
 		parent_id = id;
 		found = corpus_tree_has(&tree, parent_id, keys[i], &id);
+		if (parent_id >= 0) {
+			parent = &tree.nodes[parent_id];
+			m = parent->nchild;
+		} else {
+			parent = NULL;
+			m = tree.root.nchild;
+		}
 
-		m = tree.nodes[parent_id].nitem;
 		for (j = 0; j < m; j++) {
-			if (tree.nodes[parent_id].keys[j] == keys[i])
-			{
+			if (parent_id >= 0) {
+				child_id = parent->child_ids[j];
+			} else {
+				child_id = tree.root.child_ids[j];
+			}
+			if (tree.nodes[child_id].key == keys[i]) {
 				break;
 			}
 		}
 
 		if (found) {
-			ck_assert_int_le(0, id);
-			ck_assert_int_lt(id, tree.nnode);
+			ck_assert(0 <= id);
+			ck_assert(id < tree.nnode);
 
-			ck_assert_int_lt(j, m);
-			ck_assert_int_eq(tree.nodes[parent_id].ids[j], id);
+			ck_assert(j < m);
+			if (parent_id >= 0) {
+				ck_assert_int_eq(parent->child_ids[j], id);
+			} else {
+				ck_assert_int_eq(tree.root.child_ids[j], id);
+			}
 		} else {
 			ck_assert_int_eq(j, m);
 			break;
@@ -181,54 +186,64 @@ int has(const char *keys)
 
 void add(const char *keys)
 {
-	const char *k1, *k2;
+	const struct corpus_tree_node *parent;
 	int i, nkey = (int)strlen(keys);
-	int j, m, n;
-	int id, parent_id;
+	int j, m, m2, n;
+	int id, child_id, parent_id;
 	int had;
 
-	ck_assert(!corpus_tree_root(&tree));
-	ck_assert_int_gt(tree.nnode, 0);
-	id = 0;
+	id = CORPUS_TREE_NONE;
 
 	for (i = 0; i < nkey; i++) {
 		parent_id = id;
 
 		had = corpus_tree_has(&tree, parent_id, keys[i], NULL);
-		m = tree.nodes[parent_id].nitem;
+		if (parent_id >= 0) {
+			parent = &tree.nodes[parent_id];
+			m = parent->nchild;
+		} else {
+			parent = NULL;
+			m = tree.root.nchild;
+		}
 		n = tree.nnode;
 
 		ck_assert(!corpus_tree_add(&tree, parent_id, keys[i], &id));
-		ck_assert_int_le(0, id);
-		ck_assert_int_lt(id, tree.nnode);
+		ck_assert(0 <= id);
+		ck_assert(id < tree.nnode);
+		if (parent_id >= 0) {
+			parent = &tree.nodes[parent_id];
+			m2 = parent->nchild;
+		} else {
+			parent = NULL;
+			m2 = tree.root.nchild;
+		}
 
 		if (!had) {
-			ck_assert_int_eq(tree.nodes[parent_id].nitem, m + 1);
+			ck_assert_int_eq(m2, m + 1);
 			ck_assert_int_eq(tree.nnode, n + 1);
 			m++;
 			n++;
 		}
 
 		for (j = 0; j < m; j++) {
-			if (tree.nodes[parent_id].keys[j] == keys[i])
-			{
+			if (parent_id >= 0) {
+				child_id = parent->child_ids[j];
+			} else {
+				child_id = tree.root.child_ids[j];
+			}
+			if (tree.nodes[child_id].key == keys[i]) {
 				break;
 			}
 		}
 
-		ck_assert_int_lt(j, m);
-		ck_assert_int_eq(tree.nodes[parent_id].ids[j], id);
-		if (!had) {
-			ck_assert_int_eq(tree.nodes[id].nitem, 0);
+		ck_assert(j < m);
+		if (parent_id >= 0) {
+			ck_assert_int_eq(parent->child_ids[j], id);
+		} else {
+			ck_assert_int_eq(tree.root.child_ids[j], id);
 		}
-	}
-
-	if (!tree.is_unsorted) {
-		// all adjacent keys should be in order
-		for (i = 1; i < tree.nnode; i++) {
-			k1 = get_keys(i-1);
-			k2 = get_keys(i);
-			ck_assert_int_lt(compare_keys(k1, k2), 0);
+		if (!had) {
+			ck_assert_int_eq(tree.nodes[id].nchild, 0);
 		}
 	}
 }
@@ -238,7 +253,6 @@ void tree_clear(void)
 {
 	corpus_tree_clear(&tree);
 	ck_assert_int_eq(tree.nnode, 0);
-	ck_assert(!tree.is_unsorted);
 }
 
 
@@ -256,11 +270,10 @@ void sort(void)
 	ck_assert(!corpus_tree_sort(&tree, NULL, 0));
 
 	// check that the items are in sorted order
-	ck_assert(!tree.is_unsorted);
 	for (i = 1; i < tree.nnode; i++) {
 		k1 = get_keys(i-1);
 		k2 = get_keys(i);
-		ck_assert_int_lt(compare_keys(k1, k2), 0);
+		ck_assert(compare_keys(k1, k2) < 0);
 	}
 
 	// check that all items existed prior to the sorting
@@ -272,7 +285,7 @@ void sort(void)
 				break;
 			}
 		}
-		ck_assert_int_lt(j, nnode);
+		ck_assert(j < nnode);
 	}
 }
 
@@ -281,7 +294,6 @@ void sort(void)
 START_TEST(test_init)
 {
 	ck_assert_int_eq(tree.nnode, 0);
-	ck_assert(!tree.is_unsorted);
 	ck_assert(!has(""));
 	ck_assert(!has("hello"));
 }
