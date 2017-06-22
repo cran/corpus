@@ -12,6 +12,33 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-datatype <- function(x, ...) UseMethod("datatype")
 
-datatypes <- function(x, ...) UseMethod("datatypes")
+abbreviations <- function(kind = "english")
+{
+    wordlist("abbreviations", kind, function(k) .Call(C_abbreviations, k))
+}
+
+
+stopwords <- function(kind = "english")
+{
+    wordlist("stopwords", kind, function(k) .Call(C_stopwords, k))
+}
+
+
+wordlist <- function(type, kind, call)
+{
+    kind <- as_kind(type, kind)
+
+    words <- character()
+    for (k in kind) {
+        wk <- call(k)
+        words <- c(words, wk)
+    }
+
+    if (length(words) == 0) {
+        return(NULL)
+    }
+
+    words <- sort(unique(words))
+    words
+}

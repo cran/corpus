@@ -1,23 +1,26 @@
-\name{tokens}
+\name{text_tokens}
 \alias{corpus_token_filter}
+\alias{text_ntoken}
+\alias{text_tokens}
 \alias{token_filter}
-\alias{tokens}
 \title{Text Tokenization}
 \description{
    Segment text into tokens, each of which is an instance of
    a particular \sQuote{type}.
 }
 \usage{
+    text_tokens(x, filter = token_filter())
+
+    text_ntoken(x, filter = token_filter())
+
     token_filter(map_case = TRUE, map_compat = TRUE,
                  map_quote = TRUE, remove_ignorable = TRUE,
-                 stemmer = NULL, stem_except = drop,
-                 combine = NULL,
+                 stemmer = NA, stem_except = drop,
+                 combine = abbreviations("english"),
                  drop_letter = FALSE, drop_mark = FALSE,
                  drop_number = FALSE, drop_punct = FALSE,
                  drop_symbol = FALSE, drop_other = FALSE,
                  drop = NULL, drop_except = NULL)
-
-    tokens(x, filter = token_filter())
 }
 \arguments{
     \item{x}{object to be tokenized.}
@@ -42,7 +45,7 @@
         and soft hyphens.}
 
     \item{stemmer}{a character value giving the name of the stemming
-        algorithm, or \code{NULL} to leave words unchanged. The stemming
+        algorithm, or \code{NA} to leave words unchanged. The stemming
         algorithms are provided by the
         \href{http://snowballstem.org/algorithms/}{Snowball stemming library};
         the following stemming algorithms are available:
@@ -93,8 +96,8 @@
         \code{drop_other}, and \code{drop} arguments, or \code{NULL}.}
 }
 \details{
-    \code{tokens} splits texts into token sequences. Each token is an instance
-    of a particular type. This operation proceeds in a series
+    \code{text_tokens} splits texts into token sequences. Each token is an
+    instance of a particular type. This operation proceeds in a series
     of stages, controlled by the \code{filter} argument:
 
     \enumerate{
@@ -120,7 +123,8 @@
         \item In the third stage, if the \code{stemmer} property is
             non-\code{NULL}, we apply the indicated stemming algorithm to
             each word that does not match one of the elements of the
-            \code{stem_except} character vector.
+            \code{stem_except} character vector. See the
+            \sQuote{Stemming} section below for more information.
 
         \item Next, if the \code{combine} property is non-\code{NULL},
             we scan the word sequence from left to right, searching for
@@ -147,7 +151,31 @@
     }
 
     When \code{filter = NULL}, we treat all logical properties as
-    \code{FALSE} and all other properties as \code{NULL}.
+    \code{FALSE} and all other properties as \code{NA} or \code{NULL}.
+
+    Terms specified by the \code{stem_except}, \code{combine},
+    \code{drop}, and \code{drop_except} need to be stemmed (unless
+    \code{stemmer} is not \code{NA}), but they do not need to be
+    normalized. We normalize the argument values in the manner specified
+    by \code{map_case}, \code{map_compate}, \code{map_quote}, and
+    \code{remove_ignorable}. Thus, for example, if \code{map_case = TRUE},
+    then a token filter with \code{combine = "Mx."} produces the same
+    results as a token filter with \code{combine = "mx."}.
+}
+\section{Stemming}{
+    We use the stemming algorithms provided by the Snowball library. These
+    algorithms are also available in the \code{SnowballC} R package. Unlike
+    that package, we provide the ability to exempt certain words from stemming,
+    using the \code{stem_except} argument; see the examples below.
+    If you do not specify the \code{stem_except} argument, then we set its
+    value equal to the \code{drop} argument.
+
+    We also exempt from stemming any case that would turn internal
+    punctuation like the full stop in \code{"u.s"} into boundary punctuation
+    like at the end of \code{"u."}; otherwise, in examples like this, the
+    stemming procedure would turn single-word tokens into multi-word
+    tokens (compare \code{text_tokens("u.s")} with \code{text_tokens("u.")}).
+    For English, this likely only affects words ending in \code{".s"}.
 }
 \section{Combining words}{
     The \code{combine} property of a \code{token_filter} enables
@@ -155,27 +183,59 @@
     example, specifying \code{combine = "new york"} will
     cause consecutive instances of the words \code{new} and \code{york}
     to get replaced by a single token, \code{new york}.
+
+    By default, we set \code{combine = abbreviations("english")}, so
+    that abbreviations like \code{"Ms."} get treated as single tokens;
+    with \code{combine = NULL}, trailing punctuation gets split off, and
+    \code{"Ms."} gets tokenized into two tokens, for "Ms" and ".".
 }
 \value{
-    A list of the same length as \code{x}, with the same names. Each list
-    item is a character vector with the tokens for the corresponding
-    element of \code{x}.
+    \code{text_tokens} returns a list of the same length as \code{x}, with
+    the same names. Each list item is a character vector with the tokens
+    for the corresponding element of \code{x}.
+
+    \code{text_ntoken} returns a numeric vector the same length as \code{x},
+    with each element giving the number of non-dropped tokens in the
+    corresponding text.
 }
 \seealso{
-    \code{\link{text_split}}, \code{\link{stopwords}},
-    \code{\link{term_counts}}, \code{\link{term_matrix}}.
+    \code{\link{text_split}}, \code{\link{text_types}},
+    \code{\link{abbreviations}}, \code{\link{stopwords}},
+    \code{\link{term_matrix}}.
 }
 \examples{
-    tokens("The quick ('brown') fox can't jump 32.3 feet, right?")
+    text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?")
+
+    # count non-dropped tokens:
+    text_ntoken("The quick ('brown') fox can't jump 32.3 feet, right?")
 
     # don't normalize:
-    tokens("The quick ('brown') fox can't jump 32.3 feet, right?", NULL)
+    text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?", NULL)
 
     # drop common function words ('stop' words):
-    tokens("Able was I ere I saw Elba.",
-           token_filter(drop = stopwords("english")))
+    text_tokens("Able was I ere I saw Elba.",
+                token_filter(drop = stopwords("english")))
 
     # drop numbers, with some exceptions:"
-    tokens("0, 1, 2, 3, 4, 5",
-           token_filter(drop_number = TRUE, drop_except = c("0", "2", "4")))
+    text_tokens("0, 1, 2, 3, 4, 5",
+                token_filter(drop_number = TRUE,
+                             drop_except = c("0", "2", "4")))
+
+    # apply stemming...
+    text_tokens("Mary is running", token_filter(stemmer = "english"))
+
+    # ...except for certain words
+    text_tokens("Mary is running",
+                token_filter(stemmer = "english", stem_except = "mary"))
+
+    # combine abbreviations by default
+    text_tokens("Ms. Jones")
+
+    # disable default combinations
+    text_tokens("Ms. Jones", token_filter(combine = NULL))
+
+    # add new combinations
+    text_tokens("Ms. Jones is from New York City, New York.",
+                token_filter(combine = c(abbreviations("english"),
+                                         "new york", "new york city")))
 }

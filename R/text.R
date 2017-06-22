@@ -161,21 +161,17 @@ names.corpus_text <- function(x)
 }
 
 
-format.corpus_text <- function(x, nchar_max = 60, suffix = "\u2026", ...)
+format.corpus_text <- function(x, trim = FALSE, chars = 45L,
+                               justify = c("left", "right", "none"),
+                               width = NULL, na.encode = TRUE, ...)
 {
-    if (length(x) == 0) {
-        str <- character()
-    } else if (is.null(nchar_max)) {
-        str <- as.character(x)
-        names(str) <- names(x)
-    } else {
-        str <- as.character(x)
-        names(str) <- names(x)
-        len <- nchar(str)
-        long <- !is.na(len) & (len >= nchar_max + 1)
-        str[long] <- paste0(substr(str[long], 1, nchar_max), suffix)
-    }
-    format(str, justify = "left")
+    x <- as_text(x)
+    trim <- as_option("trim", trim)
+    chars <- if (is.null(chars)) NA_integer_ else as.integer(chars)
+    justify <- match.arg(justify)
+    width <- if (is.null(width)) NA_integer_ else as.integer(width)
+    na.encode <- as_option("na.encode", na.encode)
+    .Call(C_format_text, x, trim, chars, justify, width, na.encode)
 }
 
 

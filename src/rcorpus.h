@@ -22,6 +22,8 @@
 #include <Rdefines.h>
 
 #include "corpus/src/table.h"
+#include "corpus/src/tree.h"
+#include "corpus/src/termset.h"
 #include "corpus/src/text.h"
 #include "corpus/src/textset.h"
 #include "corpus/src/typemap.h"
@@ -29,9 +31,13 @@
 #include "corpus/src/datatype.h"
 #include "corpus/src/data.h"
 
+#define RCORPUS_CHECK_INTERRUPT 1000
+
 struct corpus_data;
 struct corpus_filebuf;
 struct corpus_filter;
+struct corpus_search;
+struct corpus_sentfilter;
 
 struct json {
 	struct corpus_schema schema;
@@ -51,15 +57,21 @@ struct decode {
 	int overflow;
 };
 
+struct termset {
+	struct corpus_termset set;
+	struct corpus_text *items;
+	int has_set;
+	int max_length;
+	int nitem;
+};
+
 /* converting text to CHARSXP */
 void mkchar_init(struct mkchar *mk);
-void mkchar_destroy(struct mkchar *mk);
 SEXP mkchar_get(struct mkchar *mk, const struct corpus_text *text);
 
 /* converting data to R values */
 void decode_init(struct decode *d);
 void decode_clear(struct decode *d);
-void decode_destroy(struct decode *d);
 
 int decode_logical(struct decode *d, const struct corpus_data *val);
 int decode_integer(struct decode *d, const struct corpus_data *val);
@@ -85,11 +97,11 @@ SEXP as_logical_json(SEXP data);
 SEXP as_character_json(SEXP data);
 SEXP as_text_json(SEXP data);
 SEXP dim_json(SEXP data);
+SEXP json_datatype(SEXP data);
+SEXP json_datatypes(SEXP data);
 SEXP length_json(SEXP data);
 SEXP names_json(SEXP data);
 SEXP print_json(SEXP data);
-SEXP datatype_json(SEXP data);
-SEXP datatypes_json(SEXP data);
 SEXP simplify_json(SEXP data, SEXP text, SEXP stringsAsFactors);
 SEXP subscript_json(SEXP data, SEXP i);
 SEXP subset_json(SEXP data, SEXP i, SEXP j);
@@ -111,6 +123,8 @@ SEXP as_text_character(SEXP text);
 
 SEXP alloc_na_text(void);
 SEXP coerce_text(SEXP x);
+SEXP format_text(SEXP x, SEXP trim, SEXP chars, SEXP justify,
+		 SEXP width, SEXP na_encode);
 SEXP length_text(SEXP text);
 SEXP names_text(SEXP text);
 SEXP subset_text_handle(SEXP handle, SEXP i);
@@ -118,17 +132,42 @@ SEXP as_character_text(SEXP text);
 SEXP is_na_text(SEXP text);
 SEXP anyNA_text(SEXP text);
 
+/* search */
+SEXP alloc_search(SEXP sterms, const char *name, struct corpus_filter *filter);
+int is_search(SEXP search);
+struct corpus_search *as_search(SEXP search);
+SEXP items_search(SEXP search);
+
+/* sentence filter */
+SEXP alloc_sentfilter(SEXP props);
+int is_sentfilter(SEXP filter);
+struct corpus_sentfilter *as_sentfilter(SEXP filter);
+
 /* token filter */
 SEXP alloc_filter(SEXP props);
 int is_filter(SEXP filter);
 struct corpus_filter *as_filter(SEXP filter);
 
+/* term set */
+SEXP alloc_termset(SEXP sterms, const char *name,
+		   struct corpus_filter *filter, int allow_dup);
+int is_termset(SEXP termset);
+struct termset *as_termset(SEXP termset);
+SEXP items_termset(SEXP termset);
+
 /* text processing */
 SEXP abbreviations(SEXP kind);
-SEXP text_split_sentences(SEXP x, SEXP size, SEXP crlf_break, SEXP suppress);
+SEXP text_count(SEXP x, SEXP terms, SEXP filter);
+SEXP text_detect(SEXP x, SEXP terms, SEXP filter);
+SEXP text_locate(SEXP x, SEXP terms, SEXP filter);
+SEXP text_nsentence(SEXP x, SEXP filter);
+SEXP text_ntoken(SEXP x, SEXP filter);
+SEXP text_ntype(SEXP x, SEXP filter, SEXP collapse);
+SEXP text_split_sentences(SEXP x, SEXP size, SEXP filter);
 SEXP text_split_tokens(SEXP x, SEXP size, SEXP filter);
+SEXP text_types(SEXP x, SEXP filter, SEXP collapse);
 
-SEXP tokens_text(SEXP x, SEXP props);
+SEXP text_tokens(SEXP x, SEXP props);
 SEXP term_counts_text(SEXP x, SEXP props, SEXP weights, SEXP ngrams,
 		      SEXP min_count, SEXP max_count, SEXP output_types);
 SEXP term_matrix_text(SEXP x, SEXP props, SEXP weights, SEXP ngrams,
@@ -147,5 +186,6 @@ SEXP read_ndjson(SEXP buffer);
 /* internal utility functions */
 int findListElement(SEXP list, const char *str);
 SEXP getListElement(SEXP list, const char *str);
+double *as_weights(SEXP sweights, R_xlen_t n);
 
 #endif /* RCORPUS_H */

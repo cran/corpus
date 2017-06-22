@@ -417,7 +417,7 @@ SEXP names_json(SEXP sdata)
 }
 
 
-SEXP datatype_json(SEXP sdata)
+SEXP json_datatype(SEXP sdata)
 {
 	SEXP str, ans;
 	const struct json *d = as_json(sdata);
@@ -445,7 +445,7 @@ SEXP datatype_json(SEXP sdata)
 }
 
 
-SEXP datatypes_json(SEXP sdata)
+SEXP json_datatypes(SEXP sdata)
 {
 	SEXP types, str, names;
 	const struct json *d = as_json(sdata);
@@ -881,8 +881,6 @@ SEXP as_character_json(SEXP sdata)
 		}
 	}
 
-	mkchar_destroy(&mkchar);
-
 	UNPROTECT(1);
 	return ans;
 }
@@ -975,8 +973,6 @@ SEXP as_factor_json(SEXP sdata)
 		lev = mkchar_get(&mkchar, &set.items[id]);
 		SET_STRING_ELT(levels, id, lev);
 	}
-
-	mkchar_destroy(&mkchar);
 
 	setAttrib(ans, R_LevelsSymbol, levels);
 	setAttrib(ans, R_ClassSymbol, mkString("factor"));
@@ -1163,7 +1159,6 @@ SEXP as_list_json(SEXP sdata, SEXP stext, SEXP stringsAsFactors)
 		warning("Inf introduced by coercion to double-precision range");
 	}
 
-	decode_destroy(&decode);
 	UNPROTECT(1);
 	return ans;
 }

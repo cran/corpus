@@ -121,6 +121,18 @@ void corpus_decode_utf8(const uint8_t **bufptr, uint32_t *codeptr);
 void corpus_encode_utf8(uint32_t code, uint8_t **bufptr);
 
 /**
+ * Encode a codepoint in reverse, at the end of UTF-8 character buffer.
+ * The codepoint must be a valid unicode character (according to
+ * #CORPUS_IS_UNICODE) and the buffer must have space for at least
+ * #CORPUS_UTF8_ENCODE_LEN bytes.
+ *
+ * \param code the codepoint
+ * \param endptr on input, a pointer to the end of the buffer;
+ * 	on exit, a pointer to the start of the encoded codepoint
+ */
+void corpus_rencode_utf8(uint32_t code, uint8_t **endptr);
+
+/**
  * Unicode character decomposition mappings. The compatibility mappings are
  * defined in [UAX #44 Sec. 5.7.3 Character Decomposition Maps]
  * (http://www.unicode.org/reports/tr44/#Character_Decomposition_Mappings).
@@ -204,5 +216,30 @@ void corpus_unicode_order(uint32_t *ptr, size_t len);
  * 	on exit, a pointer to the number of composed codepoints
  */
 void corpus_unicode_compose(uint32_t *ptr, size_t *lenptr);
+
+
+/**
+ * Unicode character width type.
+ */
+enum corpus_charwidth_type {
+	CORPUS_CHARWIDTH_OTHER = -3,	/**< Control and others:
+					  Cc, Cn, Co, Cs, Zl, Zp */
+	CORPUS_CHARWIDTH_AMBIGUOUS = -2,/**< can be narrow or wide depending
+					  on the context */
+	CORPUS_CHARWIDTH_IGNORABLE = -1,/**< Default ignorables */
+	CORPUS_CHARWIDTH_NONE = 0,	/**< Combining marks: Mc, Me, Mn */
+	CORPUS_CHARWIDTH_NARROW = 1,	/**< Most western alphabets */
+	CORPUS_CHARWIDTH_WIDE = 2	/**< Most emoji and ideographs */
+};
+
+/**
+ * Get the width of a Unicode character, using the East Asian Width table and
+ * the Emoji data.
+ *
+ * \param code the codepoint
+ *
+ * \returns a #corpus_charwidth_type value giving the width
+ */
+int corpus_unicode_charwidth(uint32_t code);
 
 #endif /* CORPUS_UNICODE_H */
