@@ -13,26 +13,28 @@
 #  limitations under the License.
 
 
-text_split <- function(x, units, size = 1,
-                       filter = if (units == "sentences") sentence_filter()
-                                else token_filter())
+text_split <- function(x, units = "sentences", size = 1,
+                       filter = text_filter(x))
 {
-    x <- as_text(x)
-    units <- as_enum("units", units, choices = c("sentences", "tokens"))
-    size <- as_size(size)
-    filter <- as_filter(units, filter)
+    with_rethrow({
+        x <- as_text(x, filter = filter)
+        units <- as_enum("units", units, choices = c("sentences", "tokens"))
+        size <- as_size(size)
+    })
 
     if (units == "sentences") {
-        ans <- .Call(C_text_split_sentences, x, size, filter)
-    } else if (units == "tokens") {
-        ans <- .Call(C_text_split_tokens, x, size, filter)
+        ans <- .Call(C_text_split_sentences, x, size)
     } else {
-        stop(paste0("unrecognized 'units' value: '", units, "'"))
+        stopifnot(units == "tokens")
+        ans <- .Call(C_text_split_tokens, x, size)
     }
 
-    nm <- names(x)
-    if (!is.null(nm)) {
-        ans$parent <- nm[ans$parent]
+    parent_names <- names(x)
+    if (is.null(parent_names)) {
+        parent_names <-  as.character(seq_along(x))
     }
+
+    ans$parent <- structure(as.integer(ans$parent), class = "factor",
+                            levels = parent_names)
     ans
 }

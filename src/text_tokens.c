@@ -14,8 +14,10 @@
  * limitations under the License.
  */
 
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include "corpus/src/array.h"
 #include "corpus/src/table.h"
 #include "corpus/src/text.h"
 #include "corpus/src/textset.h"
@@ -36,69 +38,89 @@
 struct tokens {
 	struct corpus_filter *filter;
 
-	int *buf;
-	int nbuf, nbuf_max;
+	int *tokens;
+	int ntoken;
+	int ntoken_max;
 
 	SEXP *types;
-	int ntype, ntype_max;
-
-	int nprot;
+	int ntype;
+	int ntype_max;
 };
 
 
 static void tokens_init(struct tokens *ctx, struct corpus_filter *filter);
-static void tokens_destroy(struct tokens *ctx);
-static SEXP tokens_add(struct tokens *ctx, int type_id);
+static void tokens_clear_tokens(struct tokens *ctx);
+static void tokens_add_token(struct tokens *ctx, int type_id);
+static SEXP tokens_add_type(struct tokens *ctx, int type_id);
 static SEXP tokens_scan(struct tokens *ctx, const struct corpus_text *text);
 
 
 void tokens_init(struct tokens *ctx, struct corpus_filter *filter)
 {
-	int i, n;
-
 	ctx->filter = filter;
 
-	ctx->nbuf_max = 256;
-	ctx->buf = (void *)R_alloc(ctx->nbuf_max, sizeof(*ctx->buf));
+	ctx->ntoken_max = 0;
+	ctx->ntoken = 0;
+	ctx->tokens = NULL;
 
-	ctx->ntype_max = 256;
+	ctx->ntype_max = 0;
 	ctx->ntype = 0;
-	ctx->types = (void *)R_alloc(ctx->ntype_max, sizeof(*ctx->types));
+	ctx->types = NULL;
+}
 
-	// add the terms in the filter
-	n = ctx->filter->ntype;
-	for (i = 0; i < n; i++) {
-		PROTECT(tokens_add(ctx, i));
+
+void tokens_clear_tokens(struct tokens *ctx)
+{
+	ctx->ntoken = 0;
+}
+
+
+void tokens_add_token(struct tokens *ctx, int type_id)
+{
+	int count = ctx->ntoken;
+	int size = ctx->ntoken_max;
+	int err = 0;
+
+	if (count == size) {
+		TRY(corpus_array_size_add(&size, sizeof(*ctx->tokens),
+					  count, 1));
+		ctx->tokens = (void *)S_realloc((void *)ctx->tokens,
+					       size, count,
+					       sizeof(*ctx->tokens));
+		ctx->ntoken_max = size;
 	}
 
-	ctx->nprot = n;
+	ctx->tokens[count] = type_id;
+	ctx->ntoken = count + 1;
+out:
+	CHECK_ERROR(err);
 }
 
 
-void tokens_destroy(struct tokens *ctx)
-{
-	UNPROTECT(ctx->nprot);
-}
-
-
-SEXP tokens_add(struct tokens *ctx, int type_id)
+SEXP tokens_add_type(struct tokens *ctx, int type_id)
 {
 	SEXP ans;
 	const struct corpus_text *type;
+	int count = ctx->ntype;
+	int size = ctx->ntype_max;
+	int err = 0;
 
-	if (ctx->ntype == ctx->ntype_max) {
-		ctx->ntype_max = 2 * ctx->ntype_max;
+	if (count == size) {
+		TRY(corpus_array_size_add(&size, sizeof(*ctx->types),
+					  count, 1));
 		ctx->types = (void *)S_realloc((void *)ctx->types,
-					       ctx->ntype_max,
-					       ctx->ntype,
+					       size, count,
 					       sizeof(*ctx->types));
+		ctx->ntype_max = size;
 	}
 
 	type = corpus_filter_type(ctx->filter, type_id);
 	ans = mkCharLenCE((char *)type->ptr, CORPUS_TEXT_SIZE(type), CE_UTF8);
-	ctx->types[ctx->ntype] = ans;
-	ctx->ntype++;
+	ctx->types[count] = ans;
+	ctx->ntype = count + 1;
 
+out:
+	CHECK_ERROR(err);
 	return ans;
 }
 
@@ -106,22 +128,19 @@ SEXP tokens_add(struct tokens *ctx, int type_id)
 SEXP tokens_scan(struct tokens *ctx, const struct corpus_text *text)
 {
 	SEXP ans;
-	int nadd, type_id, ntype;
-	int err, i, ntok;
+	int nprot, type_id, ntype;
+	int err = 0, i;
+
+	nprot = 0;
 
 	if (!text->ptr) {
 		return ScalarString(NA_STRING);
 	}
 
-	if ((err = corpus_filter_start(ctx->filter, text,
-				       CORPUS_FILTER_SCAN_TOKENS))) {
-		Rf_error("error while tokenizing text");
-	}
-
 	ntype = ctx->filter->ntype;
-	nadd = 0;
-	ntok = 0;
 
+	TRY(corpus_filter_start(ctx->filter, text,
+				CORPUS_FILTER_SCAN_TOKENS));
 	while (corpus_filter_advance(ctx->filter)) {
 		type_id = ctx->filter->type_id;
 		if (type_id == CORPUS_FILTER_IGNORED) {
@@ -130,68 +149,68 @@ SEXP tokens_scan(struct tokens *ctx, const struct corpus_text *text)
 
 		// add the new types
 		while (ntype < ctx->filter->ntype) {
-			PROTECT(tokens_add(ctx, ntype));
-			nadd++;
+			PROTECT(tokens_add_type(ctx, ntype)); nprot++;
 			ntype++;
 		}
 
-		if (ntok == ctx->nbuf_max) {
-			ctx->nbuf_max = 2 * ctx->nbuf_max;
-			ctx->buf = (void *)S_realloc((void *)ctx->buf,
-						     ctx->nbuf_max,
-						     ntok, sizeof(*ctx->buf));
-		}
-		ctx->buf[ntok] = type_id;
-		ntok++;
+		tokens_add_token(ctx, type_id);
 	}
+	TRY(ctx->filter->error);
 
-	if ((err = ctx->filter->error)) {
-		Rf_error("error while tokenizing text");
-	}
+	PROTECT(ans = allocVector(STRSXP, ctx->ntoken)); nprot++;
+	for (i = 0; i < ctx->ntoken; i++) {
+		RCORPUS_CHECK_INTERRUPT(i);
 
-	PROTECT(ans = allocVector(STRSXP, ntok));
-	for (i = 0; i < ntok; i++) {
-		type_id =  ctx->buf[i];
+		type_id =  ctx->tokens[i];
 		if (type_id >= 0) {
 			SET_STRING_ELT(ans, i, ctx->types[type_id]);
 		} else {
 			SET_STRING_ELT(ans, i, NA_STRING);
 		}
 	}
+	tokens_clear_tokens(ctx);
 
-	// no need to protect the new terms any more; ans protects them
-	UNPROTECT(nadd + 1);
-
+	// no need to protect the new types any more; ans protects them
+out:
+	UNPROTECT(nprot);
+	CHECK_ERROR(err);
 	return ans;
 }
 
 
-SEXP text_tokens(SEXP sx, SEXP sprops)
+SEXP text_tokens(SEXP sx)
 {
-	SEXP ans, names, stext, sfilter;
+	SEXP ans, names;
 	const struct corpus_text *text;
 	struct corpus_filter *filter;
 	struct tokens ctx;
 	R_xlen_t i, n;
+	int nprot, type_id, ntype;
 
-	PROTECT(stext = coerce_text(sx));
-	PROTECT(sfilter = alloc_filter(sprops));
+	nprot = 0;
 
-	text = as_text(stext, &n);
-	filter = as_filter(sfilter);
+	PROTECT(sx = coerce_text(sx)); nprot++;
+	text = as_text(sx, &n);
+	filter = text_filter(sx);
 
-	PROTECT(ans = allocVector(VECSXP, n));
-	names = names_text(stext);
+	PROTECT(ans = allocVector(VECSXP, n)); nprot++;
+	names = names_text(sx);
 	setAttrib(ans, R_NamesSymbol, names);
 
 	tokens_init(&ctx, filter);
 
+	// add the existing types in the filter
+	ntype = ctx.filter->ntype;
+	for (type_id = 0; type_id < ntype; type_id++) {
+		RCORPUS_CHECK_INTERRUPT(type_id);
+		PROTECT(tokens_add_type(&ctx, type_id)); nprot++;
+	}
+
 	for (i = 0; i < n; i++) {
+		RCORPUS_CHECK_INTERRUPT(i);
 		SET_VECTOR_ELT(ans, i, tokens_scan(&ctx, &text[i]));
 	}
 
-	tokens_destroy(&ctx);
-
-	UNPROTECT(3);
+	UNPROTECT(nprot);
 	return ans;
 }

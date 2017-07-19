@@ -38,11 +38,12 @@ east_asian_width = property.read(EAST_ASIAN_WIDTH)
 # W:  Wide      (always wide)
 
 
-# Treat emoji above 0x1F000 as wide
 emoji_props = property.read(EMOJI_DATA, sets=True)
-emoji = emoji_props['Emoji']
-emoji_min = 0x1F000
+emoji = emoji_props['Emoji_Presentation']
 
+for code in emoji_props['Emoji']:
+    if code >= 0x1F000:
+        emoji.add(code)
 
 # Treat ignorables as invisible
 derived_core_properties = property.read(DERIVED_CORE_PROPERTIES, sets=True)
@@ -67,9 +68,9 @@ for code in range(len(unicode_data.uchars)):
 code_props = [None] * len(east_asian_width)
 for code in range(len(code_props)):
     eaw = east_asian_width[code]
-    if code >= emoji_min and code in emoji: # emoji overrides east_asian_width
+    if code in emoji: # emoji overrides east_asian_width
         if eaw is None or eaw != 'A':
-            code_props[code] = 'Wide'
+            code_props[code] = 'Emoji'
         else:
             code_props[code] = 'Ambiguous'
     elif code in other: # other overrides east_asian_width
@@ -88,7 +89,7 @@ for code in range(len(code_props)):
         code_props[code] = 'Narrow' # default to narrow
 
 
-prop_names = ['Other', 'Ambiguous', 'Ignorable', 'None', 'Narrow', 'Wide']
+prop_names = ['Other', 'Emoji', 'Ambiguous', 'Ignorable', 'None', 'Narrow', 'Wide']
 prop_vals = {}
 for p in prop_names:
     prop_vals[p] = len(prop_vals) - 3

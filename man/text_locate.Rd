@@ -2,23 +2,26 @@
 \alias{text_count}
 \alias{text_detect}
 \alias{text_locate}
+\alias{text_subset}
 \title{Searching for terms in text.}
 \description{
     Look for instances of one or more terms in a set of texts.
 }
 \usage{
-    text_count(x, terms, filter = token_filter())
+    text_count(x, terms, filter = text_filter(x))
 
-    text_detect(x, terms, filter = token_filter())
+    text_detect(x, terms, filter = text_filter(x))
     
-    text_locate(x, terms, filter = token_filter())
+    text_locate(x, terms, filter = text_filter(x))
+
+    text_subset(x, terms, filter = text_filter(x))
 }
 \arguments{
     \item{x}{a text or character vector.}
 
     \item{terms}{a character vector of search terms.}
 
-    \item{filter}{a token filter defining the token boundaries.}
+    \item{filter}{a text filter defining the token boundaries.}
 
 }
 \details{
@@ -31,6 +34,7 @@
     \code{text_locate} finds all instances of the search terms in the
     input text.
 
+    \code{text_subset} returns the texts that contain the search terms.
 }
 \value{
     \code{text_count} and \code{text_detect} return a numeric vector and
@@ -44,6 +48,10 @@
     the matching term; \sQuote{before} and \sQuote{after} are text vectors
     giving the text before and after the instance. The \sQuote{instance}
     column gives the token or tokens matching the search term.
+
+    \code{text_subset} returns the subset of texts that contain the given
+    search terms.  The resulting has its \code{text_filter} set to the
+    passed-in \code{filter} argument.
 }
 \seealso{
     \code{\link{term_counts}}, \code{\link{term_frame}}.
@@ -56,6 +64,7 @@
     text_count(text, "rose")
     text_detect(text, "rose")
     text_locate(text, "rose")
+    text_subset(text, "a rose")
 
     # search for multiple terms
     text_locate(text, c("rose", "rose red", "snow white"))

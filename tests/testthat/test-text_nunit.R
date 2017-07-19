@@ -1,4 +1,4 @@
-context("text_length")
+context("text_nunit")
 
 
 test_that("text_nsentence can works on sentences", {
@@ -11,6 +11,11 @@ test_that("text_nsentence can works on sentences", {
     n <- c(with(split, tapply(index, parent, length)))
     names(n) <- names(text)
     expect_equal(n, n0)
+})
+
+
+test_that("text_nsentence handles NA and empty", {
+    expect_equal(text_nsentence(c(NA, "")), c(NA, 0))
 })
 
 
@@ -27,9 +32,6 @@ test_that("text_ntoken can works on tokens", {
 })
 
 
-test_that("text_ntype works on types", {
-    expect_equal(text_ntype(LETTERS, collapse = TRUE), 26)
-
-    expect_equal(text_ntype(paste(LETTERS, letters, LETTERS)),
-                 rep(1, 26))
+test_that("text_ntoken handles NA and empty", {
+    expect_equal(text_ntoken(c(NA, "")), c(NA, 0))
 })

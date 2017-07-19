@@ -1,99 +1,21 @@
 \name{text_tokens}
-\alias{corpus_token_filter}
 \alias{text_ntoken}
 \alias{text_tokens}
-\alias{token_filter}
 \title{Text Tokenization}
 \description{
    Segment text into tokens, each of which is an instance of
    a particular \sQuote{type}.
 }
 \usage{
-    text_tokens(x, filter = token_filter())
+    text_tokens(x, filter = text_filter(x))
 
-    text_ntoken(x, filter = token_filter())
-
-    token_filter(map_case = TRUE, map_compat = TRUE,
-                 map_quote = TRUE, remove_ignorable = TRUE,
-                 stemmer = NA, stem_except = drop,
-                 combine = abbreviations("english"),
-                 drop_letter = FALSE, drop_mark = FALSE,
-                 drop_number = FALSE, drop_punct = FALSE,
-                 drop_symbol = FALSE, drop_other = FALSE,
-                 drop = NULL, drop_except = NULL)
+    text_ntoken(x, filter = text_filter(x))
 }
 \arguments{
     \item{x}{object to be tokenized.}
 
     \item{filter}{filter specifying the transformation from text to
-        token sequence, a list or token filter object.}
-
-    \item{map_case}{a logical value indicating whether to apply Unicode
-        case mapping to the text. For most languages, this transformation
-        changes uppercase characters to their lowercase equivalents.}
-
-    \item{map_compat}{a logical value indicating whether to apply
-        Unicode compatibility mappings to the characters, those required
-        for NFKC and NFKD normal forms.}
-
-    \item{map_quote}{a logical value indicating whether to replace Unicode
-        quote characters like single quote, double quote, and apostrophe,
-        with an ASCII single quote (').}
-
-    \item{remove_ignorable}{a logical value indicating whether to remove
-        Unicode "default ignorable" characters like zero-width spaces
-        and soft hyphens.}
-
-    \item{stemmer}{a character value giving the name of the stemming
-        algorithm, or \code{NA} to leave words unchanged. The stemming
-        algorithms are provided by the
-        \href{http://snowballstem.org/algorithms/}{Snowball stemming library};
-        the following stemming algorithms are available:
-            \code{"arabic"}, \code{"danish"}, \code{"dutch"},
-            \code{"english"}, \code{"finnish"}, \code{"french"},
-	        \code{"german"}, \code{"hungarian"}, \code{"italian"},
-            \code{"norwegian"}, \code{"porter"}, \code{"portuguese"},
-	        \code{"romanian"}, \code{"russian"}, \code{"spanish"},
-            \code{"swedish"}, \code{"tamil"}, and \code{"turkish"}.
-        }
-
-    \item{stem_except}{a character vector of exception words to exempt from
-        stemming, or \code{NULL}. If left unspecified, \code{stem_except}
-        is set equal to the \code{drop} argument.}
-
-    \item{combine}{a character vector of multi-word phrases to combine, or
-        \code{NULL}; see \sQuote{Combining words}.}
-
-    \item{drop_letter}{a logical value indicating whether to replace
-        \code{"letter"} tokens (cased letters, kana, idoegraphic, letter-like
-        numeric characters and other letters) with \code{NA}.}
-
-    \item{drop_mark}{a logical value indicating whether to replace
-        \code{"mark"} tokens (subscripts, superscripts, modifier letters,
-        modifier symbols, and other marks) with \code{NA}.}
-
-    \item{drop_number}{a logical value indicating whether to replace
-        \code{"number"} tokens (decimal digits, words appearing to be
-        numbers, and other numeric characters) with \code{NA}.}
-
-    \item{drop_punct}{a logical value indicating whether to replace
-        \code{"punct"} tokens (punctuation) with \code{NA}.}
-
-    \item{drop_symbol}{a logical value indicating whether to replace
-        \code{"symbol"} tokens (emoji, math, currency, and other symbols)
-        with \code{NA}.}
-
-    \item{drop_other}{a logical value indicating whether to replace
-        \code{"other"} tokens (types that do not fall into any other
-        categories) with \code{NA}.}
-
-    \item{drop}{a character vector of types to replace with \code{NA},
-        or \code{NULL}.}
-
-    \item{drop_except}{a character of types to exempt from the drop
-        rules specified by the \code{drop_letter}, \code{drop_mark},
-        \code{drop_number}, \code{drop_punct}, \code{drop_symbol},
-        \code{drop_other}, and \code{drop} arguments, or \code{NULL}.}
+        token sequence.}
 }
 \details{
     \code{text_tokens} splits texts into token sequences. Each token is an
@@ -106,11 +28,11 @@
             \href{http://unicode.org/reports/tr29/#Word_Boundaries}{Unicode
                 Standard Annex #29, Section 4}. We categorize each word as
             \code{"letter"}, \code{"mark"}, \code{"number"},
-            \code{"punct"}, \code{"symbol"}, or \code{"other"} according
-            to the first character in the word.  For words with two or
-            more characters that start with extenders like underscore
-            (\code{_}), we use the second character in the word to
-            categorize it, treating a second extender as a letter.
+            \code{"punct"}, \code{"symbol"}, \code{"other"} or
+            \code{"url"} according to the first character in the word.
+            For words with two or more characters that start with extenders
+            like underscore (\code{_}), we use the second character in
+            the word to categorize it, treating a second extender as a letter.
 
         \item Next, we normalize the remaining words by applying the
             character mappings indicated by the \code{map_case},
@@ -137,8 +59,8 @@
 
         \item If any of \code{drop_letter}, \code{drop_mark},
             \code{drop_number}, \code{drop_punct}, \code{drop_symbol},
-            or \code{drop_other} are \code{TRUE}, we replace the tokens
-            with values in the corresponding categories by \code{NA}.
+            \code{drop_other}, or \code{drop_url} are \code{TRUE}, we replace
+            the tokens with values in the corresponding categories by \code{NA}.
             (For multi-word types created by the \code{combine} step,
             we take the category of the first word in the phrase.)
             Then, if the \code{drop} property is non-\code{NULL}, we replace
@@ -178,7 +100,7 @@
     For English, this likely only affects words ending in \code{".s"}.
 }
 \section{Combining words}{
-    The \code{combine} property of a \code{token_filter} enables
+    The \code{combine} property of a \code{text_filter} enables
     transformations that combine two or more words into a single token. For
     example, specifying \code{combine = "new york"} will
     cause consecutive instances of the words \code{new} and \code{york}
@@ -210,32 +132,34 @@
     text_ntoken("The quick ('brown') fox can't jump 32.3 feet, right?")
 
     # don't normalize:
-    text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?", NULL)
+    f <- text_filter(map_case = FALSE, map_compat = FALSE,
+                     map_quote = FALSE, remove_ignorable = FALSE)
+    text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?", f)
 
     # drop common function words ('stop' words):
     text_tokens("Able was I ere I saw Elba.",
-                token_filter(drop = stopwords("english")))
+                text_filter(drop = stopwords("english")))
 
     # drop numbers, with some exceptions:"
     text_tokens("0, 1, 2, 3, 4, 5",
-                token_filter(drop_number = TRUE,
-                             drop_except = c("0", "2", "4")))
+                text_filter(drop_number = TRUE,
+                            drop_except = c("0", "2", "4")))
 
     # apply stemming...
-    text_tokens("Mary is running", token_filter(stemmer = "english"))
+    text_tokens("Mary is running", text_filter(stemmer = "english"))
 
     # ...except for certain words
     text_tokens("Mary is running",
-                token_filter(stemmer = "english", stem_except = "mary"))
+                text_filter(stemmer = "english", stem_except = "mary"))
 
     # combine abbreviations by default
     text_tokens("Ms. Jones")
 
     # disable default combinations
-    text_tokens("Ms. Jones", token_filter(combine = NULL))
+    text_tokens("Ms. Jones", text_filter(combine = NULL))
 
     # add new combinations
     text_tokens("Ms. Jones is from New York City, New York.",
-                token_filter(combine = c(abbreviations("english"),
-                                         "new york", "new york city")))
+                text_filter(combine = c(abbreviations("english"),
+                                        "new york", "new york city")))
 }

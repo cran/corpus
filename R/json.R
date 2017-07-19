@@ -13,9 +13,14 @@
 #  limitations under the License.
 
 
-read_ndjson <- function(file, mmap = FALSE, simplify = TRUE, text = "text",
-                        stringsAsFactors = default.stringsAsFactors())
+read_ndjson <- function(file, mmap = FALSE, simplify = TRUE, text = NULL)
 {
+    with_rethrow({
+        mmap <- as_option("mmap", mmap)
+        simplify <- as_option("simplify", simplify)
+        text <- as_character_vector("text", text)
+    })
+
     if (mmap) {
         if (!is.character(file)) {
             stop("'file' must be a character string when 'mmap' is TRUE")
@@ -53,14 +58,10 @@ read_ndjson <- function(file, mmap = FALSE, simplify = TRUE, text = "text",
     }
 
     if (simplify) {
-        text <- as.character(text)
         if (length(dim(ans)) == 2) {
-            ans <- as.data.frame(ans, text = text,
-                                 stringsAsFactors = stringsAsFactors)
-        } else if (json_datatype(ans) == "text") {
-            ans <- .Call(C_as_text_json, ans)
+            ans <- as.data.frame(ans, text = text)
         } else {
-            ans <- .Call(C_simplify_json, ans, text, stringsAsFactors)
+            ans <- .Call(C_simplify_json, ans, text)
         }
     }
     ans
@@ -87,30 +88,19 @@ names.corpus_json <- function(x)
 
 `names<-.corpus_json` <- function(x, value)
 {
-    stop("setting names on a json object is not allowed")
+    stop("setting names on a JSON object is not allowed")
 }
 
 
 dimnames.corpus_json <- function(x)
 {
-    cn <- names(x)
-    if (is.null(cn)) {
-        NULL
+    if (is.null(dim(x))) {
+        return(NULL)
     } else {
-        list(NULL, cn)
+        rn <- as.character(seq_len(nrow(x)))
+        cn <- names(x)
+        list(rn, cn)
     }
-}
-
-
-json_datatype <- function(x)
-{
-    .Call(C_json_datatype, x)
-}
-
-
-json_datatypes <- function(x)
-{
-    .Call(C_json_datatypes, x)
 }
 
 
@@ -123,7 +113,7 @@ print.corpus_json <- function(x, ...)
 `$.corpus_json` <- function(x, name)
 {
     if (is.null(dim(x))) {
-        stop("$ operator is invalid for scalar json objects")
+        stop("$ operator is invalid for scalar JSON objects")
     }
     x[[name]]
 }
@@ -131,7 +121,7 @@ print.corpus_json <- function(x, ...)
 
 `$<-.corpus_json` <- function(x, name, value)
 {
-    stop("$<- operator is invalid for json objects")
+    stop("$<- operator is invalid for JSON objects")
 }
 
 
@@ -170,89 +160,82 @@ print.corpus_json <- function(x, ...)
     }
 
     ans <- .Call(C_subscript_json, x, i)
-    ans <- .Call(C_simplify_json, ans, NULL, FALSE)
+    ans <- .Call(C_simplify_json, ans, NULL)
     ans
 }
 
 
 `[[<-.corpus_json` <- function(x, i, value)
 {
-    stop("[[<- operator is invalid for json objects")
+    stop("[[<- operator is invalid for JSON objects")
 }
 
 
 
-`[.corpus_json` <- function(x, ...)
+`[.corpus_json` <- function(x, i, j, drop = TRUE)
 {
-    if (!all(names(sys.call()[-1] == ""))) {
-        stop("named arguments are not allowed")
+    if (missing(i)) {
+        i <- NULL
+    } else if (is.null(i)) {
+        i <- numeric()
     }
 
-    ni <- nargs() - 1
-
-    if (is.null(dim(x))) {
-        # Scalar json:
-        # If non-NULL, convert i to a double() vector of indices;
-        # set j to NULL.
-
-        if (ni > 1) {
-            stop("incorrect number of dimensions")
-	    }
-
-        if (ni < 1 || missing(..1)) {
-	        i <- NULL
-	    } else {
-            i <- seq_len(NROW(x))[..1]
-            i <- as.double(i)
-        }
-	    j <- NULL
+    if (missing(j)) {
+        ni <- 1
+        j <- NULL
+    } else if (is.null(dim(x))) {
+        stop("incorrect number of dimensions")
     } else {
-        # Record json:
-        # If non-NULL, convert i to a double() vector of indices;
-        # if non-NULL convert j to a column index
-
-        if (ni > 2) {
-            stop("incorrect number of dimensions")
-	    }
-
-        if (ni < 1 || missing(..1)) {
-            i <- NULL
-	    } else {
-            i <- seq_len(NROW(x))[..1]
-            i <- as.double(i)
-        }
-
-
-        if (ni < 2 || missing(..2)) {
-            j <- NULL
-        } else {
-            j <- ..2
-            if (length(j) == 0) {
-                stop("second subscript of length 0 is not allowed")
-            } else if (length(j) > 1) {
-                stop("second subscript of length >1 is not allowed")
-            }
-
-            if (is.character(j)) {
-                if (!(j %in% names(x))) {
-                    stop(paste0("invalid column name: \"", j, "\""))
-                }
-                j <- match(j, names(x))
-            }
-            if (!is.numeric(j) || is.na(j)) {
-                stop(paste0("invalid column subscript: \"", j, "\""))
-            }
-            j <- floor(as.double(j))
+        ni <- 2
+        if (is.null(j)) {
+            j <- integer()
         }
     }
 
-    .Call(C_subset_json, x, i, j)
+    with_rethrow({
+        drop <- as_option("drop", drop)
+    })
+
+    if (!is.null(i)) {
+        ix <- seq_len(NROW(x))
+        if (!is.null(dim(x))) {
+            names(ix) <- row.names(x)
+        }
+        i <- ix[i]
+        i <- as.double(i)
+    }
+
+    if (!is.null(j)) {
+        if (length(j) == 0) {
+            stop("second subscript of length 0 is not allowed")
+        } else if (length(j) > 1) {
+            stop("second subscript of length >1 is not allowed")
+        }
+
+        if (is.character(j)) {
+            if (!j %in% names(x)) {
+                stop(paste0("invalid column name: \"", j, "\""))
+            }
+            j <- match(j, names(x))
+        }
+
+        if (!is.numeric(j) || is.na(j)) {
+            stop(paste0("invalid column subscript: \"", j, "\""))
+        }
+        j <- floor(as.double(j))
+    }
+
+    ans <- .Call(C_subset_json, x, i, j)
+    if (drop && !is.null(dim(ans)) && length(ans) == 1) {
+        ans <- .Call(C_simplify_json, ans, NULL)
+    }
+    ans
 }
 
 
 `[<-.corpus_json` <- function(x, ..., value)
 {
-    stop("[<- operator is invalid for json objects")
+    stop("[<- operator is invalid for JSON objects")
 }
 
 
@@ -262,13 +245,60 @@ as.character.corpus_json <- function(x, ...)
 }
 
 
-as.data.frame.corpus_json <-
-    function(x, ..., text = "text",
-             stringsAsFactors = default.stringsAsFactors())
+as.data.frame.corpus_json <- function(x, row.names = NULL, ...,
+                                      text = NULL, stringsAsFactors = FALSE)
 {
-    l <- as.list(x, text = text, stringsAsFactors = stringsAsFactors)
-    as.data.frame(l, row.names = row.names(x), ...,
-                  text = text, stringsAsFactors = stringsAsFactors)
+    with_rethrow({
+        text <- as_character_vector("text", text)
+        stringsAsFactors <- as_option("stringsAsFactors", stringsAsFactors)
+    })
+
+    if (is.null(dim(x))) {
+        n <- length(x)
+        l <- list(.Call(C_simplify_json, x, text))
+        names(l) <- deparse(substitute(x), width.cutoff = 500L)
+    } else {
+        n <- nrow(x)
+        l <- as.list.corpus_json(x, text = text)
+    }
+
+    if (!is.null(row.names)) {
+        with_rethrow({
+            row.names <- as_names("row.names", row.names, n)
+        })
+    } else {
+        row.names <- c(NA, -n)
+    }
+
+    cols <- list()
+    names <- character()
+    ncol <- 0
+
+    for (i in seq_along(l)) {
+        elt <- l[[i]]
+        nm <- names(l)[[i]]
+
+        if (inherits(elt, "corpus_json")) {
+            nested <- as.data.frame(elt, ..., text = text,
+                                    stringsAsFactors = stringsAsFactors)
+            for (j in seq_along(nested)) {
+                ncol <- ncol + 1L
+                cols[[ncol]] <- nested[[j]]
+                names[[ncol]] <- paste(nm, names(nested)[[j]], sep = ".")
+            }
+        } else {
+            if (is.character(elt) && stringsAsFactors) {
+                elt <- as.factor(elt)
+            }
+            ncol <- ncol + 1L
+            cols[[ncol]] <- elt
+            names[[ncol]] <- nm
+        }
+    }
+
+    names(cols) <- names
+    structure(cols, row.names = row.names,
+              class = c("corpus_frame", "data.frame"))
 }
 
 
@@ -290,25 +320,10 @@ as.double.corpus_json <- function(x, ...)
 }
 
 
-as.list.corpus_json <- function(x, ..., text = "text",
-                                stringsAsFactors = default.stringsAsFactors())
+as.list.corpus_json <- function(x, text = NULL, ...)
 {
-    text <- as.character(text)
-    .Call(C_as_list_json, x, text, stringsAsFactors)
-}
-
-
-as_text.corpus_json <- function(x, ...)
-{
-    if (length(dim(x)) == 2) {
-        if (!("text" %in% names(x))) {
-            stop("no column named 'text'")
-        }
-        nm <- row.names(x)
-        x <- as_text(x$text)
-        names(x) <- nm
-        x
-    } else {
-        .Call(C_as_text_json, x)
-    }
+    with_rethrow({
+        text <- as_character_vector("text", text)
+    })
+    .Call(C_as_list_json, x, text)
 }

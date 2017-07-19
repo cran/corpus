@@ -6,11 +6,11 @@
     Tokenize a set of texts and compute a term frequency matrix or data frame.
 }
 \usage{
-    term_matrix(x, filter = token_filter(), weights = NULL,
+    term_matrix(x, filter = text_filter(x), weights = NULL,
                 ngrams = NULL, select = NULL, group = NULL,
                 transpose = FALSE)
 
-    term_frame(x, filter = token_filter(), weights = NULL,
+    term_frame(x, filter = text_filter(x), weights = NULL,
                ngrams = NULL, select = NULL, group = NULL)
 }
 \arguments{
@@ -67,15 +67,16 @@
 
     \code{term_frame} with \code{group = NULL} returns a data frame with one
     row for each entry of the term matrix, and columns \code{"text"},
-    \code{"term"}, and \code{"count"} giving the text ID, term, and count. If
-    \code{names(as_text(x))} is non-\code{NULL}, then the text ID is taken
-    as its name; otherwise, the text ID is an integer giving its row index
-    in \code{x}.
+    \code{"term"}, and \code{"count"} giving the text ID, term, and count.
+    The \code{"term"} column is a character vector.  The \code{"text"}
+    column is a factor with levels equal to \code{names(as_text(x))};
+    calling \code{as.integer} on the \code{"text"} column converts from
+    the factor values to the integer row index in the term matrix.
 
     \code{term_frame} with \code{group} non-\code{NULL} behaves similarly,
     but the result instead has columns named \code{"group"}, \code{"term"},
     and \code{"count"}, with \code{"group"} giving the grouping level, as
-    a character string.
+    a factor.
 }
 \seealso{
     \code{\link{text_tokens}}, \code{\link{term_counts}}.

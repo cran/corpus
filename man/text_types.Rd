@@ -1,19 +1,19 @@
 \name{text_types}
 \alias{text_ntype}
 \alias{text_types}
-\title{Text type sets.}
+\title{Text Type Sets.}
 \description{
     Get or measure the set of types (unique token values).
 }
 \usage{
-    text_types(x, filter = token_filter(), collapse = FALSE)
+    text_types(x, filter = text_filter(x), collapse = FALSE)
 
-    text_ntype(x, filter = token_filter(), collapse = FALSE)
+    text_ntype(x, filter = text_filter(x), collapse = FALSE)
 }
 \arguments{
     \item{x}{a text or character vector.}
 
-    \item{filter}{a token filter defining the token boundaries and
+    \item{filter}{a text filter defining the token boundaries and
         normalization.}
 
     \item{collapse}{a logical value indicating whether to collapse the
@@ -29,7 +29,8 @@
     vector with the same length and names as the input text, with the elements
     giving the number of units in the corresponding texts.  For
     \code{text_types}, the result is a list of character vector with each
-    vector giving the unique types in the corresponding text.
+    vector giving the unique types in the corresponding text, ordered
+    according to the \code{\link{sort}} function.
 
     If \code{collapse = TRUE}, then we aggregate over all rows of the input.
     In this case, \code{text_ntype} produces a scalar indicating the number
@@ -37,7 +38,7 @@
     vector with the unique types.
 }
 \seealso{
-    \code{\link{token_filter}}, \code{\link{text_tokens}}.
+    \code{\link{text_filter}}, \code{\link{text_tokens}}.
 }
 \examples{
     text <- c("I saw Mr. Jones today.",

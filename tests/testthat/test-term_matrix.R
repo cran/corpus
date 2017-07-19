@@ -60,6 +60,17 @@ test_that("'term_maxtrix' group works", {
 })
 
 
+test_that("'term_maxtrix' group can handle NA", {
+    text <- c("A rose is a rose is a rose.",
+              "A Rose is red, a violet is blue!",
+              "A rose by any other name would smell as sweet.")
+    g <- c("A", NA, "B")
+    x0 <- term_matrix(c(A=text[1], B=text[3]))
+    x <- term_matrix(text, group = g)
+    expect_equal(x, x0)
+})
+
+
 test_that("'term_matrix' weights and group works", {
     text <- c("A rose is a rose is a rose.",
               "A Rose is red, a violet is blue!",
@@ -88,9 +99,25 @@ test_that("'term_matrix' can transpose", {
 })
 
 
+test_that("'term_matrix can select ngrams", {
+    text <- c("A rose is a rose is a rose.",
+              "A Rose is red, a violet is blue!",
+              "A rose by any other name would smell as sweet.")
+    ngrams <- c(1, 3)
+    x <- term_matrix(text, ngrams = ngrams)
+    terms <- colnames(x)
+    for (i in seq_len(nrow(x))) {
+        stats <- term_counts(text[i], ngrams = ngrams)
+        expect_true(all(stats$term %in% terms))
+        expect_equal(as.numeric(x[i,stats$term]), stats$count)
+        expect_true(all(x[i,!terms %in% stats$term] == 0))
+    }
+})
+
+
 test_that("'term_matrix' can select stemmed bigrams", {
     text <- "A sentence. Another sentence. Others..."
-    f <- token_filter(stemmer = "english", drop_punct = TRUE,
+    f <- text_filter(stemmer = "english", drop_punct = TRUE,
                       drop = stopwords("english"))
     select <- c("sentenc", "anoth", "anoth sentenc")
     x0 <- term_matrix(text, f, select = select)
@@ -110,7 +137,7 @@ test_that("'term_matrix' errors for empty terms", {
 
 
 test_that("'term_matrix' errors for dropped select terms", {
-    f <- token_filter(drop = "a")
+    f <- text_filter(drop = "a")
     expect_error(term_matrix("", f, select = c("b b", "b a", "c")),
                  paste0("select term in position 2 ('b a')",
                         " contains a dropped type ('a')"),
@@ -138,8 +165,55 @@ test_that("'term_matrix' can select really long terms", {
 
 
 test_that("'term_matrix' can select types ending in '.s", {
-    f <- token_filter(stemmer = "english", drop_punct = TRUE, combine = NULL)
+    f <- text_filter(stemmer = "english", drop_punct = TRUE, combine = NULL)
     expect_equal(term_matrix("u.s.", f, select = "u.s"),
                  Matrix::sparseMatrix(i = 1, j = 1, x = 1,
                                       dimnames = list(NULL, "u.s")))
+})
+
+
+test_that("'term_frame' gives equivalent results to 'term_matrix'", {
+    text <- c(a="A rose is a rose is a rose.",
+              b="A Rose is red, a violet is blue!",
+              c="A rose by any other name would smell as sweet.")
+    x <- term_matrix(text)
+    tf <- term_frame(text)
+    xtf <- Matrix::sparseMatrix(i = as.integer(tf$text),
+                                j = as.integer(factor(tf$term, levels = colnames(x))),
+                                x = tf$count,
+                                dimnames = list(levels(tf$text),
+                                                colnames(x)))
+    expect_equal(x, xtf)
+})
+
+
+test_that("'term_frame' gives equivalent results to 'term_matrix' no names", {
+    text <- c("A rose is a rose is a rose.",
+              "A Rose is red, a violet is blue!",
+              "A rose by any other name would smell as sweet.")
+    x <- term_matrix(text)
+    rownames(x) <- as.character(seq_along(text))
+    tf <- term_frame(text)
+    xtf <- Matrix::sparseMatrix(i = as.integer(tf$text),
+                                j = as.integer(factor(tf$term, levels = colnames(x))),
+                                x = tf$count,
+                                dimnames = list(levels(tf$text),
+                                                colnames(x)))
+    expect_equal(x, xtf)
+})
+
+
+test_that("'term_frame' with group gives equivalent results to 'term_matrix'", {
+    text <- c(a="A rose is a rose is a rose.",
+              b="A Rose is red, a violet is blue!",
+              c="A rose by any other name would smell as sweet.")
+    g <- factor(c("X", "Y", "X"))
+    x <- term_matrix(text, group = g)
+    tf <- term_frame(text, group = g)
+    xtf <- Matrix::sparseMatrix(i = as.integer(tf$group),
+                                j = as.integer(factor(tf$term, levels = colnames(x))),
+                                x = tf$count,
+                                dimnames = list(levels(tf$group),
+                                                colnames(x)))
+    expect_equal(x, xtf)
 })

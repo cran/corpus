@@ -1,0 +1,254 @@
+<!--
+%\VignetteIndexEntry{Chinese text handling}
+%\VignetteEngine{knitr::rmarkdown}
+%\VignetteEncoding{UTF-8}
+-->
+
+Chinese text handling
+=====================
+
+
+
+This vignette shows how to work with Chinese language materials using the
+corpus package.  It's based on Haiyan Wang's [rOpenSci demo](https://github.com/ropensci/textworkshop17/tree/master/demos/chineseDemo)
+and assumes you have `httr`, `stringi`, and `wordcloud` installed.
+
+We'll start by loading the package and setting a seed to ensure reproducible
+results
+
+```r
+library("corpus")
+set.seed(100)
+```
+
+## Documents and stopwords
+
+First download a stop word list suitable for Chinese, the Baidu stop words
+
+```r
+cstops <- "https://raw.githubusercontent.com/ropensci/textworkshop17/master/demos/chineseDemo/ChineseStopWords.txt"
+csw <- paste(readLines(cstops, encoding = "UTF-8"), collapse = "\n") # download
+csw <- gsub("\\s", "", csw)           # remove whitespace
+stop_words <- strsplit(csw, ",")[[1]] # extract the comma-separated words
+```
+Next, download some demonstration documents. These are in plain text format,
+encoded in UTF-8.
+
+```r
+gov_reports <- "https://api.github.com/repos/ropensci/textworkshop17/contents/demos/chineseDemo/govReports"
+raw <- httr::GET(gov_reports)
+paths <- sapply(httr::content(raw), function(x) x$path)
+names <- tools::file_path_sans_ext(basename(paths))
+urls <- sapply(httr::content(raw), function(x) x$download_url)
+text <- sapply(urls, function(url) paste(readLines(url, warn = FALSE,
+                                                   encoding = "UTF-8"),
+                                         collapse = "\n"))
+names(text) <- names
+```
+
+## Tokenization
+
+Corpus does not know how to tokenize languages with no spaces between words.
+Fortunately, the ICU library (used internally by the `stringi` package) does,
+by using a dictionary of words along with information about their relative
+usage rates.
+
+We use `stringi`'s tokenizer, collect a dictionary of the word types,
+and then manually insert zero-width spaces between tokens.
+
+```r
+toks <- stringi::stri_split_boundaries(text, type = "word")
+dict <- unique(c(toks, recursive = TRUE)) # unique words
+text2 <- sapply(toks, paste, collapse = "\u200b")
+```
+and put the input text in a data frame for convenient analysis
+
+```r
+data <- data.frame(name = names, text = as_text(text2),
+                   stringsAsFactors = FALSE)
+```
+
+We then specify a token filter to determine what is counted by other corpus
+functions.  Here we set `combine = dict` so that multi-word
+tokens get treated as single entities
+
+```r
+f <- text_filter(drop_punct = TRUE, drop = stop_words, combine = dict)
+(text_filter(data) <- f) # set the text column's filter
+```
+
+```
+Text filter with the following options:
+
+	map_case: TRUE
+	map_compat: TRUE
+	map_quote: TRUE
+	remove_ignorable: TRUE
+	stemmer: NULL
+	stem_dropped: FALSE
+	stem_except: NULL
+	combine:  chr [1:12033] "\n" "1954" "年" "政府" "工作" "报告" ...
+	drop_letter: FALSE
+	drop_mark: FALSE
+	drop_number: FALSE
+	drop_symbol: FALSE
+	drop_punct: TRUE
+	drop_other: FALSE
+	drop_url: FALSE
+	drop:  chr [1:717] "按" "按照" "俺" "俺们" "阿" "别" "别人" ...
+	drop_except: NULL
+	sent_crlf: FALSE
+	sent_suppress:  chr [1:164] "A." "A.D." "a.m." "A.M." "A.S." ...
+```
+
+## Document statistics
+
+We can now compute type, token, and sentence counts
+
+```r
+head(data.frame(text = data$name,
+                types = text_ntype(data),
+                tokens = text_ntoken(data),
+                sentences = text_nsentence(data)))
+```
+
+```
+                     text types tokens sentences
+1 1954政府工作报告_周恩来  2023   8694       453
+2 1955政府工作报告_李富春  2780  21079       981
+3 1956政府工作报告_李先念  1338   9077       495
+4 1957政府工作报告_周恩来  2331  13007       704
+5 1958政府工作报告_薄一波  1970   9347       412
+6 1959政府工作报告_周恩来  2261  11638       577
+```
+and examine term frequencies
+
+```r
+(stats <- term_counts(data))
+```
+
+```
+   term count support
+1  发展  5627      49
+2  经济  5036      49
+3  社会  4255      49
+4  建设  4248      49
+5  人民  2897      49
+6  主义  2817      49
+7  工作  2642      49
+8  企业  2627      49
+9  国家  2595      49
+10 加强  2438      49
+11 生产  2407      49
+12 年    2021      49
+13 我国  1999      49
+14 提高  1947      49
+15 中    1860      49
+16 增长  1800      49
+17 化    1740      49
+18 继续  1670      49
+⋮
+(11574 rows total)
+```
+These operations all use the `text_filter(data)` value we set above to determine
+the token and sentence boundaries.
+
+
+## Visualization
+
+We can visualize word frequencies with a wordcloud.  You may want to use a font
+suitable for Chinese ('STSong' is a good choice for Mac users). We switch to
+this font, create the wordcloud, then switch back.
+
+```r
+font_family <- par("family") # the previous font family
+par(family = "STSong") # change to a nice Chinese font
+with(stats, {
+    wordcloud::wordcloud(term, count, min.freq = 500,
+                         random.order = FALSE, rot.per = 0.25,
+                         colors = RColorBrewer::brewer.pal(8, "Dark2"))
+})
+```
+
+![Word cloud](chinese-wordcloud-1.png)
+
+```r
+par(family = font_family) # switch the font back
+```
+
+## Co-occurrences 
+
+Here are the terms that show up in sentences containing a particular
+term
+
+```r
+sents <- text_split(data) # split text into sentences
+subset <- text_subset(sents, '\u6539\u9769') # select those with the term
+term_counts(subset) # count the word occurrences
+```
+
+```
+   term count support
+1  改革  2931    2457
+2  发展   866     652
+3  体制   768     649
+4  经济  1016     639
+5  推进   522     491
+6  深化   473     469
+7  社会   664     464
+8  建设   513     391
+9  制度   452     364
+10 开放   389     353
+11 企业   489     339
+12 工作   301     268
+13 积极   262     252
+14 继续   260     251
+15 管理   281     249
+16 进行   239     232
+17 加快   230     225
+18 化     261     224
+⋮
+(3880 rows total)
+```
+The first term is the search query. It appears 2931 times in the corpus,
+in 2457 different sentences. The second term in the list appears in
+652 of 2457 sentences containing the search term. (I don't speak Chinese,
+but Google translate tells me that the search term is "reform", and the
+second and third items in the list are "development" and "system".)
+
+
+## Keyword in context
+
+Finally, here's how we might show terms in their local context
+
+```r
+text_locate(data, "\u6027")
+```
+
+```
+     text term before                    instance                     after
+1    1    性   …方面的重要问题之一是计划    性    不足。我们现在还有许多计…
+2    1    性   …术和提高劳动生产率的积极    性    ，对于发展经济建设很有害…
+3    1    性   …表现了人民群众的政治积极    性    和政治觉悟的提高，充分表…
+4    1    性   …、氢武器和其他大规模毁灭    性    武器的愿望必须满足。这些…
+5    2    性   …在劳动战线上的高度的积极    性    和创造性，依靠全国人民在…
+6    2    性   …线上的高度的积极性和创造    性    ，依靠全国人民在改革土地…
+7    2    性   …已经分得了土地，生产积极    性    很高，何必实行合作化呢？…
+8    2    性   …悟，充分地发挥群众的积极    性    和创造性，提高劳动生产率…
+9    2    性   …地发挥群众的积极性和创造    性    ，提高劳动生产率。\n\n　…
+10   2    性   …须照顾单干农户的生产积极    性    ，给单干农户以积极的帮助…
+11   2    性   …要办法。国家从缩减非生产    性    建设的支出和行政机关的经…
+12   2    性   …更重要的是发扬地方的积极    性    ，加强地方党政机关对农业…
+13   2    性   …，提高农民群众的生产积极    性    ，保证这个计划的实现。地…
+14   2    性   …刺激和发挥农民的经营积极    性    。\n\n　　有些农村的地方…
+15   2    性   …以后，为了加强生产的计划    性    ，对许多重要原料，有的由…
+16   2    性   …一步地提高农民的增产积极    性    ，促进农业生产的发展。这…
+17   2    性   …农民特别是中农的生产积极    性    。\n\n　　关于粮食的计划…
+18   2    性   …关系，从而更加积极地创造    性    地参加国家建设。\n\n　　…
+⋮
+(1341 rows total)
+```
+*Note: the alignment looks bad here because the Chinese characters have
+widths between 1 and 2 spaces each. The spacing in the table is set assuming
+that Chinese characters take exactly 2 spaces each. If you know how to set
+the font to make the widths agree, please contact me.*

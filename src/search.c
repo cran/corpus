@@ -25,20 +25,6 @@
 #include "rcorpus.h"
 
 
-#define TRY(x) \
-	do { \
-		if ((err = (x))) { \
-			goto out; \
-		} \
-	} while (0)
-
-#define TRY_ALLOC(x) \
-	do { \
-		if ((err = (x) ? 0 : CORPUS_ERROR_NOMEM)) { \
-			goto out; \
-		} \
-	} while (0)
-
 #define SEARCH_TAG install("corpus::search")
 
 
@@ -105,7 +91,7 @@ SEXP alloc_search(SEXP sterms, const char *name, struct corpus_filter *filter)
 	struct corpus_search *obj;
 	struct termset *termset;
 	int i, n;
-	int err, nprot;
+	int err = 0, nprot;
 
 	nprot = 0;
 
@@ -116,21 +102,19 @@ SEXP alloc_search(SEXP sterms, const char *name, struct corpus_filter *filter)
 	PROTECT(sset = alloc_termset(sterms, name, filter, 1)); nprot++;
 	termset = as_termset(sset);
 	items = items_termset(sset);
+	R_SetExternalPtrProtected(ans, items);
 
 	n = termset->nitem;
 	for (i = 0; i < n; i++) {
+		RCORPUS_CHECK_INTERRUPT(i);
 		term = &termset->set.items[i];
 		TRY(corpus_search_add(obj, term->type_ids,
 				      term->length, NULL));
 	}
 
 out:
-	if (err) {
-		error("failed initializing %s term set", name);
-	}
+	CHECK_ERROR(err);
 	UNPROTECT(nprot);
-
-	R_SetExternalPtrProtected(ans, items);
 	return ans;
 }
 

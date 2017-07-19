@@ -16,10 +16,10 @@
 
 #include <errno.h>
 #include <stdlib.h>
+#include "corpus/src/memory.h"
 #include "corpus/src/filebuf.h"
 #include <Rdefines.h>
 #include "rcorpus.h"
-
 
 #define FILEBUF_TAG install("corpus::filebuf")
 
@@ -32,10 +32,9 @@ static struct corpus_filebuf *filebuf_new(const char *filename)
 	errno = 0;
 
 	if (corpus_filebuf_init(&buf, filename) == 0) {
-		if (!(obj = malloc(sizeof(*obj)))) {
+		if (!(obj = corpus_malloc(sizeof(*obj)))) {
 			corpus_filebuf_destroy(&buf);
-			error("failed allocating memory (%u bytes)",
-			      (unsigned)sizeof(*obj));
+			error("failed allocating memory");
 		}
 		*obj = buf;
 	} else {
@@ -55,7 +54,7 @@ static void filebuf_free(struct corpus_filebuf *buf)
 {
 	if (buf) {
 		corpus_filebuf_destroy(buf);
-		free(buf);
+		corpus_free(buf);
 	}
 }
 
@@ -63,6 +62,7 @@ static void filebuf_free(struct corpus_filebuf *buf)
 static void free_filebuf(SEXP sbuf)
 {
         struct corpus_filebuf *buf = R_ExternalPtrAddr(sbuf);
+	R_SetExternalPtrAddr(sbuf, NULL);
 	filebuf_free(buf);
 }
 

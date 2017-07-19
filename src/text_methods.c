@@ -25,13 +25,21 @@
 #include "rcorpus.h"
 
 
-SEXP names_text(SEXP stext)
+SEXP names_text(SEXP text)
 {
-	if (!is_text(stext)) {
-		error("invalid 'text' object");
+	if (!is_text(text)) {
+		error("invalid text object");
 	}
+	return getListElement(text, "names");
+}
 
-	return getListElement(stext, "names");
+
+SEXP filter_text(SEXP text)
+{
+	if (!is_text(text)) {
+		error("invalid text object");
+	}
+	return getListElement(text, "filter");
 }
 
 
@@ -47,49 +55,22 @@ SEXP as_character_text(SEXP stext)
 {
 	SEXP ans, str;
 	struct corpus_text *text;
-	struct corpus_text_iter it;
-	const uint8_t *ptr;
-	uint8_t *buf, *end;
-	size_t buf_len, len;
+	struct mkchar mk;
 	R_xlen_t i, n;
 
 	text = as_text(stext, &n);
 
 	// allocate temporary buffer for decoding
-	buf = NULL;
-	buf_len = 0;
+	mkchar_init(&mk);
 
 	PROTECT(ans = allocVector(STRSXP, n));
 
 	for (i = 0; i < n; i++) {
-		ptr = text[i].ptr;
-		len = CORPUS_TEXT_SIZE(&text[i]);
+		RCORPUS_CHECK_INTERRUPT(i);
 
-		if (ptr == NULL) {
-			str = NA_STRING;
-		} else {
-			if (CORPUS_TEXT_HAS_ESC(&text[i])) {
-				// grow buffer if necessary
-				if (buf_len < len) {
-					buf_len = len;
-					buf = (uint8_t *)R_alloc(buf_len, 1);
-				}
-
-				corpus_text_iter_make(&it, &text[i]);
-				end = buf;
-
-				while (corpus_text_iter_advance(&it)) {
-					corpus_encode_utf8(it.current, &end);
-				}
-
-				ptr = buf;
-				len = end - ptr;
-			} else {
-				len = CORPUS_TEXT_SIZE(&text[i]);
-			}
-			str = mkCharLenCE((char *)ptr, len, CE_UTF8);
-		}
+		str = mkchar_get(&mk, &text[i]);
 		SET_STRING_ELT(ans, i, str);
+
 	}
 
 	UNPROTECT(1);
@@ -109,6 +90,8 @@ SEXP is_na_text(SEXP stext)
 	isna = LOGICAL(ans);
 
 	for (i = 0; i < n; i++) {
+		RCORPUS_CHECK_INTERRUPT(i);
+
 		if (text[i].ptr) {
 			isna[i] = FALSE;
 		} else {
@@ -131,6 +114,8 @@ SEXP anyNA_text(SEXP stext)
 
 	anyNA = FALSE;
 	for (i = 0; i < n; i++) {
+		RCORPUS_CHECK_INTERRUPT(i);
+
 		if (!text[i].ptr) {
 			anyNA = TRUE;
 			break;

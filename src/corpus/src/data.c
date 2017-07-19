@@ -68,7 +68,8 @@ int corpus_data_bool(const struct corpus_data *d, int *valptr)
 	int val;
 	int err;
 
-	if (d->type_id != CORPUS_DATATYPE_BOOLEAN) {
+	if (d->type_id != CORPUS_DATATYPE_BOOLEAN
+			|| d->size == 0 || *d->ptr == 'n') {
 		val = INT_MIN;
 		err = CORPUS_ERROR_INVAL;
 	} else {
@@ -90,7 +91,8 @@ int corpus_data_int(const struct corpus_data *d, int *valptr)
 	int val;
 	int err;
 
-	if (d->type_id != CORPUS_DATATYPE_INTEGER) {
+	if (d->type_id != CORPUS_DATATYPE_INTEGER
+			|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
@@ -132,7 +134,9 @@ int corpus_data_double(const struct corpus_data *d, double *valptr)
 	int err;
 	int neg = 0;
 
-	if (!(d->type_id == CORPUS_DATATYPE_REAL || d->type_id == CORPUS_DATATYPE_INTEGER)) {
+	if (!(d->type_id == CORPUS_DATATYPE_REAL
+				|| d->type_id == CORPUS_DATATYPE_INTEGER)
+			|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
@@ -192,7 +196,8 @@ int corpus_data_text(const struct corpus_data *d, struct corpus_text *valptr)
 	const uint8_t *end;
 	int err;
 
-	if (d->type_id != CORPUS_DATATYPE_TEXT) {
+	if (d->type_id != CORPUS_DATATYPE_TEXT
+			|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
@@ -307,13 +312,7 @@ int corpus_data_items_advance(struct corpus_data_items *it)
 	end = ptr;
 	scan_value(&end);
 
-	if (it->item_type == CORPUS_DATATYPE_ANY
-			|| it->item_kind == CORPUS_DATATYPE_RECORD) {
-		// we need to re-parse records to figure out exactly
-		// which fields are present (it->item_type is the union
-		// over all items in the array, and might include
-		// fields not in the current item)
-
+	if (it->item_type == CORPUS_DATATYPE_ANY) {
 		// the call to data_assign won't fail because we already
 		// have enough space in the schema buffer to parse the
 		// array item
@@ -455,7 +454,8 @@ int corpus_data_items(const struct corpus_data *d,
 	int err;
 
 	if (d->type_id < 0
-		|| s->types[d->type_id].kind != CORPUS_DATATYPE_ARRAY) {
+		|| s->types[d->type_id].kind != CORPUS_DATATYPE_ARRAY
+		|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
@@ -490,7 +490,8 @@ int corpus_data_nitem(const struct corpus_data *d,
 	int err, nitem;
 
 	if (d->type_id < 0
-		|| s->types[d->type_id].kind != CORPUS_DATATYPE_ARRAY) {
+		|| s->types[d->type_id].kind != CORPUS_DATATYPE_ARRAY
+		|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
@@ -520,14 +521,25 @@ out:
 int corpus_data_nfield(const struct corpus_data *d,
 		       const struct corpus_schema *s, int *nfieldptr)
 {
+	struct corpus_data_fields it;
 	int err, nfield;
 
 	if (d->type_id < 0
-		|| s->types[d->type_id].kind != CORPUS_DATATYPE_RECORD) {
+		|| s->types[d->type_id].kind != CORPUS_DATATYPE_RECORD
+		|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
-	nfield = s->types[d->type_id].meta.record.nfield;
+	// the following won't work:
+	//     nfield = s->types[d->type_id].meta.record.nfield;
+	// (the data type might be that of a supertype with more fields)
+
+	nfield = 0;
+	corpus_data_fields(d, s, &it);
+	while (corpus_data_fields_advance(&it)) {
+		nfield++;
+	}
+
 	err = 0;
 	goto out;
 
@@ -551,7 +563,8 @@ int corpus_data_fields(const struct corpus_data *d,
 	int err;
 
 	if (d->type_id < 0
-		|| s->types[d->type_id].kind != CORPUS_DATATYPE_RECORD) {
+		|| s->types[d->type_id].kind != CORPUS_DATATYPE_RECORD
+		|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
@@ -594,7 +607,8 @@ int corpus_data_field(const struct corpus_data *d,
 	int err, flags, id, type_id;
 
 	if (d->type_id < 0
-		|| s->types[d->type_id].kind != CORPUS_DATATYPE_RECORD) {
+		|| s->types[d->type_id].kind != CORPUS_DATATYPE_RECORD
+		|| d->size == 0 || *d->ptr == 'n') {
 		goto nullval;
 	}
 
