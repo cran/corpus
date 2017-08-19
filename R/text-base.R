@@ -191,12 +191,14 @@ format.corpus_text <- function(x, trim = FALSE, chars = NULL,
         chars <- max(chars, 12)
     }
 
-    .Call(C_format_text, x, trim, chars, justify, width, na.encode,
-          quote, na.print, utf8)
+    fmt <- .Call(C_format_text, x, trim, chars, justify, width, na.encode,
+                 quote, na.print, utf8)
+    names(fmt) <- names(x)
+    fmt
 }
 
 
-print.corpus_text <- function(x, chars = NULL, quote = TRUE,
+print.corpus_text <- function(x, rows = 20L, chars = NULL, quote = TRUE,
                               na.print = NULL, print.gap = NULL,
                               max = NULL, display = TRUE, ...)
 {
@@ -209,6 +211,7 @@ print.corpus_text <- function(x, chars = NULL, quote = TRUE,
     }
 
     with_rethrow({
+        rows <- as_rows("rows", rows)
         chars <- as_chars("chars", chars)
         quote <- as_option("quote", quote)
         na.print <- as_na_print("na.print", na.print)
@@ -222,28 +225,49 @@ print.corpus_text <- function(x, chars = NULL, quote = TRUE,
         return(invisible(x))
     }
 
+    if (is.null(rows) || rows < 0) {
+        rows <- .Machine$integer.max
+    }
+
+    if (is.null(print.gap)) {
+        print.gap <- 1L
+    }
+
     if (is.null(max)) {
         max <- getOption("max.print")
     }
 
-    if (length(x) <= max) {
+    width <- getOption("width")
+    stdout <- as.integer(stdout()) == 1
+
+    if (length(x) <= rows) {
         xsub <- x
         nextra <- 0
     } else {
-        xsub <- x[seq_len(max)]
-        nextra <- length(x) - max
+        xsub <- x[seq_len(rows)]
+        nextra <- length(x) - rows
     }
 
     fmt <- format.corpus_text(xsub, chars = chars, quote = quote,
                               na.print = na.print, print.gap = print.gap)
+    fmt <- utf8_encode(fmt, display)
 
-    utf8_print(fmt, chars = .Machine$integer.max, quote = FALSE,
-               print.gap = print.gap, max = .Machine$integer.max,
-               display = display)
+    mat <- cbind(fmt)
+    if (is.null(rownames(mat))) {
+        rownames(mat) <- format(paste0("[", seq_len(nrow(mat)), "]"),
+                                justify = "right")
+    }
+    colnames(mat) <- NULL
+    .Call(C_print_table, mat, print.gap, FALSE, max, width, stdout)
 
     if (nextra > 0) {
+        name_width <- max(0, utf8_width(rownames(mat)))
+
         ellipsis <- ifelse(Sys.getlocale("LC_CTYPE") == "C", "...", "\u22ee")
-        cat(sprintf("%s\n(%d entries total)\n", ellipsis, length(x)))
+        ellipsis <- substr(ellipsis, 1, name_width)
+
+        space <- format(ellipsis, width = name_width + print.gap)
+        cat(sprintf("%s(%d entries total)\n", space, length(x)))
     }
 
     invisible(x)

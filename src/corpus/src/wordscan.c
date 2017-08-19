@@ -249,6 +249,7 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 		goto Break;
 
 	case WORD_BREAK_DOUBLE_QUOTE:
+	case WORD_BREAK_HYPHEN:
 	case WORD_BREAK_MIDLETTER:
 	case WORD_BREAK_MIDNUM:
 	case WORD_BREAK_MIDNUMLET:
@@ -260,7 +261,10 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 
 	case WORD_BREAK_SYMBOL:
 		scan->type = CORPUS_WORD_SYMBOL;
-		if (scan->code == '@' || scan->code == '#') {
+		// @, #, + fullwidth versions
+		if (scan->code == '@' || scan->code == '#'
+				|| scan->code == 0xFEE0 + '@'
+				|| scan->code == 0xFEE0 + '#') {
 			switch (scan->iter_prop) {
 			case WORD_BREAK_ALETTER:
 			case WORD_BREAK_EXTENDNUMLET:
@@ -285,12 +289,7 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 		NEXT();
 		goto Break;
 
-	case WORD_BREAK_EXTEND:
-	case WORD_BREAK_MARK:
-		scan->type = CORPUS_WORD_MARK;
-		NEXT();
-		goto Break;
-
+	case WORD_BREAK_EXTEND: // marks
 	case WORD_BREAK_FORMAT: // Cf format controls
 	case WORD_BREAK_OTHER:
 		scan->type = CORPUS_WORD_OTHER;
@@ -346,7 +345,7 @@ http:
 		NEXT();
 	}
 	if (scan->code == ':' && scan->iter.current == '/') {
-		scan->type = CORPUS_WORD_URL;
+		scan->type = CORPUS_WORD_SYMBOL;
 		NEXT();
 		NEXT();
 		goto Url;
@@ -364,6 +363,7 @@ Url:
 	case WORD_BREAK_DOUBLE_QUOTE:
 		goto Break;
 
+	case WORD_BREAK_HYPHEN:
 	case WORD_BREAK_MIDLETTER:
 	case WORD_BREAK_MIDNUM:
 	case WORD_BREAK_MIDNUMLET:
@@ -422,6 +422,26 @@ ALetter:
 
 		// Otherwise break everywhere
 		// WB14: Any + Any
+		goto Break;
+	
+	case WORD_BREAK_HYPHEN:
+		// custom rule:
+		// don't break across hyphen when followed by letter or number
+		if (scan->iter_prop == WORD_BREAK_ALETTER) {
+			NEXT();
+			NEXT();
+			goto ALetter;
+		}
+		if (scan->iter_prop == WORD_BREAK_NUMERIC) {
+			NEXT();
+			NEXT();
+			goto Numeric;
+		}
+		if (scan->iter_prop == WORD_BREAK_HEBREW_LETTER) {
+			NEXT();
+			NEXT();
+			goto Hebrew_Letter;
+		}
 		goto Break;
 
 	case WORD_BREAK_NUMERIC:
@@ -483,6 +503,26 @@ Hebrew_Letter:
 		}
 		goto Break;
 
+	case WORD_BREAK_HYPHEN:
+		// custom rule:
+		// don't break across hyphen when followed by letter or number
+		if (scan->iter_prop == WORD_BREAK_HEBREW_LETTER) {
+			NEXT();
+			NEXT();
+			goto Hebrew_Letter;
+		}
+		if (scan->iter_prop == WORD_BREAK_NUMERIC) {
+			NEXT();
+			NEXT();
+			goto Numeric;
+		}
+		if (scan->iter_prop == WORD_BREAK_ALETTER) {
+			NEXT();
+			NEXT();
+			goto ALetter;
+		}
+		goto Break;
+
 	case WORD_BREAK_DOUBLE_QUOTE:
 		// WB7b: Hebrew_Letter * Double_Quote Hebrew_Letter
 		if (scan->iter_prop == WORD_BREAK_HEBREW_LETTER) {
@@ -526,6 +566,26 @@ Numeric:
 			NEXT();
 			NEXT();
 			goto Numeric;
+		}
+		goto Break;
+
+	case WORD_BREAK_HYPHEN:
+		// custom rule:
+		// don't break across hyphen when followed by letter or number
+		if (scan->iter_prop == WORD_BREAK_NUMERIC) {
+			NEXT();
+			NEXT();
+			goto Numeric;
+		}
+		if (scan->iter_prop == WORD_BREAK_ALETTER) {
+			NEXT();
+			NEXT();
+			goto ALetter;
+		}
+		if (scan->iter_prop == WORD_BREAK_HEBREW_LETTER) {
+			NEXT();
+			NEXT();
+			goto Hebrew_Letter;
 		}
 		goto Break;
 

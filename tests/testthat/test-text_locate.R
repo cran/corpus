@@ -45,6 +45,61 @@ test_that("'text_detect' can use a custom filter", {
 })
 
 
+test_that("'text_match' can return matching term as a factor", {
+    text <- c("Rose is a rose is a rose is a rose.",
+              "A rose by any other name would smell as sweet.",
+              "Snow White and Rose Red")
+
+    actual <- text_match(text, c(".", "rose"))
+
+    expected <- data.frame(
+        text = structure(c(1, 1, 1, 1, 1, 2, 2, 3), levels = as.character(1:3),
+                         class = "factor"),
+        term = structure(c(2, 2, 2, 2, 1, 2, 1, 2), levels = c(".", "rose"),
+                         class = "factor"),
+        row.names = NULL,
+        stringsAsFactors = FALSE)
+    class(expected) <- c("corpus_frame", "data.frame")
+
+    expect_equal(actual, expected)
+})
+
+
+test_that("'text_match' works with NULL terms", {
+    text <- c("Rose is a rose is a rose is a rose.",
+              "A rose by any other name would smell as sweet.",
+              "Snow White and Rose Red")
+
+    actual <- text_match(text, NULL)
+    expected <- data.frame(text = structure(integer(), levels = labels(text),
+                                            class = "factor"),
+                           term = structure(integer(), levels = character(),
+                                            class = "factor"))
+    class(expected) <- c("corpus_frame", "data.frame")
+    expect_equal(actual, expected)
+})
+
+
+test_that("'text_match' errors for invalid arguments", {
+    text <- c("Rose is a rose is a rose is a rose.",
+              "A rose by any other name would smell as sweet.",
+              "Snow White and Rose Red")
+
+    expect_error(text_match(text, 1),
+                 "'terms' must be a character vector or NULL")
+
+    expect_error(text_match(text, c("rose", NA)),
+                 "'terms' argument cannot contain missing values")
+
+    invalid <- "fa\xE7ile"; Encoding(invalid) <- "UTF-8"
+    expect_error(text_match(text, invalid),
+                 "'terms' argument cannot contain invalid UTF-8")
+
+    expect_error(text_match(text, c("rose", "Rose")),
+                 "'terms' argument cannot contain duplicate types")
+})
+
+
 test_that("'text_locate' can give instance contexts", {
     text <- c("Rose is a rose is a rose is a rose.",
               "A rose by any other name would smell as sweet.",
@@ -53,16 +108,17 @@ test_that("'text_locate' can give instance contexts", {
     actual <- text_locate(text, "rose")
 
     expected <- data.frame(
-        text = c(1, 1, 1, 1, 2, 3),
-        term = rep("rose", 6),
+        text = structure(c(1, 1, 1, 1, 2, 3), levels = as.character(1:3),
+                         class = "factor"),
         before = as_text(c("", "Rose is a ", "Rose is a rose is a ",
                    "Rose is a rose is a rose is a ", "A ",
                    "Snow White and ")),
-        instance = c("Rose", "rose", "rose", "rose", "rose", "Rose"),
+        instance = as_text(c("Rose", "rose", "rose", "rose", "rose", "Rose")),
         after = as_text(c(" is a rose is a rose is a rose.",
                           " is a rose is a rose.", " is a rose.", ".",
                           " by any other name would smell as sweet.",
                           " Red")),
+        row.names = NULL,
         stringsAsFactors = FALSE)
     class(expected) <- c("corpus_text_locate", "corpus_frame", "data.frame")
 
@@ -78,12 +134,13 @@ test_that("'text_locate' can use a custom filter", {
     actual <- text_locate(text, "Rose", f)
 
     expected <- data.frame(
-        text = c(1, 3),
-        term = rep("Rose", 2),
+        text = structure(c(1, 3), levels = as.character(1:3),
+                         class = "factor"),
         before = as_text(c("", "Snow White and "), filter = f),
-        instance = c("Rose", "Rose"),
+        instance = as_text(c("Rose", "Rose"), filter = f),
         after = as_text(c(" is a rose is a rose is a rose.", " Red"),
                         filter = f),
+        row.names = NULL,
         stringsAsFactors = FALSE)
     class(expected) <- c("corpus_text_locate", "corpus_frame", "data.frame")
 
@@ -99,16 +156,15 @@ test_that("'text_locate' prints results correctly", {
     loc <- text_locate(text, "Rose", f)
 
     oldwidth <- getOption("width")
-    options(width = 80)
+    options(width = 76)
 
     ctype <- switch_ctype("C")
     on.exit(Sys.setlocale("LC_CTYPE", ctype))
 
     lines <- strsplit(capture_output(print(loc)), "\n")[[1]]
-    expect_equal(lines,
-c("  text term before                        instance                         after",
-  "1 1    Rose                                 Rose    is a rose is a rose is a ...",
-  "2 3    Rose               Snow White and    Rose    Red                         "))
-
+    expect_equal(lines, c(
+"  text            before             instance             after             ",
+"1 1                                    Rose    is a rose is a rose is a r...",
+"2 3                  Snow White and    Rose    Red                          "))
     options(width = oldwidth)
 })

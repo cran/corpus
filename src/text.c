@@ -88,6 +88,17 @@ static void free_text(SEXP stext)
 static void load_text(SEXP x);
 
 
+SEXP alloc_text_handle(void)
+{
+	SEXP ans;
+
+	PROTECT(ans = R_MakeExternalPtr(NULL, TEXT_TAG, R_NilValue));
+	R_RegisterCFinalizerEx(ans, free_text, TRUE);
+	UNPROTECT(1);
+	return ans;
+}
+
+
 SEXP alloc_text(SEXP sources, SEXP source, SEXP row, SEXP start, SEXP stop,
 		SEXP eltnames, SEXP filter)
 {
@@ -95,8 +106,7 @@ SEXP alloc_text(SEXP sources, SEXP source, SEXP row, SEXP start, SEXP stop,
 	R_xlen_t n;
 	int s, nsrc;
 
-	PROTECT(handle = R_MakeExternalPtr(NULL, TEXT_TAG, R_NilValue));
-	R_RegisterCFinalizerEx(handle, free_text, TRUE);
+	PROTECT(handle = alloc_text_handle());
 
 	n = XLENGTH(source);
 
@@ -223,9 +233,9 @@ struct corpus_text *as_text(SEXP stext, R_xlen_t *lenptr)
 }
 
 
-SEXP as_text_json(SEXP sdata)
+SEXP as_text_json(SEXP sdata, SEXP filter)
 {
-	SEXP ans, handle, sources, source, row, start, stop, names, filter;
+	SEXP ans, handle, sources, source, row, start, stop, names;
 	const struct json *d = as_json(sdata);
 	struct rcorpus_text *obj;
 	R_xlen_t i, nrow = d->nrow;
@@ -248,8 +258,8 @@ SEXP as_text_json(SEXP sdata)
 
 	PROTECT(start = allocVector(INTSXP, nrow)); nprot++;
 	PROTECT(stop = allocVector(INTSXP, nrow)); nprot++;
+
 	names = R_NilValue;
-	filter = R_NilValue;
 
 	PROTECT(ans = alloc_text(sources, source, row, start, stop, names,
 				 filter));
@@ -291,9 +301,9 @@ out:
 }
 
 
-SEXP as_text_character(SEXP x)
+SEXP as_text_character(SEXP x, SEXP filter)
 {
-	SEXP ans, handle, sources, source, row, start, stop, names, filter, str;
+	SEXP ans, handle, sources, source, row, start, stop, names, str;
 	struct rcorpus_text *obj;
 	const char *ptr;
 	R_xlen_t i, nrow, len;
@@ -328,11 +338,10 @@ SEXP as_text_character(SEXP x)
 
 	PROTECT(start = allocVector(INTSXP, nrow)); nprot++;
 	PROTECT(stop = allocVector(INTSXP, nrow)); nprot++;
-	names = getAttrib(x, R_NamesSymbol);
-	filter = R_NilValue;
+	names = R_NilValue;
 
 	PROTECT(ans = alloc_text(sources, source, row, start, stop, names,
-				filter));
+				 filter));
 	nprot++;
 
 	handle = getListElement(ans, "handle");
@@ -403,12 +412,6 @@ out:
 }
 
 
-SEXP alloc_na_text(void)
-{
-	return as_text_character(ScalarString(NA_STRING));
-}
-
-
 SEXP coerce_text(SEXP sx)
 {
 	SEXP ans;
@@ -416,13 +419,12 @@ SEXP coerce_text(SEXP sx)
 	if (is_text(sx)) {
 		return sx;
 	} else if (is_json(sx)) {
-		return as_text_json(sx);
+		return as_text_json(sx, R_NilValue);
 	}
 
 	PROTECT(sx = coerceVector(sx, STRSXP));
-	ans = as_text_character(sx);
+	ans = as_text_character(sx, R_NilValue);
 	UNPROTECT(1);
-
 	return ans;
 }
 
@@ -438,7 +440,7 @@ static void load_text(SEXP x)
 	const uint8_t *ptr;
 	double r;
 	R_xlen_t i, j, len, nrow;
-	int err = 0, s, nsrc, begin, end, flags;
+	int err = 0, s, nsrc, begin, end, flags = 0;
 
 	shandle = getListElement(x, "handle");
 
@@ -496,6 +498,7 @@ static void load_text(SEXP x)
 
 	for (i = 0; i < nrow; i++) {
 		RCORPUS_CHECK_INTERRUPT(i);
+
 		s = source[i];
 		if (!(1 <= s && s <= nsrc)) {
 			error("source[[%"PRIu64"]] (%d) is out of range",
@@ -510,18 +513,30 @@ static void load_text(SEXP x)
 		}
 		j = (R_xlen_t)(r - 1);
 
+		// handle NA range
+		if (start[i] == NA_INTEGER || stop[i] == NA_INTEGER) {
+			obj->text[i].ptr = NULL;
+			obj->text[i].attr = 0;
+			continue;
+		}
+
 		switch (sources[s].type) {
 		case SOURCE_CHAR:
 			str = STRING_ELT(sources[s].data.chars, j);
-			ptr = (const uint8_t *)CHAR(str);
-			len = XLENGTH(str);
-			flags = CORPUS_TEXT_NOESCAPE;
-			err = corpus_text_assign(&txt, ptr, len, flags);
-			if (err) {
-				error("character object in source %d"
-				      " at index %"PRIu64
-				      " contains invalid UTF-8",
-				      s + 1, (uint64_t)(j + 1));
+			if (str == NA_STRING) {
+				txt.ptr = NULL;
+				txt.attr = 0;
+			} else {
+				ptr = (const uint8_t *)CHAR(str);
+				len = XLENGTH(str);
+				flags = CORPUS_TEXT_NOESCAPE;
+				err = corpus_text_assign(&txt, ptr, len, flags);
+				if (err) {
+					error("character object in source %d"
+					      " at index %"PRIu64
+					      " contains invalid UTF-8",
+					      s + 1, (uint64_t)(j + 1));
+				}
 			}
 			break;
 
@@ -548,7 +563,6 @@ static void load_text(SEXP x)
 		// 'can_break?' function to corpus/text.h
 		err = corpus_text_assign(&obj->text[i], txt.ptr + begin,
 					 end - begin, flags);
-
 		if (err) {
 			error("text span in row[[%"PRIu64"]]"
 			      " starts or ends in the middle"
@@ -557,42 +571,4 @@ static void load_text(SEXP x)
 	}
 out:
 	CHECK_ERROR(err);
-}
-
-
-SEXP subset_text_handle(SEXP handle, SEXP si)
-{
-	SEXP ans;
-	const struct rcorpus_text *obj = R_ExternalPtrAddr(handle);
-	struct rcorpus_text *sub;
-	R_xlen_t i, n;
-	double ix;
-	int err = 0;
-
-	PROTECT(ans = R_MakeExternalPtr(NULL, TEXT_TAG, R_NilValue));
-	R_RegisterCFinalizerEx(ans, free_text, TRUE);
-
-	if (obj) {
-		n = XLENGTH(si);
-
-		TRY_ALLOC(sub = corpus_calloc(1, sizeof(*sub)));
-		R_SetExternalPtrAddr(ans, sub);
-
-		if (n > 0) {
-			TRY_ALLOC(sub->text
-					= corpus_calloc(n, sizeof(*sub->text)));
-			sub->length = n;
-		}
-
-		for (i = 0; i < n; i++) {
-			RCORPUS_CHECK_INTERRUPT(i);
-			ix = REAL(si)[i] - 1;
-			sub->text[i] = obj->text[(R_xlen_t)ix];
-		}
-	}
-
-out:
-	UNPROTECT(1);
-	CHECK_ERROR(err);
-	return ans;
 }

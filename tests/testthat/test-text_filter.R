@@ -4,7 +4,6 @@ context("text_filter")
 test_that("'text_filter' has the right defaults", {
     f <- text_filter()
     expect_equal(f$map_case, TRUE)
-    expect_equal(f$map_compat, TRUE)
     expect_equal(f$map_quote, TRUE)
     expect_equal(f$remove_ignorable, TRUE)
     expect_equal(f$stemmer, NULL)
@@ -12,11 +11,9 @@ test_that("'text_filter' has the right defaults", {
     expect_equal(f$stem_except, NULL)
     expect_equal(f$combine, abbreviations("english"))
     expect_equal(f$drop_letter, FALSE)
-    expect_equal(f$drop_mark, FALSE)
     expect_equal(f$drop_number, FALSE)
     expect_equal(f$drop_punct, FALSE)
     expect_equal(f$drop_symbol, FALSE)
-    expect_equal(f$drop_other, FALSE)
     expect_equal(f$drop, NULL)
     expect_equal(f$drop_except, NULL)
     expect_equal(f$sent_crlf, FALSE)
@@ -154,11 +151,23 @@ test_that("'as_text' propagates a non-NULL to filter to text data frame", {
 })
 
 
-test_that("'as_text' with NULL filter leaves existing in place", {
+test_that("'as_text' with NULL filter gives default filter", {
     x <- as_text("hello")
     f0 <- text_filter(map_case = FALSE, map_quote = FALSE)
     text_filter(x) <- f0
 
     y <- as_text(x, filter = NULL)
-    expect_equal(text_filter(y), f0)
+    expect_equal(text_filter(y), text_filter())
+})
+
+
+test_that("'text_filter' clears the old filter", {
+    x <- as_text("wicked")
+    y <- as_text(x, filter = text_filter(stemmer = "english"))
+
+    toks1 <- text_tokens(y)
+    expect_equal(text_tokens(y), list("wick"))
+
+    toks2 <- text_tokens(x)
+    expect_equal(toks2, list("wicked"))
 })

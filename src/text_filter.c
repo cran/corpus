@@ -17,34 +17,6 @@
 #include "rcorpus.h"
 
 
-SEXP text_filter_update(SEXP x)
-{
-	SEXP handle;
-	struct rcorpus_text *obj;
-
-	handle = getListElement(x, "handle");
-	obj = R_ExternalPtrAddr(handle);
-
-	if (!obj) {
-		goto out;
-	}
-
-	if (obj->has_filter) {
-		corpus_filter_destroy(&obj->filter);
-		obj->has_filter = 0;
-		obj->valid_filter = 0;
-	}
-
-	if (obj->has_sentfilter) {
-		corpus_sentfilter_destroy(&obj->sentfilter);
-		obj->has_sentfilter = 0;
-		obj->valid_sentfilter = 0;
-	}
-out:
-	return R_NilValue;
-}
-
-
 static int filter_logical(SEXP filter, const char *key, int nullval)
 {
 	SEXP val = getListElement(filter, key);
@@ -65,7 +37,6 @@ static int filter_type_kind(SEXP filter)
 
 	if (filter == R_NilValue) {
 		kind |= CORPUS_TYPE_MAPCASE;
-		kind |= CORPUS_TYPE_MAPCOMPAT;
 		kind |= CORPUS_TYPE_MAPQUOTE;
 		kind |= CORPUS_TYPE_RMDI;
 		return kind;
@@ -73,10 +44,6 @@ static int filter_type_kind(SEXP filter)
 
 	if (filter_logical(filter, "map_case", 0)) {
 		kind |= CORPUS_TYPE_MAPCASE;
-	}
-
-	if (filter_logical(filter, "map_compat", 0)) {
-		kind |= CORPUS_TYPE_MAPCOMPAT;
 	}
 
 	if (filter_logical(filter, "map_quote", 0)) {
@@ -107,14 +74,11 @@ static const char *filter_stemmer(SEXP filter)
 
 static int filter_flags(SEXP filter)
 {
-	int flags = CORPUS_FILTER_IGNORE_SPACE;
+	int flags = (CORPUS_FILTER_IGNORE_SPACE
+			| CORPUS_FILTER_IGNORE_OTHER);
 
 	if (filter_logical(filter, "drop_letter", 0)) {
 		flags |= CORPUS_FILTER_DROP_LETTER;
-	}
-
-	if (filter_logical(filter, "drop_mark", 0)) {
-		flags |= CORPUS_FILTER_DROP_MARK;
 	}
 
 	if (filter_logical(filter, "drop_number", 0)) {
@@ -127,14 +91,6 @@ static int filter_flags(SEXP filter)
 
 	if (filter_logical(filter, "drop_symbol", 0)) {
 		flags |= CORPUS_FILTER_DROP_SYMBOL;
-	}
-
-	if (filter_logical(filter, "drop_other", 0)) {
-		flags |= CORPUS_FILTER_DROP_OTHER;
-	}
-
-	if (filter_logical(filter, "drop_url", 0)) {
-		flags |= CORPUS_FILTER_DROP_URL;
 	}
 
 	return flags;

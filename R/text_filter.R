@@ -20,15 +20,13 @@ text_filter <- function(x = NULL, ...)
 
 
 text_filter.default <- function(x = NULL, ...,
-                                map_case = TRUE, map_compat = TRUE,
-                                map_quote = TRUE, remove_ignorable = TRUE,
+                                map_case = TRUE, map_quote = TRUE,
+                                remove_ignorable = TRUE,
                                 stemmer = NULL, stem_dropped = FALSE,
                                 stem_except = NULL,
                                 combine = abbreviations("english"),
-                                drop_letter = FALSE, drop_mark = FALSE,
-                                drop_number = FALSE, drop_punct = FALSE,
-                                drop_symbol = FALSE, drop_other = FALSE,
-                                drop_url = FALSE,
+                                drop_letter = FALSE, drop_number = FALSE,
+                                drop_punct = FALSE, drop_symbol = FALSE,
                                 drop = NULL, drop_except = NULL,
                                 sent_crlf = FALSE,
                                 sent_suppress = abbreviations("english"))
@@ -44,7 +42,6 @@ text_filter.default <- function(x = NULL, ...,
 
     ans <- structure(list(), class = c("corpus_text_filter"))
     ans$map_case <- map_case
-    ans$map_compat <- map_compat
     ans$map_quote <- map_quote
     ans$remove_ignorable <- remove_ignorable
     ans$stemmer <- stemmer
@@ -52,12 +49,9 @@ text_filter.default <- function(x = NULL, ...,
     ans$stem_except <- stem_except
     ans$combine <- combine
     ans$drop_letter <- drop_letter
-    ans$drop_mark <- drop_mark
     ans$drop_number <- drop_number
-    ans$drop_symbol <- drop_symbol
     ans$drop_punct <- drop_punct
-    ans$drop_other <- drop_other
-    ans$drop_url <- drop_url
+    ans$drop_symbol <- drop_symbol
     ans$drop <- drop
     ans$drop_except <- drop_except
     ans$sent_crlf <- sent_crlf
@@ -149,9 +143,9 @@ text_filter.corpus_text <- function(x = NULL, ...)
     value0 <- text_filter(x)
     if (!identical(value, value0)) {
         y <- unclass(x)
+        y$handle <- .Call(C_alloc_text_handle)
         y$filter <- value
         class(y) <- class(x)
-        .Call(C_text_filter_update, y)
         x <- y
     }
     x
@@ -160,10 +154,9 @@ text_filter.corpus_text <- function(x = NULL, ...)
 
 `$<-.corpus_text_filter` <- function(x, name, value)
 {
-    if (name %in% c("map_case", "map_compat", "map_quote",
-                    "remove_ignorable", "drop_letter", "drop_mark",
-                    "drop_number", "drop_symbol", "drop_punct",
-                    "drop_other", "drop_url", "stem_dropped", "sent_crlf")) {
+    if (name %in% c("map_case", "map_quote", "remove_ignorable",
+                    "drop_letter", "drop_number", "drop_punct",
+                    "drop_symbol", "stem_dropped", "sent_crlf")) {
         value <- as_option(name, value)
     } else if (name %in% c("stem_except", "combine", "drop", "drop_except",
                            "sent_suppress")) {

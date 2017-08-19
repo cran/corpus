@@ -668,10 +668,6 @@ int corpus_filter_symbol_prop(const struct corpus_filter *f,
 		drop = f->flags & CORPUS_FILTER_DROP_LETTER;
 		break;
 
-	case CORPUS_WORD_MARK:
-		drop = (f->flags & CORPUS_FILTER_DROP_MARK);
-		break;
-
 	case CORPUS_WORD_NUMBER:
 		drop = f->flags & CORPUS_FILTER_DROP_NUMBER;
 		break;
@@ -685,11 +681,7 @@ int corpus_filter_symbol_prop(const struct corpus_filter *f,
 		break;
 
 	case CORPUS_WORD_OTHER:
-		drop = f->flags & CORPUS_FILTER_DROP_OTHER;
-		break;
-
-	case CORPUS_WORD_URL:
-		drop = f->flags & CORPUS_FILTER_DROP_URL;
+		ignore = f->flags & CORPUS_FILTER_IGNORE_OTHER;
 		break;
 
 	default:

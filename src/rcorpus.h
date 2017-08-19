@@ -19,6 +19,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
 #include <Rdefines.h>
 
 #include "corpus/src/error.h"
@@ -36,6 +37,7 @@
 #include "corpus/src/sentscan.h"
 #include "corpus/src/filter.h"
 #include "corpus/src/sentfilter.h"
+
 
 #define RCORPUS_CHECK_EVERY 1000
 #define RCORPUS_CHECK_INTERRUPT(i) \
@@ -78,6 +80,12 @@
 		case CORPUS_ERROR_OVERFLOW: \
 			Rf_error(fmt sep "overflow error", __VA_ARGS__); \
 			break; \
+		case CORPUS_ERROR_DOMAIN: \
+			Rf_error(fmt sep "domain error", __VA_ARGS__); \
+			break; \
+		case CORPUS_ERROR_RANGE: \
+			Rf_error(fmt sep "range error", __VA_ARGS__); \
+			break; \
 		case CORPUS_ERROR_INTERNAL: \
 			Rf_error(fmt sep "internal error", __VA_ARGS__); \
 			break; \
@@ -111,6 +119,7 @@ struct mkchar {
 struct decode {
 	struct mkchar mkchar;
 	int overflow;
+	int underflow;
 };
 
 struct json {
@@ -153,6 +162,7 @@ SEXP mkchar_get(struct mkchar *mk, const struct corpus_text *text);
 /* converting data to R values */
 void decode_init(struct decode *d);
 int decode_set_overflow(struct decode *d, int overflow);
+int decode_set_underflow(struct decode *d, int underflow);
 
 int decode_logical(struct decode *d, const struct corpus_data *val);
 int decode_integer(struct decode *d, const struct corpus_data *val);
@@ -176,7 +186,7 @@ SEXP as_factor_json(SEXP data);
 SEXP as_list_json(SEXP data, SEXP text);
 SEXP as_logical_json(SEXP data);
 SEXP as_character_json(SEXP data);
-SEXP as_text_json(SEXP data);
+SEXP as_text_json(SEXP data, SEXP filter);
 SEXP dim_json(SEXP data);
 SEXP length_json(SEXP data);
 SEXP names_json(SEXP data);
@@ -205,19 +215,19 @@ int is_text(SEXP text);
 struct corpus_text *as_text(SEXP text, R_xlen_t *lenptr);
 struct corpus_filter *text_filter(SEXP x);
 struct corpus_sentfilter *text_sentfilter(SEXP x);
-SEXP as_text_character(SEXP text);
+SEXP as_text_character(SEXP text, SEXP filter);
 
-SEXP alloc_na_text(void);
+SEXP alloc_text_handle(void);
 SEXP coerce_text(SEXP x);
 SEXP format_text(SEXP x, SEXP trim, SEXP chars, SEXP justify, SEXP width,
 		 SEXP na_encode, SEXP quote, SEXP na_print, SEXP utf8);
 SEXP length_text(SEXP text);
 SEXP names_text(SEXP text);
 SEXP filter_text(SEXP text);
-SEXP subset_text_handle(SEXP handle, SEXP i);
 SEXP as_character_text(SEXP text);
 SEXP is_na_text(SEXP text);
 SEXP anyNA_text(SEXP text);
+SEXP text_c(SEXP args, SEXP names, SEXP filter);
 SEXP text_valid(SEXP x);
 
 /* search */
@@ -237,13 +247,15 @@ SEXP items_termset(SEXP termset);
 SEXP abbreviations(SEXP kind);
 SEXP text_count(SEXP x, SEXP terms);
 SEXP text_detect(SEXP x, SEXP terms);
-SEXP text_filter_update(SEXP x);
+SEXP text_length(SEXP x);
 SEXP text_locate(SEXP x, SEXP terms);
+SEXP text_match(SEXP x, SEXP terms);
 SEXP text_nsentence(SEXP x);
 SEXP text_ntoken(SEXP x);
 SEXP text_ntype(SEXP x, SEXP collapse);
 SEXP text_split_sentences(SEXP x, SEXP size);
 SEXP text_split_tokens(SEXP x, SEXP size);
+SEXP text_sub(SEXP x, SEXP start, SEXP end);
 SEXP text_tokens(SEXP x);
 SEXP text_types(SEXP x, SEXP collapse);
 SEXP term_counts_text(SEXP x, SEXP weights, SEXP ngrams,
@@ -258,8 +270,10 @@ SEXP utf8_coerce(SEXP x);
 SEXP utf8_encode(SEXP x, SEXP display, SEXP utf8);
 SEXP utf8_format(SEXP x, SEXP trim, SEXP chars, SEXP justify, SEXP width,
 		 SEXP na_encode, SEXP quote, SEXP na_print, SEXP utf8);
+SEXP utf8_normalize(SEXP x, SEXP map_case, SEXP map_compat, SEXP map_quote,
+		    SEXP remove_ignorable);
 SEXP utf8_valid(SEXP x);
-SEXP utf8_width(SEXP x, SEXP width);
+SEXP utf8_width(SEXP x, SEXP quote, SEXP utf8);
 
 /* json values */
 SEXP mmap_ndjson(SEXP file);
@@ -268,7 +282,7 @@ SEXP read_ndjson(SEXP buffer);
 /* internal utility functions */
 double *as_weights(SEXP sweights, R_xlen_t n);
 int charwidth(uint32_t code);
-int charsxp_width(SEXP charsxp, int utf8);
+int charsxp_width(SEXP charsxp, int quote, int utf8);
 int encodes_utf8(cetype_t ce);
 int findListElement(SEXP list, const char *str);
 SEXP getListElement(SEXP list, const char *str);

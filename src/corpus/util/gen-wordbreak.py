@@ -41,17 +41,17 @@ default_ignorable = derived_core_properties['Default_Ignorable_Code_Point']
 white_space = white_space.union(default_ignorable)
 
 letter = set()
-mark = set()
+#mark = set()
 number = set()
 other = set()
 punctuation = set()
 symbol = set()
-letter_cats = set(('Ll', 'Lm', 'Lo', 'Lt', 'Lu', 'Nl')) # Note: Lm in mark
-mark_cats = set(('Lm', 'Mc', 'Me', 'Mn', 'Sk'))
+letter_cats = set(('Ll', 'Lm', 'Lo', 'Lt', 'Lu', 'Nl'))
+#mark_cats = set(('Mc', 'Me', 'Mn'))
 number_cats = set(('Nd', 'No')) # Note: Nl in 'letter'
 other_cats = set(('Cc', 'Cf', 'Cs', 'Co', 'Cn'))
 punctuation_cats = set(('Pc', 'Pd', 'Pe', 'Pf', 'Pi', 'Po', 'Ps'))
-symbol_cats = set(('Sc', 'Sm', 'So')) # Note: Sk in mark
+symbol_cats = set(('Sc', 'Sk', 'Sm', 'So'))
 
 for code in range(len(unicode_data.uchars)):
     u = unicode_data.uchars[code]
@@ -59,8 +59,8 @@ for code in range(len(unicode_data.uchars)):
         other.add(code)
     elif u.category in letter_cats:
         letter.add(code)
-    elif u.category in mark_cats:
-        mark.add(code)
+#    elif u.category in mark_cats:
+#        mark.add(code)
     elif u.category in number_cats:
         number.add(code)
     elif u.category in punctuation_cats:
@@ -68,10 +68,14 @@ for code in range(len(unicode_data.uchars)):
     elif u.category in symbol_cats:
         symbol.add(code)
 
-# legacy punctuation
+# reclassify legacy punctuation as 'Symbol'
 for ch in ['#', '%', '&', '@']:
     punctuation.remove(ord(ch))
     symbol.add(ord(ch))
+    # fullwidth versions
+    wch =  0xFEE0 + ord(ch)
+    punctuation.remove(wch)
+    symbol.add(wch)
 
 
 prop_names = set(code_props)
@@ -86,7 +90,7 @@ assert 'Symbol' not in prop_names
 assert 'White_Space' not in prop_names
 prop_names.add('Letter')
 prop_names.add('Number')
-prop_names.add('Mark')
+#prop_names.add('Mark')
 prop_names.add('Other')
 prop_names.add('Punctuation')
 prop_names.add('Symbol')
@@ -98,8 +102,8 @@ for code in range(len(code_props)):
             code_props[code] = 'White_Space'
         elif code in letter:
             code_props[code] = 'Letter'
-        elif code in mark:
-            code_props[code] = 'Mark'
+#        elif code in mark:
+#            code_props[code] = 'Mark'
         elif code in number:
             code_props[code] = 'Number'
         elif code in other:
@@ -108,6 +112,23 @@ for code in range(len(code_props)):
             code_props[code] = 'Punctuation'
         elif code in symbol:
             code_props[code] = 'Symbol'
+
+# override the hyphen property (default is 'Punctuation')
+prop_names.add('Hyphen')
+code_props[0x002D] = 'Hyphen' # HYPHEN-MINUS
+code_props[0x058A] = 'Hyphen' # ARMENIAN HYPHEN
+code_props[0x05BE] = 'Hyphen' # HEBREW PUNCTUATION MAQAF
+code_props[0x1400] = 'Hyphen' # CANADIAN SYLLABICS HYPHEN
+code_props[0x1806] = 'Hyphen' # MONGOLIAN TODO SOFT HYPHEN
+code_props[0x2010] = 'Hyphen' # HYPHEN
+code_props[0x2011] = 'Hyphen' # NON-BREAKING HYPHEN
+code_props[0x2E17] = 'Hyphen' # DOUBLE OBLIQUE HYPHEN
+code_props[0x2E1A] = 'Hyphen' # HYPHEN WITH DIAERESIS
+code_props[0x2E40] = 'Hyphen' # DOUBLE HYPHEN
+code_props[0x30A0] = 'Hyphen' # KATAKANA-HIRAGANA DOUBLE HYPHEN
+code_props[0xFE63] = 'Hyphen' # SMALL HYPHEN-MINUS
+code_props[0xFF0D] = 'Hyphen' # FULLWIDTH HYPHEN-MINUS
+
 
 # make sure we didn't miss anything
 for code in range(len(code_props)):

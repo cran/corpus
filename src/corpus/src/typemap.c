@@ -147,10 +147,6 @@ int corpus_typemap_set_kind(struct corpus_typemap *map, int kind)
 		map->charmap_type = CORPUS_UDECOMP_ALL;
 	}
 
-	if (kind & CORPUS_TYPE_MAPQUOTE) {
-		map->ascii_map['"'] = '\'';
-	}
-
 	map->kind = kind;
 
 	return 0;
@@ -244,16 +240,21 @@ int corpus_typemap_stem_except(struct corpus_typemap *map,
 	return err;
 }
 
-static int count_words(const struct corpus_text *text)
+static int count_words(const struct corpus_text *text, int *kind_ptr)
 {
 	struct corpus_wordscan scan;
-	int nword;
+	int nword, kind;
 
 	nword = 0;
+	kind = CORPUS_WORD_NONE;
 	corpus_wordscan_make(&scan, text);
 	while (corpus_wordscan_advance(&scan)) {
+		if (nword == 0) {
+			kind = scan.type;
+		}
 		nword++;
 	}
+	*kind_ptr = kind;
 	return nword;
 }
 
@@ -263,9 +264,14 @@ int corpus_typemap_stem(struct corpus_typemap *map)
 	struct corpus_text stem;
 	size_t size;
 	const uint8_t *buf;
-	int err, nword0, nword;
+	int err, kind0, kind, nword0, nword;
 
 	if (!map->stemmer) {
+		return 0;
+	}
+
+	nword0 = count_words(&map->type, &kind0);
+	if (kind0 != CORPUS_WORD_LETTER) {
 		return 0;
 	}
 
@@ -274,7 +280,6 @@ int corpus_typemap_stem(struct corpus_typemap *map)
 	}
 
 	size = CORPUS_TEXT_SIZE(&map->type);
-
 	if (size >= INT_MAX) {
 		err = CORPUS_ERROR_OVERFLOW;
 		corpus_log(err, "type size (%"PRIu64" bytes)"
@@ -283,7 +288,6 @@ int corpus_typemap_stem(struct corpus_typemap *map)
 		goto out;
 	}
 
-	nword0 = count_words(&map->type);
 	buf = (const uint8_t *)sb_stemmer_stem(map->stemmer, map->type.ptr,
 					       (int)size);
 	if (buf == NULL) {
@@ -297,7 +301,7 @@ int corpus_typemap_stem(struct corpus_typemap *map)
 	size = (size_t)sb_stemmer_length(map->stemmer);
 	stem.ptr = (uint8_t *)buf;
 	stem.attr = (map->type.attr & ~CORPUS_TEXT_SIZE_MASK) | size;
-	nword = count_words(&stem);
+	nword = count_words(&stem, &kind);
 
 	// only stem types if the number of words doesn't change; this
 	// protects against turning inner punctuation like 'u.s' to
@@ -335,37 +339,17 @@ int corpus_typemap_set_utf32(struct corpus_typemap *map, const uint32_t *ptr,
 			continue;
 		} else if (code <= 0xDFFFF) {
 			switch (code) {
-			// Quotation_Mark = Yes
-			case 0x00AB:
-			case 0x00BB:
-			case 0x2018:
-			case 0x2019:
-			case 0x201A:
-			case 0x201B:
-			case 0x201C:
-			case 0x201D:
-			case 0x201E:
-			case 0x201F:
-			case 0x2039:
-			case 0x203A:
-			case 0x2E42:
-			case 0x300C:
-			case 0x300D:
-			case 0x300E:
-			case 0x300F:
-			case 0x301D:
-			case 0x301E:
-			case 0x301F:
-			case 0xFE41:
-			case 0xFE42:
-			case 0xFE43:
-			case 0xFE44:
-			case 0xFF02:
-			case 0xFF07:
-			case 0xFF62:
-			case 0xFF63:
+			case 0x2018: // LEFT SINGLE QUOTATION MARK
+			case 0x2019: // RIGHT SINGLE QUOTATION MARK
 				if (map_quote) {
-					code = 0x0027;
+					code = '\'';
+				}
+				break;
+
+			case 0x201C: // LEFT DOUBLE QUOTATION MARK
+			case 0x201D: // RIGHT DOUBLE QUOTATION MARK
+				if (map_quote) {
+					code = '"';
 				}
 				break;
 

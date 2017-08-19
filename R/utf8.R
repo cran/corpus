@@ -14,9 +14,13 @@
 
 
 # converts a character vector from its declared encoding to UTF-8
-as_utf8 <- function(x)
+as_utf8 <- function(x, normalize = TRUE)
 {
-    .Call(C_utf8_coerce, x)
+    ans <- .Call(C_utf8_coerce, x)
+    if (normalize) {
+        ans <- utf8_normalize(ans)
+    }
+    ans
 }
 
 # encode an R character string in a form suitable for display
@@ -294,15 +298,32 @@ utf8_valid <- function(x)
 }
 
 # gets the width; NA for invalid or nonprintable sequences
-utf8_width <- function(x, encode = TRUE)
+utf8_width <- function(x, encode = TRUE, quote = FALSE)
 {
     with_rethrow({
         encode <- as_option("encode", encode)
+        quote <- as_option("quote", quote)
     })
     
     if (encode) {
         x <- utf8_encode(x)
     }
     utf8 <- (Sys.getlocale("LC_CTYPE") != "C")
-    .Call(C_utf8_width, x, utf8)
+    .Call(C_utf8_width, x, quote, utf8)
+}
+
+
+utf8_normalize <- function(x, map_case = FALSE, map_compat = FALSE,
+                           map_quote = FALSE, remove_ignorable = FALSE)
+{
+    with_rethrow({
+        x <- as_utf8(x, normalize = FALSE)
+        map_case <- as_option("map_case", map_case)
+        map_compat <- as_option("map_compat", map_compat)
+        map_quote <- as_option("map_quote", map_quote)
+        remove_ignorable <- as_option("remove_ignorable", remove_ignorable)
+    })
+
+    .Call(C_utf8_normalize, x, map_case, map_compat, map_quote,
+          remove_ignorable)
 }

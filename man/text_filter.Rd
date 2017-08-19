@@ -22,15 +22,13 @@
     \method{text_filter}{data.frame}(x = NULL, ...)
 
     \method{text_filter}{default}(x = NULL, ...,
-                        map_case = TRUE, map_compat = TRUE,
-                        map_quote = TRUE, remove_ignorable = TRUE,
+                        map_case = TRUE, map_quote = TRUE,
+                        remove_ignorable = TRUE,
                         stemmer = NULL, stem_dropped = FALSE,
                         stem_except = NULL,
                         combine = abbreviations("english"),
-                        drop_letter = FALSE, drop_mark = FALSE,
-                        drop_number = FALSE, drop_punct = FALSE,
-                        drop_symbol = FALSE, drop_other = FALSE,
-                        drop_url = FALSE,
+                        drop_letter = FALSE, drop_number = FALSE,
+                        drop_punct = FALSE, drop_symbol = FALSE,
                         drop = NULL, drop_except = NULL,
                         sent_crlf = FALSE,
                         sent_suppress = abbreviations("english"))
@@ -46,13 +44,9 @@
         case mapping to the text. For most languages, this transformation
         changes uppercase characters to their lowercase equivalents.}
 
-    \item{map_compat}{a logical value indicating whether to apply
-        Unicode compatibility mappings to the characters, those required
-        for NFKC and NFKD normal forms.}
-
-    \item{map_quote}{a logical value indicating whether to replace Unicode
-        quote characters like single quote, double quote, and apostrophe,
-        with an ASCII single quote (').}
+    \item{map_quote}{a logical value indicating whether to replace curly
+        single quotes and double quotes with straight single quotes
+        and double quotes.}
 
     \item{remove_ignorable}{a logical value indicating whether to remove
         Unicode "default ignorable" characters like zero-width spaces
@@ -85,10 +79,6 @@
         \code{"letter"} tokens (cased letters, kana, idoegraphic, letter-like
         numeric characters and other letters) with \code{NA}.}
 
-    \item{drop_mark}{a logical value indicating whether to replace
-        \code{"mark"} tokens (subscripts, superscripts, modifier letters,
-        modifier symbols, and other marks) with \code{NA}.}
-
     \item{drop_number}{a logical value indicating whether to replace
         \code{"number"} tokens (decimal digits, words appearing to be
         numbers, and other numeric characters) with \code{NA}.}
@@ -97,25 +87,16 @@
         \code{"punct"} tokens (punctuation) with \code{NA}.}
 
     \item{drop_symbol}{a logical value indicating whether to replace
-        \code{"symbol"} tokens (emoji, math, currency, and other symbols)
-        with \code{NA}.}
-
-    \item{drop_other}{a logical value indicating whether to replace
-        \code{"other"} tokens (types that do not fall into any other
-        categories) with \code{NA}.}
-
-    \item{drop_url}{a logical value indicating whether to replace
-        \code{"url"} tokens (web addresses starting with \code{"http:/"} or
-        \code{"https:/"}) with \code{NA}.}
+        \code{"symbol"} tokens (emoji, math, currency, URLs, and other
+        symbols) with \code{NA}.}
 
     \item{drop}{a character vector of types to replace with \code{NA},
         or \code{NULL}.}
 
     \item{drop_except}{a character of types to exempt from the drop
-        rules specified by the \code{drop_letter}, \code{drop_mark},
-        \code{drop_number}, \code{drop_punct}, \code{drop_symbol},
-        \code{drop_other}, \code{drop_url}, and \code{drop} arguments,
-        or \code{NULL}.}
+        rules specified by the \code{drop_letter}, \code{drop_number},
+        \code{drop_punct}, \code{drop_symbol}, and \code{drop}
+        arguments, or \code{NULL}.}
 
     \item{sent_crlf}{a logical value indicating whether to break
         sentences on carriage returns or line feeds.}

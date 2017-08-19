@@ -262,10 +262,10 @@ few lines of the file, we see the following:</p>
 encoded as UTF-8. So, we should be in good shape. However, we run into trouble
 as soon as we try to process the text:</p>
 
-<pre><code class="r">term_counts(lines) # produces an error
+<pre><code class="r">term_stats(lines) # produces an error
 </code></pre>
 
-<pre><code>Error in term_counts(lines) :
+<pre><code>Error in term_stats(lines) :
   argument entry 15252 is marked as &quot;UTF-8&quot; but contains an invalid byte in position 36 (\xa3)
 </code></pre>
 
@@ -486,10 +486,10 @@ UTF-8 as the <code>iconv()</code> function from base R already serves this purpu
 <p>Back to our original problem: getting the text of <em>Mansfield Park</em> into R.
 Our first attempt failed:</p>
 
-<pre><code class="r">term_counts(lines)
+<pre><code class="r">term_stats(lines)
 </code></pre>
 
-<pre><code>Error in term_counts(lines) :
+<pre><code>Error in term_stats(lines) :
   argument entry 15252 is marked as &quot;UTF-8&quot; but contains an invalid byte in position 36 (\xa3)
 </code></pre>
 
@@ -515,30 +515,31 @@ lines2[15252]
 <p>It worked! Now we can analyze our text.</p>
 
 <pre><code class="r">f &lt;- text_filter(drop_punct = TRUE, drop = stopwords(&quot;english&quot;))
-term_counts(lines2, f)
+term_stats(lines2, f)
 </code></pre>
 
 <pre><code>   term     count support
 1  fanny      816     806
 2  must       508     492
 3  crawford   493     488
-4  will       498     474
-5  mr.        482     466
-6  much       459     450
-7  miss       432     419
-8  said       406     400
-9  mrs.       408     399
-10 sir        372     366
-11 edmund     364     364
-12 one        372     360
-13 think      349     346
-14 now        333     331
-15 good       326     321
-16 might      324     320
-17 time       315     312
-18 well       324     311
-⋮
-(8250 rows total)
+4  mr.        482     466
+5  much       459     450
+6  miss       432     419
+7  said       406     400
+8  mrs.       408     399
+9  sir        372     366
+10 edmund     364     364
+11 one        370     358
+12 think      349     346
+13 now        333     331
+14 might      324     320
+15 time       310     307
+16 little     309     300
+17 nothing    301     291
+18 well       299     286
+19 thomas     288     285
+20 good       280     275
+⋮  (8457 rows total)
 </code></pre>
 
 <h2>The <em>readtext</em> package</h2>

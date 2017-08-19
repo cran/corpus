@@ -1,4 +1,5 @@
 \name{text_tokens}
+\alias{text_length}
 \alias{text_ntoken}
 \alias{text_tokens}
 \title{Text Tokenization}
@@ -10,6 +11,8 @@
     text_tokens(x, filter = text_filter(x))
 
     text_ntoken(x, filter = text_filter(x))
+
+    text_length(x, filter = text_filter(x))
 }
 \arguments{
     \item{x}{object to be tokenized.}
@@ -27,20 +30,19 @@
             defined by
             \href{http://unicode.org/reports/tr29/#Word_Boundaries}{Unicode
                 Standard Annex #29, Section 4}. We categorize each word as
-            \code{"letter"}, \code{"mark"}, \code{"number"},
-            \code{"punct"}, \code{"symbol"}, \code{"other"} or
-            \code{"url"} according to the first character in the word.
+            \code{"letter"}, \code{"number"}, \code{"punct"}, or
+            \code{"symbol"} according to the first character in the word.
             For words with two or more characters that start with extenders
             like underscore (\code{_}), we use the second character in
-            the word to categorize it, treating a second extender as a letter.
+            the word to categorize it, treating a second extender as a
+            letter.
 
         \item Next, we normalize the remaining words by applying the
             character mappings indicated by the \code{map_case},
-            \code{map_compat}, \code{map_quote}, and \code{remove_ignorable}.
+            \code{map_quote}, and \code{remove_ignorable}.
             At the end of the second stage, we have segmented
             the text into a sequence of normalized words, in Unicode composed
-            normal form (NFC, or if \code{map_compat} is \code{TRUE},
-            NFKC).
+            normal form (NFC).
 
         \item In the third stage, if the \code{stemmer} property is
             non-\code{NULL}, we apply the indicated stemming algorithm to
@@ -57,19 +59,18 @@
             this stage, the sequence elements are \sQuote{tokens}, not
             \sQuote{words}.
 
-        \item If any of \code{drop_letter}, \code{drop_mark},
-            \code{drop_number}, \code{drop_punct}, \code{drop_symbol},
-            \code{drop_other}, or \code{drop_url} are \code{TRUE}, we replace
-            the tokens with values in the corresponding categories by \code{NA}.
-            (For multi-word types created by the \code{combine} step,
-            we take the category of the first word in the phrase.)
-            Then, if the \code{drop} property is non-\code{NULL}, we replace
-            tokens that match elements of this character vector with
-            \code{NA}. We can add exceptions to the drop rules by specifying
-            a non-\code{NULL} value for the \code{drop_except} property:
-            \code{drop_except} is a character vector, then we we restore
-            tokens that match elements of vector to their values prior to
-            dropping.
+        \item If any of \code{drop_letter}, \code{drop_number},
+            \code{drop_punct}, or \code{drop_symbol} are \code{TRUE},
+            then we replace the tokens with values in the corresponding
+            categories by \code{NA}.  (For multi-word types created by the
+            \code{combine} step, we take the category of the first word in
+            the phrase.) Then, if the \code{drop} property is
+            non-\code{NULL}, we replace tokens that match elements of this
+            character vector with \code{NA}. We can add exceptions to the
+            drop rules by specifying a non-\code{NULL} value for the
+            \code{drop_except} property: \code{drop_except} is a character
+            vector, then we we restore tokens that match elements of
+            vector to their values prior to dropping.
     }
 
     When \code{filter = NULL}, we treat all logical properties as
@@ -79,10 +80,10 @@
     \code{drop}, and \code{drop_except} need to be stemmed (unless
     \code{stemmer} is not \code{NA}), but they do not need to be
     normalized. We normalize the argument values in the manner specified
-    by \code{map_case}, \code{map_compate}, \code{map_quote}, and
-    \code{remove_ignorable}. Thus, for example, if \code{map_case = TRUE},
-    then a token filter with \code{combine = "Mx."} produces the same
-    results as a token filter with \code{combine = "mx."}.
+    by \code{map_case}, \code{map_quote}, and \code{remove_ignorable}.
+    Thus, for example, if \code{map_case = TRUE}, then a token filter with
+    \code{combine = "Mx."} produces the same results as a token filter
+    with \code{combine = "mx."}.
 }
 \section{Stemming}{
     We use the stemming algorithms provided by the Snowball library. These
@@ -118,7 +119,8 @@
 
     \code{text_ntoken} returns a numeric vector the same length as \code{x},
     with each element giving the number of non-dropped tokens in the
-    corresponding text.
+    corresponding text. \code{text_length} is similar, but includes dropped
+    tokens in the result.
 }
 \seealso{
     \code{\link{text_split}}, \code{\link{text_types}},
@@ -131,9 +133,11 @@
     # count non-dropped tokens:
     text_ntoken("The quick ('brown') fox can't jump 32.3 feet, right?")
 
-    # don't normalize:
-    f <- text_filter(map_case = FALSE, map_compat = FALSE,
-                     map_quote = FALSE, remove_ignorable = FALSE)
+    # count dropped and non-dropped tokens:
+    text_length("The quick ('brown') fox can't jump 32.3 feet, right?")
+
+    # don't change case or quotes:
+    f <- text_filter(map_case = FALSE, map_quote = FALSE)
     text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?", f)
 
     # drop common function words ('stop' words):

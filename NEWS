@@ -1,3 +1,70 @@
+Changes in version 0.9.0
+
+ * Add new vignette, "Introduction to corpus" vignette.
+
+ * Add `random` argument to `text_locate` for random order.
+
+ * Change format.corpus_frame to use elastic column widths for text.
+
+ * Allow `rows = -1` for print.corpus_frame to print all rows.
+
+ * Add corpus(), as_corpus(), is_corpus() functions.
+
+ * Make text_split() split into evenly-sized blocks, with the 'size'
+   argument specifying the maximum block size.
+
+ * Following *quanteda*, add "will" to the English stop word list.
+
+ * Add special handling for hyphens so that, for example, "world-wide"
+   is a single token (but "-world-wide-" is three tokens).
+
+ * Merged 'url' and 'symbol' word categories.  Removed 'other' word
+   category (ignore these characters).
+
+ * Renamed term_counts() to term_stats().
+
+ * Added text_stats() function.
+
+ * Removed deprecated functions token_filter() and sentence_filter().
+
+ * Removed 'term' column from text_locate() output.
+
+ * Added text_match() function to return matching terms as a factor.
+
+ * Change stemmer so that it only modifies tokens of kind "letter",
+   preserving "number", "symbol", "url", etc.
+
+ * Removed 'map_compat' option from text_filter(); use utf8_normalize()
+   instead if you need to apply compatibility maps.
+
+ * Implemented text subset assignment operators `[<-` and `[[<-`.
+
+ * Switched to more efficient c.corpus_text() function.
+
+ * Added utf8_normalize() function for translating to NFC normal form,
+   applying case and compatibility maps.
+
+ * Make text_locate() return "text" column as a factor.
+
+ * Constrain text names() to be unique, non-missing.
+
+ * Added "names" argument to as_text for overriding default names.
+
+ * Added text_sub() for getting token sub-sequences.
+
+ * Added text_length() for text length, including NA tokens.
+
+ * Added checks for underflow in read_ndjson() double deserialization.
+
+ * Fixed bug in `text_filter<-` where assignment did not make a deep copy
+   of the object.
+
+ * Fixed bug in utf8_format, utf8_print, utf8_width where internal
+   double quotes were not escaped.
+
+ * Fixed rchk, UBSAN warnings.
+
+
 Changes in version 0.8.0 (2017-07-18)
 
  * Added text_filter() generic. Deprecate token_filter() and

@@ -32,15 +32,24 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
         print.gap <- as_print_gap("print.gap", print.gap)
     })
 
-    if (is.null(chars)) {
+
+    if ((stretch <- is.null(chars))) {
+        width <- getOption("width")
+        rn <- rownames(x)
+        rn[is.na(rn)] <- "NA"
+        rownames_width <- max(0, utf8_width(rn))
+
+        gap <- if (is.null(print.gap)) 1 else print.gap
+
         utf8 <- Sys.getlocale("LC_CTYPE") != "C"
         ellipsis <- if (utf8) 1 else 3
         quotes <- if (quote) 2 else 0
-        gap <- if (is.null(print.gap)) 1 else print.gap
-        width <- getOption("width")
-        chars <- (width - ellipsis - quotes
-                  - gap - max(0, utf8_width(rownames(x))))
-        chars <- max(chars, 12)
+
+        chars_min <- 24
+        chars_max <- (width - ellipsis - quotes
+                      - gap - rownames_width)
+        chars_max <- max(chars_max, chars_min)
+        chars <- chars_max
     }
 
     nr <- .row_names_info(x, 2L)
@@ -48,10 +57,19 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
     names <- names(x)
 
     cols <- vector("list", nc)
+
+    if (stretch) {
+        chars_left <- chars_max
+    }
+
     for (i in seq_len(nc)) {
         elt <- x[[i]]
         cl <- class(elt)
         fac <- FALSE
+
+        if (stretch) {
+            chars <- max(chars_min, chars_left)
+        }
 
         if (is.factor(elt) && (identical(cl, "factor")
                                || identical(cl, c("AsIs", "factor")))) {
@@ -73,16 +91,31 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
                                 na.encode = na.encode, quote = quote,
                                 na.print = na.print,
                                 print.gap = print.gap, ...)
-            char <- FALSE
+            char <- is_text(elt)
         }
 
-        if (char || is_text(elt)) {
+        if (char) {
             # use same justification for column and name
             names[[i]] <- utf8_format(names[[i]],
                                       chars = .Machine$integer.max,
                                       justify = justify,
                                       width = max(0, utf8_width(cols[[i]])),
                                       na.encode = TRUE, na.print = "NA")
+        }
+
+        if (stretch) {
+            cn <- names[[i]]
+            if (is.na(cn)) {
+                cn <- "NA"
+            }
+
+            cw <- utf8_width(cols[[i]], quote = quote)
+            cw[is.na(cw)] <- if (char && !quote) 4 else 2
+
+            chars_left <- (chars_left - gap - max(cw, utf8_width(cn)))
+            if (chars_left < 0) {
+                chars_left <- chars_max
+            }
         }
     }
 
@@ -106,7 +139,7 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
 }
 
 
-print.corpus_frame <- function(x, rows = 18L, chars = NULL, digits = NULL,
+print.corpus_frame <- function(x, rows = 20L, chars = NULL, digits = NULL,
                                quote = FALSE, na.print = NULL,
                                print.gap = NULL, right = FALSE,
                                row.names = TRUE, max = NULL,
@@ -124,7 +157,7 @@ print.corpus_frame <- function(x, rows = 18L, chars = NULL, digits = NULL,
     nc <- length(x)
 
     with_rethrow({
-        rows <- as_max_print("rows", rows)
+        rows <- as_rows("rows", rows)
         chars <- as_chars("chars", chars)
         digits <- as_digits("digits", digits)
         quote <- as_option("quote", quote)
@@ -141,6 +174,10 @@ print.corpus_frame <- function(x, rows = 18L, chars = NULL, digits = NULL,
         max <- as_max_print("max", max)
         display <- as_option("display", display)
     })
+
+    if (is.null(rows) || rows < 0) {
+        rows <- .Machine$integer.max
+    }
 
     if (length(x) == 0) {
         cat(sprintf(ngettext(n, "data frame with 0 columns and %d row",
@@ -180,8 +217,14 @@ print.corpus_frame <- function(x, rows = 18L, chars = NULL, digits = NULL,
     if (n == 0) {
         cat("(0 rows)\n")
     } else if (trunc) {
-        ellipsis <- ifelse(Sys.getlocale("LC_CTYPE") == "C", "...", "\u22ee")
-        cat(sprintf("%s\n(%d rows total)\n", ellipsis, n))
+        name_width <- max(0, utf8_width(rownames(m)))
+
+        ellipsis <- ifelse(Sys.getlocale("LC_CTYPE") == "C", ".", "\u22ee")
+        ellipsis <- substr(ellipsis, 1, name_width)
+        gap <- if (is.null(print.gap)) 1 else print.gap
+
+        space <- format(ellipsis, width = name_width + gap)
+        cat(sprintf("%s(%d rows total)\n", space, n))
     }
 
     invisible(x)

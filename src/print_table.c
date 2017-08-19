@@ -166,7 +166,7 @@ static int print_range(SEXP sx, int begin, int end, int print_gap,
 				n = 2;
 			} else {
 				str = translate(name, is_stdout);
-				w = charsxp_width(name, utf8);
+				w = charsxp_width(name, 0, utf8);
 				n = strlen(str);
 			}
 			if (j > begin || row_names != R_NilValue) {
@@ -194,7 +194,7 @@ static int print_range(SEXP sx, int begin, int end, int print_gap,
 				n = 2;
 			} else {
 				str = translate(name, is_stdout);
-				w = charsxp_width(name, utf8);
+				w = charsxp_width(name, 0, utf8);
 				n = strlen(str);
 			}
 
@@ -219,7 +219,7 @@ static int print_range(SEXP sx, int begin, int end, int print_gap,
 			}
 
 			str = translate(elt, is_stdout);
-			w = charsxp_width(elt, utf8);
+			w = charsxp_width(elt, 0, utf8);
 			n = strlen(str);
 			PRINT_ENTRY(str, n, width - w);
 		}
@@ -265,11 +265,18 @@ SEXP print_table(SEXP sx, SEXP sprint_gap, SEXP sright, SEXP smax,
 			RCORPUS_CHECK_INTERRUPT(i);
 
 			elt = STRING_ELT(row_names, i);
-			w = (elt == NA_STRING) ? 2 : charsxp_width(elt, utf8);
+			w = (elt == NA_STRING ? 2
+					      : charsxp_width(elt, 0, utf8));
 			if (w > namewidth) {
 				namewidth = w;
 			}
 		}
+	}
+
+	if (ncol == 0) {
+		nprint = print_range(sx, 0, 0, print_gap, right, max,
+				     is_stdout, namewidth, NULL);
+		goto out;
 	}
 
 	colwidths = (void *)R_alloc(ncol, sizeof(*colwidths));
@@ -280,7 +287,7 @@ SEXP print_table(SEXP sx, SEXP sprint_gap, SEXP sright, SEXP smax,
 			if (elt == NA_STRING) {
 				colwidths[j] = 2;
 			} else {
-				colwidths[j] = charsxp_width(elt, utf8);
+				colwidths[j] = charsxp_width(elt, 0, utf8);
 			}
 		}
 	}
@@ -291,7 +298,7 @@ SEXP print_table(SEXP sx, SEXP sprint_gap, SEXP sright, SEXP smax,
 		if (elt == NA_STRING) {
 			w = 0;
 		} else {
-			w = charsxp_width(elt, utf8);
+			w = charsxp_width(elt, 0, utf8);
 		}
 
 		if (w > colwidths[j]) {
@@ -341,11 +348,6 @@ SEXP print_table(SEXP sx, SEXP sprint_gap, SEXP sright, SEXP smax,
 		begin = end;
 	}
 
-	if (ncol == 0) {
-		nprint += print_range(sx, 0, 0, print_gap, right,
-				      max - nprint, is_stdout, namewidth,
-				      colwidths);
-	}
-
+out:
 	return ScalarInteger(nprint);
 }

@@ -43,17 +43,53 @@ text_subset <- function(x, terms, filter = text_filter(x))
 }
 
 
-text_locate <- function(x, terms, filter = text_filter(x))
+text_match <- function(x, terms, filter = text_filter(x))
+{
+    with_rethrow({
+        x <- as_text(x, filter = filter)
+    })
+
+    if (!(is.null(terms) || is.character(terms))) {
+        stop("'terms' must be a character vector or NULL")
+    }
+
+    if (anyNA(terms)) {
+        stop("'terms' argument cannot contain missing values")
+    }
+
+    if (!all(utf8_valid(terms))) {
+        stop("'terms' argument cannot contain invalid UTF-8")
+    }
+    uterms <- as_utf8(terms)
+
+    ans <- .Call(C_text_match, x, uterms)
+
+    if (nlevels(ans$term) != length(terms)) {
+        stop("'terms' argument cannot contain duplicate types")
+    }
+
+    if (!is.null(terms)) {
+        levels(ans$term) <- terms
+    }
+
+    ans$text <- structure(ans$text, levels = labels(x), class = "factor")
+    ans
+}
+
+
+text_locate <- function(x, terms, filter = text_filter(x), random = FALSE)
 {
     with_rethrow({
         x <- as_text(x, filter = filter)
         terms <- as_character_vector("terms", terms)
+        random <- as_option("random", random)
     })
 
-    nm <- names(x)
     ans <- .Call(C_text_locate, x, terms)
-    if (!is.null(nm)) {
-        ans$text <- nm[ans$text]
+    ans$text <- structure(ans$text, levels = labels(x), class = "factor")
+    if (random) {
+        o <- sample.int(nrow(ans))
+        ans <- ans[o,]
     }
     ans
 }
@@ -63,9 +99,12 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
                                       print.gap = NULL, ...,
                                       display = FALSE, justify = "left")
 {
-    width <- as_integer_scalar("width", width)
-    print.gap <- as_print_gap("print.gap", print.gap)
-    justify <- as_justify("justify", justify)
+    with_rethrow({
+        width <- as_integer_scalar("width", width)
+        print.gap <- as_print_gap("print.gap", print.gap)
+        display <- as_option("display", display)
+        justify <- as_justify("justify", justify)
+    })
 
     if (is.null(print.gap)) {
         print.gap <- 1
@@ -120,7 +159,7 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
         w <- floor(ctxwidth)
         rval[[i]] <- format(x[[i]], chars = w - ellipsis, width = w,
                             display = display, justify = "right")
-        names[[i]] <- format("before", width = w, justify = "left")
+        names[[i]] <- format("before", width = w, justify = "centre")
     }
 
     if ("after" %in% names) {
@@ -128,7 +167,7 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
         w <- ceiling(ctxwidth)
         rval[[i]] <- format(x[[i]], chars = w - ellipsis, width = w,
                             display = display, justify = "left")
-        names[[i]] <- format("after", width = w, justify = "right")
+        names[[i]] <- format("after", width = w, justify = "centre")
     }
     names(rval) <- names
 
@@ -142,11 +181,12 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
 }
 
 
-print.corpus_text_locate <- function(x, print.gap = NULL, display = TRUE, ...)
+print.corpus_text_locate <- function(x, rows = 20L, print.gap = NULL,
+                                     display = TRUE, ...)
 {
     fmt <- format.corpus_text_locate(x, print.gap = print.gap,
                                      display = display, ...)
-    print.corpus_frame(fmt, chars = .Machine$integer.max,
+    print.corpus_frame(fmt, rows = rows, chars = .Machine$integer.max,
                        print.gap = print.gap)
     invisible(x)
 }

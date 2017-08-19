@@ -47,8 +47,8 @@ static void locate_init(struct locate *loc);
 static void locate_add(struct locate *loc, int text_id, int term_id,
 		       const struct corpus_text *instance);
 static void locate_grow(struct locate *loc, int nadd);
-SEXP make_instances(struct locate *loc, SEXP sx, SEXP terms,
-		    const struct corpus_text *text);
+SEXP make_matches(struct locate *loc, SEXP terms);
+SEXP make_instances(struct locate *loc, SEXP sx, const struct corpus_text *text);
 
 
 void locate_init(struct locate *loc)
@@ -87,12 +87,13 @@ void locate_grow(struct locate *loc, int nadd)
 		return;
 	}
 
-        if ((err = corpus_array_size_add(&size, width, loc->nitem, nadd))) {
-                Rf_error("overflow error");
-        }
+        TRY(corpus_array_size_add(&size, width, loc->nitem, nadd));
 
         loc->items = (void *)S_realloc(base, size, loc->nitem_max, width);
         loc->nitem_max = size;
+	err = 0;
+out:
+	CHECK_ERROR(err);
 }
 
 
@@ -138,12 +139,9 @@ SEXP text_count(SEXP sx, SEXP sterms)
 	}
 
 	err = 0;
-
 out:
+	CHECK_ERROR(err);
 	UNPROTECT(nprot);
-	if (err) {
-		Rf_error("memory allocation failure");
-	}
 	return ans;
 }
 
@@ -189,17 +187,14 @@ SEXP text_detect(SEXP sx, SEXP sterms)
 	}
 
 	err = 0;
-
 out:
+	CHECK_ERROR(err);
 	UNPROTECT(nprot);
-	if (err) {
-		Rf_error("memory allocation failure");
-	}
 	return ans;
 }
 
 
-SEXP text_locate(SEXP sx, SEXP sterms)
+SEXP text_match(SEXP sx, SEXP sterms)
 {
 	SEXP ans, sitems, ssearch;
 	const struct corpus_text *text, *token;
@@ -239,29 +234,123 @@ SEXP text_locate(SEXP sx, SEXP sterms)
 		TRY(search->error);
 	}
 
-	PROTECT(ans = make_instances(&loc, sx, sitems, text)); nprot++;
+	PROTECT(ans = make_matches(&loc, sitems)); nprot++;
 	err = 0;
-
 out:
+	CHECK_ERROR(err);
 	UNPROTECT(nprot);
-	if (err) {
-		Rf_error("memory allocation failure");
-	}
 	return ans;
 }
 
 
-SEXP make_instances(struct locate *loc, SEXP sx, SEXP terms,
-		    const struct corpus_text *text)
+SEXP text_locate(SEXP sx, SEXP sterms)
+{
+	SEXP ans, ssearch;
+	const struct corpus_text *text, *token;
+	struct corpus_filter *filter;
+	struct corpus_search *search;
+	struct locate loc;
+	R_xlen_t i, n;
+	int err, nprot, term_id;
+
+	nprot = 0;
+
+	PROTECT(sx = coerce_text(sx)); nprot++;
+	text = as_text(sx, &n);
+	filter = text_filter(sx);
+
+	PROTECT(ssearch = alloc_search(sterms, "locate", filter)); nprot++;
+	search = as_search(ssearch);
+
+	locate_init(&loc);
+
+	for (i = 0; i < n; i++) {
+		RCORPUS_CHECK_INTERRUPT(i);
+
+		if (text[i].ptr == NULL) {
+			continue;
+		}
+
+		TRY(corpus_search_start(search, &text[i], filter));
+
+		while (corpus_search_advance(search)) {
+			term_id = search->term_id;
+			token = &search->current;
+			locate_add(&loc, i, term_id, token);
+		}
+
+		TRY(search->error);
+	}
+
+	PROTECT(ans = make_instances(&loc, sx, text)); nprot++;
+	err = 0;
+out:
+	UNPROTECT(nprot);
+	CHECK_ERROR(err);
+	return ans;
+}
+
+
+SEXP make_matches(struct locate *loc, SEXP levels)
+{
+	SEXP ans, names, row_names, sclass, stext, sterm;
+	R_xlen_t i, n, term_id, text_id;
+	int nprot;
+
+	n = loc->nitem;
+	nprot = 0;
+
+	PROTECT(stext = allocVector(REALSXP, n)); nprot++;
+	PROTECT(sterm = allocVector(INTSXP, n)); nprot++;
+
+	for (i = 0; i < n; i++) {
+		RCORPUS_CHECK_INTERRUPT(i);
+
+		text_id = loc->items[i].text_id;
+		REAL(stext)[i] = (double)(text_id + 1);
+
+		term_id = loc->items[i].term_id;
+		INTEGER(sterm)[i] = term_id + 1;
+	}
+	setAttrib(sterm, R_LevelsSymbol, levels);
+	setAttrib(sterm, R_ClassSymbol, mkString("factor"));
+
+	PROTECT(ans = allocVector(VECSXP, 2)); nprot++;
+	SET_VECTOR_ELT(ans, 0, stext);
+	SET_VECTOR_ELT(ans, 1, sterm);
+
+	PROTECT(names = allocVector(STRSXP, 2)); nprot++;
+	SET_STRING_ELT(names, 0, mkChar("text"));
+	SET_STRING_ELT(names, 1, mkChar("term"));
+	setAttrib(ans, R_NamesSymbol, names);
+
+	PROTECT(row_names = allocVector(REALSXP, 2)); nprot++;
+	REAL(row_names)[0] = NA_REAL;
+	REAL(row_names)[1] = -(double)n;
+	setAttrib(ans, R_RowNamesSymbol, row_names);
+
+	PROTECT(sclass = allocVector(STRSXP, 2)); nprot++;
+        SET_STRING_ELT(sclass, 0, mkChar("corpus_frame"));
+        SET_STRING_ELT(sclass, 1, mkChar("data.frame"));
+        setAttrib(ans, R_ClassSymbol, sclass);
+
+	UNPROTECT(nprot);
+	return ans;
+}
+
+
+SEXP make_instances(struct locate *loc, SEXP sx, const struct corpus_text *text)
 {
 	SEXP ans, names, filter, row_names, sclass, sources,
 	     ptable, psource, prow, pstart, pstop,
 	     before, bsource, brow, bstart, bstop,
+	     instance, isource, irow, istart, istop,
 	     after, asource, arow, astart, astop,
-	     stext, sterm, instance;
+	     stext;
 	struct mkchar mkchar;
-	R_xlen_t i, n, term_id, text_id;
-	int nprot, off, len, start, stop;
+	R_xlen_t i, n, text_id;
+	double row;
+	int nprot, off, len, source, start, stop;
 	
 	n = loc->nitem;
 	nprot = 0;
@@ -275,13 +364,16 @@ SEXP make_instances(struct locate *loc, SEXP sx, SEXP terms,
 	pstop = getListElement(ptable, "stop");
 
 	PROTECT(stext = allocVector(REALSXP, n)); nprot++;
-	PROTECT(sterm = allocVector(STRSXP, n)); nprot++;
-	PROTECT(instance = allocVector(STRSXP, n)); nprot++;
 
 	PROTECT(bsource = allocVector(INTSXP, n)); nprot++;
 	PROTECT(brow = allocVector(REALSXP, n)); nprot++;
 	PROTECT(bstart = allocVector(INTSXP, n)); nprot++;
 	PROTECT(bstop = allocVector(INTSXP, n)); nprot++;
+
+	PROTECT(isource = allocVector(INTSXP, n)); nprot++;
+	PROTECT(irow = allocVector(REALSXP, n)); nprot++;
+	PROTECT(istart = allocVector(INTSXP, n)); nprot++;
+	PROTECT(istop = allocVector(INTSXP, n)); nprot++;
 
 	PROTECT(asource = allocVector(INTSXP, n)); nprot++;
 	PROTECT(arow = allocVector(REALSXP, n)); nprot++;
@@ -296,24 +388,26 @@ SEXP make_instances(struct locate *loc, SEXP sx, SEXP terms,
 		text_id = loc->items[i].text_id;
 		REAL(stext)[i] = (double)(text_id + 1);
 
-		term_id = loc->items[i].term_id;
-		SET_STRING_ELT(sterm, i, STRING_ELT(terms, term_id));
-
-		SET_STRING_ELT(instance, i,
-			       mkchar_get(&mkchar, &loc->items[i].instance));
-
+		source = INTEGER(psource)[text_id];
+		row = REAL(prow)[text_id];
 		start = INTEGER(pstart)[text_id];
 		stop = INTEGER(pstop)[text_id];
+
 		off = (int)(loc->items[i].instance.ptr - text[text_id].ptr);
 		len = (int)CORPUS_TEXT_SIZE(&loc->items[i].instance);
 
-		INTEGER(bsource)[i] = INTEGER(psource)[text_id];
-		REAL(brow)[i] = REAL(prow)[text_id];
+		INTEGER(bsource)[i] = source;
+		REAL(brow)[i] = row;
 		INTEGER(bstart)[i] = start;
 		INTEGER(bstop)[i] = start + off - 1;
 
-		INTEGER(asource)[i] = INTEGER(psource)[text_id];
-		REAL(arow)[i] = REAL(prow)[text_id];
+		INTEGER(isource)[i] = source;
+		REAL(irow)[i] = row;
+		INTEGER(istart)[i] = start + off;
+		INTEGER(istop)[i] = start + off + len - 1;
+
+		INTEGER(asource)[i] = source;
+		REAL(arow)[i] = row;
 		INTEGER(astart)[i] = start + off + len;
 		INTEGER(astop)[i] = stop;
 	}
@@ -322,23 +416,25 @@ SEXP make_instances(struct locate *loc, SEXP sx, SEXP terms,
 				    R_NilValue, filter));
 	nprot++;
 
+	PROTECT(instance = alloc_text(sources, isource, irow, istart, istop,
+				      R_NilValue, filter));
+	nprot++;
+
 	PROTECT(after = alloc_text(sources, asource, arow, astart, astop,
 				   R_NilValue, filter));
 	nprot++;
 
-	PROTECT(ans = allocVector(VECSXP, 5)); nprot++;
+	PROTECT(ans = allocVector(VECSXP, 4)); nprot++;
 	SET_VECTOR_ELT(ans, 0, stext);
-	SET_VECTOR_ELT(ans, 1, sterm);
-	SET_VECTOR_ELT(ans, 2, before);
-	SET_VECTOR_ELT(ans, 3, instance);
-	SET_VECTOR_ELT(ans, 4, after);
+	SET_VECTOR_ELT(ans, 1, before);
+	SET_VECTOR_ELT(ans, 2, instance);
+	SET_VECTOR_ELT(ans, 3, after);
 
-	PROTECT(names = allocVector(STRSXP, 5)); nprot++;
+	PROTECT(names = allocVector(STRSXP, 4)); nprot++;
 	SET_STRING_ELT(names, 0, mkChar("text"));
-	SET_STRING_ELT(names, 1, mkChar("term"));
-	SET_STRING_ELT(names, 2, mkChar("before"));
-	SET_STRING_ELT(names, 3, mkChar("instance"));
-	SET_STRING_ELT(names, 4, mkChar("after"));
+	SET_STRING_ELT(names, 1, mkChar("before"));
+	SET_STRING_ELT(names, 2, mkChar("instance"));
+	SET_STRING_ELT(names, 3, mkChar("after"));
 	setAttrib(ans, R_NamesSymbol, names);
 
 	PROTECT(row_names = allocVector(REALSXP, 2)); nprot++;
