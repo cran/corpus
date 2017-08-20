@@ -226,7 +226,7 @@ encodings. Whenever you read a text file into R, you need to specify the
 encoding. If you don&#39;t, R will try to guess the encoding, and if it guesses
 incorrectly, it will wrongly interpret the sequence of ones and zeros.</p>
 
-<p>We will demonstrate the difficulties with encodings with the text of
+<p>We will demonstrate the difficulties of encodings with the text of
 Jane Austen&#39;s novel, <em>Mansfield Park</em> provided by
 <a href="http://www.gutenberg.org">Project Gutenberg</a>. We will download the text, then
 read in the lines of the novel using the <em><a href="https://github.com/tidyverse/readr#readme">readr</a></em> package.</p>
@@ -288,7 +288,7 @@ all such lines using the <code>utf8_valid</code> function:</p>
 
 <p>So, there aren&#39;t any other invalid lines.</p>
 
-<p>The offending byte in line 15252 is displayed as <code>\xa3</code> an escape code
+<p>The offending byte in line 15252 is displayed as <code>\xa3</code>, an escape code
 for hexadecimal value 0xa3, decimal value 163. To understand why this
 is invalid, we need to learn more about UTF-8 encoding.</p>
 
@@ -324,11 +324,12 @@ utf8_print(ascii, quote = FALSE)
 <p>The first 32 codes (the first two rows of the table) are special control
 codes, the most common of which, <code>0x0a</code> denotes a new line (<code>\n</code>). The special
 code <code>0x00</code> often denotes the end of the input, and R does not allow this
-value in character strings. When <code>utf8_print</code> the low level <code>utf8_encode</code>
-subroutine format control codes, they do so as <code>\uXXXX</code> for four hexadecimal
-digits <code>XXXX</code> or as <code>\UXXXXYYYY</code> for eight hexadecimal digits <code>XXXXYYYY</code>.</p>
+value in character strings. When you call <code>utf8_print</code>, it uses the low
+level <code>utf8_encode</code> subroutine format control codes; they format
+as <code>\uXXXX</code> for four hexadecimal digits <code>XXXX</code> or as <code>\UXXXXYYYY</code>
+for eight hexadecimal digits <code>XXXXYYYY</code>.</p>
 
-<p>Compare the output with the base R print function:</p>
+<p>Compare <code>utf8_print</code> output with the output with the base R print function:</p>
 
 <pre><code class="r">print(ascii, quote = FALSE)
 </code></pre>
@@ -377,7 +378,10 @@ characters common in Latin languages. Note that <code>0xa3</code>, the invalid b
 from <em>Mansfield Park</em>, corresponds to a pound sign in the Latin-1 encoding.
 Given the context of the byte:</p>
 
-<pre><code>lines[15252]
+<pre><code class="r">lines[15252]
+</code></pre>
+
+<pre><code>[1] &quot;the command of her beauty, and her \xa320,000, any one who could satisfy the&quot;
 </code></pre>
 
 <p>this is probably the right symbol. The text is probably encoded in Latin-1,

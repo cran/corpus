@@ -4,8 +4,8 @@
 %\VignetteEncoding{UTF-8}
 -->
 
-Introduction to corpus
-======================
+Introduction to *corpus*
+========================
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
 knitr::opts_chunk$set(comment = "", fig.path = "corpus-", fig.retina = TRUE)
@@ -512,7 +512,7 @@ Emotion lexicon
 [WordNet Affect Lexicon][wn-affect].
 
 ```{r}
-wnaffect
+affect_wordnet
 ```
 
 This lexicon classifies a large set of terms correlated with emotional affect
@@ -520,20 +520,20 @@ into four main categories: "Positive", "Negative", "Ambiguous", and "Neutral",
 and a variety of sub-categories. Here is a summary:
 
 ```{r}
-summary(wnaffect)
+summary(affect_wordnet)
 ```
 
 Here are the term counts broken down by category:
 
 ```{r}
-with(wnaffect, table(category, emotion))
+with(affect_wordnet, table(category, emotion))
 ```
 
 Terms can appear in multiple categories, or with multiple parts of speech.
 
 ```{r}
 # some duplicate terms
-subset(wnaffect, term %in% c("caring", "chill", "hopeful"))
+subset(affect_wordnet, term %in% c("caring", "chill", "hopeful"))
 ```
 
 The term "chill", for example, is listed as denoting both positive calmness
@@ -556,7 +556,7 @@ We will first need a lexicon of emotion words. We will take as a starting
 point the WordNet-Affect lexicon, but we will remove "Neutral" emotion words.
 
 ```{r}
-affect <- subset(wnaffect, emotion != "Neutral")
+affect <- subset(affect_wordnet, emotion != "Neutral")
 affect$emotion <- droplevels(affect$emotion) # drop the unused "Neutral" level
 affect$category <- droplevels(affect$category) # drop unused categories
 ```
@@ -569,13 +569,12 @@ term_stats(data, subset = term %in% affect$term)
 ```
 
 A few terms jump out as unusual: "yellow" is probably for the yellow brick
-road, and "wicked" is probably for the wicked witch. When these terms appear,
-they probably don't describe an emotional state. We can verify this using the
-`text_locate` function, which shows these terms in context.
+road; "down" and "near" probably do not evoke emotions.  We can inspect the
+usages of the most common terms using the `text_locate` function, which shows
+these terms in context.
 
 ```{r}
-text_locate(data, "yellow", random = TRUE)
-text_locate(data, "wicked", random = TRUE)
+text_locate(data, "down", random = TRUE)
 ```
 
 Here, we use the `random = TRUE` option to return the matches in random order.
@@ -584,31 +583,24 @@ ensure that we don't make conclusions about these words using a biased sample.
 With the default option (`random = FALSE`), we would only see the matches at
 the beginning of the novel.
 
-
-We can also inspect the first token after each appearance of "wicked":
-
-```{r}
-term_stats(text_sub(text_locate(data, "wicked")$after, 1, 1))
-```
-
-of the 72 appearances of "wicked", 58 are followed by "witch" or "witches".
-Likewise, "yellow" is often referring to the road, or referring to the color
-of an object and not an emotion:
+It looks like "down" is mostly used as a preposition, not an emotion. We will
+exclude it form the lexicon.
 
 ```{r}
-term_stats(text_sub(text_locate(data, "yellow")$after, 1, 1))
+text_locate(data, "good", random = TRUE)
 ```
 
-The word "heart" is also suspiciously frequent. Here are some occurrences of
-that word:
+"Good" seems to be an appropriate emotion work, evoking positive affection or
+love. We will keep it in the lexicon.
 
 ```{r}
 text_locate(data, "heart", random = TRUE)
 ```
 
-A central part of the novel's plot is the Tin Woodman's quest for a heart; it
-is not surprising that the word "heart" shows up so frequently. Indeed, most
-appearances of the word "heart" are within 25 tokens of "woodman":
+"Heart" is mostly used as an object (noun), not an emotion meaning compassion.
+The Tin Woodman's search for a heart is a central plot of the novel, so it is
+not surprising that the term shows up frequently. We can look for
+co-occurrences of "heart" with "woodman":
 
 ```{r}
 loc <- text_locate(data, "heart")
@@ -616,16 +608,37 @@ before <- text_detect(text_sub(loc$before, -25, -1), "woodman")
 after <- text_detect(text_sub(loc$after, 1, 25), "woodman")
 summary(before | after)
 ```
-"Woodman" appears within 25 tokens of "heart" in in 45 of the 67
-contexts where the latter word appears.
 
-All of this analysis shows that we should probably exclude these terms if we
-are interested in words that connote emotion in _The Wizard of Oz_. We will
-also drop some other terms from the lexicon based on similar considerations
-(not shown here):
+"Woodman" appears within 25 tokens of "heart" in in 45 of the 67 contexts
+where the latter word appears.
+
+The decision of whether to include or exclude "heart" is a difficult judgement
+call. Most of the time it appears, it describes an object, not an emotion.
+Still, that object does have an emotional association.  I'm deciding to
+include "heart", but this is not a clear-cut decision.
+
+We can also inspect the first token after each appearance of "yellow":
 
 ```{r}
-affect <- subset(affect, !term %in% c("drop", "heart", "wicked", "yellow", "blue"))
+term_stats(text_sub(text_locate(data, "yellow")$after, 1, 1))
+```
+
+Over half the time, "yellow" prefaces "brick" or "bricks", and otherwise it
+describes objects. There it does not describe or evoke emotion.
+
+```{r}
+term_stats(text_sub(text_locate(data, "yellow")$after, 1, 1))
+```
+
+Similar analysis not shown here indicates that "great" is mostly used to
+describe size, not positive enthusiasm; "like" is often used to mean "similar
+to", not "affection for"; "blue" is mostly used as a color, not an emotion.
+
+All of this analysis shows that we should probably exclude some of the common
+terms from the lexicon.
+
+```{r}
+affect <- subset(affect, !term %in% c("down", "great", "like", "yellow", "near", "low", "blue"))
 ```
 
 ### Term emotion matrix
@@ -647,7 +660,7 @@ times that term *i* appeared in the affect lexicon with emotion *j*.
 
 We re-classify any term appearing in two or more categories as ambigous:
 
-``{r}
+```{r}
 ncat <- rowSums(term_scores > 0)
 term_scores[ncat > 1, c("Positive", "Negative", "Ambiguous")] <- c(0, 0, 1)
 ```
@@ -663,7 +676,7 @@ term_scores[term_scores > 1] <- 1
 
 ### Segmenting chapters into smaller chunks
 
-To compute emotion occurence rates, we start by splitting each chapter into
+To compute emotion occurrence rates, we start by splitting each chapter into
 equal-sized segments of at most 500 tokens. The specific size of 500 tokens is
 somewhat arbitrary, but not entirely so. We want the segments to be large enough
 so that our rate estimates are reliable, but not so large that the emotion
@@ -769,7 +782,7 @@ box()
 col <- c(total = "#000000", pos = "#FC8D62", neg = "#8DA0CB", ambig = "#66C2A5")
 
 # add a legend on the right hand side
-legend(usr[2] + 0.02 * diff(usr[1:2]), usr[3] + 0.8 * diff(usr[3:4]),
+legend(usr[2] + 0.015 * diff(usr[1:2]), usr[3] + 0.8 * diff(usr[3:4]),
        legend = c("Total", "Positive", "Negative", "Ambiguous"),
        title = expression(bold("Emotion")),
        fill = col[c("total", "pos", "neg", "ambig")],
@@ -803,21 +816,22 @@ for (t in c("ambig", "neg", "pos", "total")) {
 ### Discussion
 
 This is a crude measurement, but it appears to give a reasonable approximation
-of the emotional dynamics of the novel. The "Positive", "Negative", and
-"Ambiguous" categories are hard to interpet, but "Total" emotion seems to make
-sense.  The novel starts slowly, then quickly gets exciting when the tornado
-hits Kansas. There is a lull while Dorothy is in Munchkinland, but gets
-exciting when Dorothy meets the Cowardly Lion in the forest. The excitement
-level ebbs and flows throughout the rest of the novel.
+of the emotional dynamics of the novel.  There are some interesting dynamics
+to the "Positive" and "Negative" emotions, but I'm going to focus on the
+"Total" emotion.
 
 
-The least exciting segment appears in "The Queen of the Field Mice", a chapter
-that got cut from the _Wizard of Oz_ movie.There are two segments with
-particularly high emotion: segment 45 from "The Wonderful City of Oz", where
-the Tin Woodman and the Cowardly Lion ask the Wizard for help, and he compels
-them to defeat the Wicked Witch of the West; and segment 64, from "The
-Discovery of Oz, the Terrible", where Dorothy and her companions discover that
-the Wizard of Oz is not a wizard at all, just a common man.
+There are five segments where the rate of emotion word usage is two or more
+standard deviations above the mean for the rest of the novel. In all five
+cases, these are statistically significant differences (more than two standard
+errors above the mean). The first two interesting segments are when Dorothy
+meets the Tin Woodman and the Cowardly Lion. The next is when the Dorothy and
+her companions meet the Great Oz for the first time and he tasks them with
+defeating the Wicked Witch of the West; this is the point in the novel with
+the highest emotion word usage. The fourth interesting point is when Oz is
+revealed to be a common man, not a great wizard. The last emotional segment is
+when Dorothy and her companions leave the Emerald city feeling triumphant and
+hopeful.
 
 
 Summary
