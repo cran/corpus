@@ -5,20 +5,22 @@
     Extract token subsequences from a set of texts.
 }
 \usage{
-    text_sub(x, start = 1L, end = -1L, filter = text_filter(x))
+text_sub(x, start = 1L, end = -1L, filter = NULL, ...)
 }
 \arguments{
-    \item{x}{text vector or corpus object.}
+\item{x}{text vector or corpus object.}
 
-    \item{start}{integer vector giving the starting positions of the
-        subsequences, or a two-column integer matrix giving the starting
-        and ending positions.}
+\item{start}{integer vector giving the starting positions of the
+    subsequences, or a two-column integer matrix giving the starting
+    and ending positions.}
 
-    \item{end}{integer vector giving the ending positions of the
-        subsequences; ignored if \code{start} is a two-column matrix.}
+\item{end}{integer vector giving the ending positions of the
+    subsequences; ignored if \code{start} is a two-column matrix.}
 
-    \item{filter}{filter specifying the transformation from text to
-        token sequence.}
+\item{filter}{if non-\code{NULL}, a text filter to to use instead of
+    the default text filter for \code{x}.}
+
+\item{\dots}{additional properties to set on the text filter.}
 }
 \details{
     \code{text_sub} extracts token subsequences from a set of texts.
@@ -37,15 +39,15 @@
     \code{\link{text_tokens}}, \code{\link{text_length}}.
 }
 \examples{
-    x <- as_text(c("A man, a plan.", "A \"canal\"?", "Panama!"),
-                 filter = text_filter(drop_punct = TRUE))
+x <- as_corpus_text(c("A man, a plan.", "A \"canal\"?", "Panama!"),
+                    filter = text_filter(drop_punct = TRUE))
 
-    # entire text
-    text_sub(x, 1, -1)
+# entire text
+text_sub(x, 1, -1)
 
-    # first three elements
-    text_sub(x, 1, 3)
+# first three elements
+text_sub(x, 1, 3)
 
-    # last two elements
-    text_sub(x, -2, -1)
+# last two elements
+text_sub(x, -2, -1)
 }

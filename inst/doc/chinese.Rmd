@@ -1,15 +1,15 @@
-<!--
-%\VignetteIndexEntry{Chinese text handling}
-%\VignetteEngine{knitr::rmarkdown}
-%\VignetteEncoding{UTF-8}
--->
+---
+title: "Chinese text handling"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Chinese text handling}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
-Chinese text handling
-=====================
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE}
-knitr::opts_chunk$set(comment = "", fig.path = "chinese-", fig.retina = TRUE)
-```
+
+## Overview
 
 This vignette shows how to work with Chinese language materials using the
 corpus package.  It's based on Haiyan Wang's [rOpenSci demo](https://github.com/ropensci/textworkshop17/tree/master/demos/chineseDemo)
@@ -17,7 +17,8 @@ and assumes you have `httr`, `stringi`, and `wordcloud` installed.
 
 We'll start by loading the package and setting a seed to ensure reproducible
 results
-```{r}
+
+```r
 library("corpus")
 set.seed(100)
 ```
@@ -25,7 +26,8 @@ set.seed(100)
 ## Documents and stopwords
 
 First download a stop word list suitable for Chinese, the Baidu stop words
-```{r, message = FALSE, warning = FALSE}
+
+```r
 cstops <- "https://raw.githubusercontent.com/ropensci/textworkshop17/master/demos/chineseDemo/ChineseStopWords.txt"
 csw <- paste(readLines(cstops, encoding = "UTF-8"), collapse = "\n") # download
 csw <- gsub("\\s", "", csw)           # remove whitespace
@@ -33,7 +35,8 @@ stop_words <- strsplit(csw, ",")[[1]] # extract the comma-separated words
 ```
 Next, download some demonstration documents. These are in plain text format,
 encoded in UTF-8.
-```{r, message = FALSE, warning = FALSE}
+
+```r
 gov_reports <- "https://api.github.com/repos/ropensci/textworkshop17/contents/demos/chineseDemo/govReports"
 raw <- httr::GET(gov_reports)
 paths <- sapply(httr::content(raw), function(x) x$path)
@@ -54,37 +57,108 @@ usage rates.
 
 We use `stringi`'s tokenizer, collect a dictionary of the word types,
 and then manually insert zero-width spaces between tokens.
-```{r}
+
+```r
 toks <- stringi::stri_split_boundaries(text, type = "word")
 dict <- unique(c(toks, recursive = TRUE)) # unique words
 text2 <- sapply(toks, paste, collapse = "\u200b")
 ```
-and put the input text in a data frame for convenient analysis
-```{r}
-data <- data.frame(name = names, text = as_text(text2),
-                   stringsAsFactors = FALSE)
+and put the input text in a corpus data frame for convenient analysis
+
+```r
+data <- corpus_frame(name = names, text = text2)
 ```
 
 We then specify a token filter to determine what is counted by other corpus
 functions.  Here we set `combine = dict` so that multi-word
 tokens get treated as single entities
-```{r}
+
+```r
 f <- text_filter(drop_punct = TRUE, drop = stop_words, combine = dict)
 (text_filter(data) <- f) # set the text column's filter
+```
+
+```
+Text filter with the following options:
+
+	map_case: TRUE
+	map_quote: TRUE
+	remove_ignorable: TRUE
+	stemmer: NULL
+	stem_dropped: FALSE
+	stem_except: NULL
+	combine:  chr [1:12033] "\n" "1954" "年" "政府" "工作" "报告" ...
+	drop_letter: FALSE
+	drop_number: FALSE
+	drop_punct: TRUE
+	drop_symbol: FALSE
+	drop:  chr [1:717] "按" "按照" "俺" "俺们" "阿" "别" "别人" ...
+	drop_except: NULL
+	sent_crlf: FALSE
+	sent_suppress:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." ...
 ```
 
 ## Document statistics
 
 We can now compute type, token, and sentence counts
-```{r}
-head(data.frame(text = data$name,
-                types = text_ntype(data),
-                tokens = text_ntoken(data),
-                sentences = text_nsentence(data)))
+
+```r
+text_stats(data)
+```
+
+```
+   tokens types sentences
+1    8694  2023       453
+2   21079  2780       981
+3    9079  1342       495
+4   13009  2334       704
+5    9347  1973       412
+6   11640  2263       577
+7    3889  1128       164
+8    7303  1697       387
+9    2020   839       125
+10  11935  2744       659
+11  10652  2412       505
+12   5634  1300       342
+13  12464  2588       671
+14  11867  2478       585
+15   9018  2267       487
+16   7187  1976       413
+17   5714  1519       292
+18  10540  2149       481
+19   8694  1895       405
+20  11830  2429       653
+⋮  (49 rows total)
 ```
 and examine term frequencies
-```{r}
+
+```r
 (stats <- term_stats(data))
+```
+
+```
+   term count support
+1  发展  5627      49
+2  经济  5036      49
+3  社会  4255      49
+4  建设  4248      49
+5  人民  2897      49
+6  主义  2817      49
+7  工作  2642      49
+8  企业  2627      49
+9  国家  2595      49
+10 加强  2438      49
+11 生产  2407      49
+12 年    2021      49
+13 我国  1999      49
+14 提高  1947      49
+15 中    1860      49
+16 增长  1800      49
+17 化    1740      49
+18 继续  1670      49
+19 技术  1586      49
+20 工业  1580      49
+⋮  (11612 rows total)
 ```
 These operations all use the `text_filter(data)` value we set above to determine
 the token and sentence boundaries.
@@ -95,7 +169,8 @@ the token and sentence boundaries.
 We can visualize word frequencies with a wordcloud.  You may want to use a font
 suitable for Chinese ('STSong' is a good choice for Mac users). We switch to
 this font, create the wordcloud, then switch back.
-```{r wordcloud, message = FALSE, warning = FALSE, fig.cap = "Word cloud"}
+
+```r
 font_family <- par("family") # the previous font family
 par(family = "STSong") # change to a nice Chinese font
 with(stats, {
@@ -103,6 +178,11 @@ with(stats, {
                          random.order = FALSE, rot.per = 0.25,
                          colors = RColorBrewer::brewer.pal(8, "Dark2"))
 })
+```
+
+![Word cloud](chinese-wordcloud-1.png)
+
+```r
 par(family = font_family) # switch the font back
 ```
 
@@ -110,10 +190,36 @@ par(family = font_family) # switch the font back
 
 Here are the terms that show up in sentences containing a particular
 term
-```{r}
+
+```r
 sents <- text_split(data) # split text into sentences
 subset <- text_subset(sents, '\u6539\u9769') # select those with the term
 term_stats(subset) # count the word occurrences
+```
+
+```
+   term count support
+1  改革  2931    2457
+2  发展   866     652
+3  体制   768     649
+4  经济  1016     639
+5  推进   522     491
+6  深化   473     469
+7  社会   664     464
+8  建设   513     391
+9  制度   452     364
+10 开放   389     353
+11 企业   489     339
+12 工作   301     268
+13 积极   262     252
+14 继续   260     251
+15 管理   281     249
+16 进行   239     232
+17 加快   230     225
+18 化     261     224
+19 加强   248     224
+20 主义   275     221
+⋮  (3888 rows total)
 ```
 The first term is the search query. It appears 2931 times in the corpus,
 in 2457 different sentences. The second term in the list appears in
@@ -125,8 +231,34 @@ second and third items in the list are "development" and "system".)
 ## Keyword in context
 
 Finally, here's how we might show terms in their local context
-```{r}
+
+```r
 text_locate(data, "\u6027")
+```
+
+```
+   text            before            instance             after            
+1  1     …业方面的重要问题之一是计划    性    不足。我们现在还有许多计划不…
+2  1     …技术和提高劳动生产率的积极    性    ，对于发展经济建设很有害，因…
+3  1     …分表现了人民群众的政治积极    性    和政治觉悟的提高，充分表现了…
+4  1     …器、氢武器和其他大规模毁灭    性    武器的愿望必须满足。这些都是…
+5  2     …众在劳动战线上的高度的积极    性    和创造性，依靠全国人民在改革…
+6  2     …战线上的高度的积极性和创造    性    ，依靠全国人民在改革土地制度…
+7  2     …，已经分得了土地，生产积极    性    很高，何必实行合作化呢？我们…
+8  2     …觉悟，充分地发挥群众的积极    性    和创造性，提高劳动生产率。\n…
+9  2     …分地发挥群众的积极性和创造    性    ，提高劳动生产率。\n\n　　我…
+10 2     …必须照顾单干农户的生产积极    性    ，给单干农户以积极的帮助和领…
+11 2     …重要办法。国家从缩减非生产    性    建设的支出和行政机关的经费等…
+12 2     …，更重要的是发扬地方的积极    性    ，加强地方党政机关对农业的领…
+13 2     …策，提高农民群众的生产积极    性    ，保证这个计划的实现。地方的…
+14 2     …，刺激和发挥农民的经营积极    性    。\n\n　　有些农村的地方国家…
+15 2     …设以后，为了加强生产的计划    性    ，对许多重要原料，有的由国家…
+16 2     …进一步地提高农民的增产积极    性    ，促进农业生产的发展。这对于…
+17 2     …高农民特别是中农的生产积极    性    。\n\n　　关于粮食的计划收购…
+18 2     …害关系，从而更加积极地创造    性    地参加国家建设。\n\n　　人们…
+19 2     …，我们必须大大地削减非生产    性    建设的支出。几年来在非生产性…
+20 2     …年计划中，工业部门的非生产    性    投资只占全部投资的百分之十四…
+⋮  (1341 rows total)
 ```
 *Note: the alignment looks bad here because the Chinese characters have
 widths between 1 and 2 spaces each. The spacing in the table is set assuming

@@ -13,40 +13,40 @@
 #  limitations under the License.
 
 
-text_count <- function(x, terms, filter = text_filter(x))
+text_count <- function(x, terms, filter = NULL, ...)
 {
     with_rethrow({
-        x <- as_text(x, filter = filter)
+        x <- as_corpus_text(x, filter, ...)
         terms <- as_character_vector("terms", terms)
     })
     .Call(C_text_count, x, terms)
 }
 
 
-text_detect <- function(x, terms, filter = text_filter(x))
+text_detect <- function(x, terms, filter = NULL, ...)
 {
     with_rethrow({
-        x <- as_text(x, filter = filter)
+        x <- as_corpus_text(x, filter, ...)
         terms <- as_character_vector("terms", terms)
     })
     .Call(C_text_detect, x, terms)
 }
 
 
-text_subset <- function(x, terms, filter = text_filter(x))
+text_subset <- function(x, terms, filter = NULL, ...)
 {
     with_rethrow({
-        x <- as_text(x, filter = filter)
+        x <- as_corpus_text(x, filter, ...)
     })
     i <- text_detect(x, terms)
     x[i]
 }
 
 
-text_match <- function(x, terms, filter = text_filter(x))
+text_match <- function(x, terms, filter = NULL, ...)
 {
     with_rethrow({
-        x <- as_text(x, filter = filter)
+        x <- as_corpus_text(x, filter, ...)
     })
 
     if (!(is.null(terms) || is.character(terms))) {
@@ -77,20 +77,43 @@ text_match <- function(x, terms, filter = text_filter(x))
 }
 
 
-text_locate <- function(x, terms, filter = text_filter(x), random = FALSE)
+text_locate <- function(x, terms, filter = NULL, random = FALSE, ...)
 {
+    if (!missing(random)) {
+        warning("argument 'random' is deprecated; use the 'text_sample' function instead.",
+                call. = FALSE)
+        if (random) {
+            return(text_sample(x, terms, filter = filter, ...))
+        }
+    }
+
     with_rethrow({
-        x <- as_text(x, filter = filter)
+        x <- as_corpus_text(x, filter, ...)
         terms <- as_character_vector("terms", terms)
-        random <- as_option("random", random)
     })
 
     ans <- .Call(C_text_locate, x, terms)
     ans$text <- structure(ans$text, levels = labels(x), class = "factor")
-    if (random) {
-        o <- sample.int(nrow(ans))
-        ans <- ans[o,]
+    ans
+}
+
+
+text_sample <- function(x, terms, size = NULL, filter = NULL, ...)
+{
+    with_rethrow({
+        x <- as_corpus_text(x, filter, ...)
+        terms <- as_character_vector("terms", terms)
+        size <- as_nonnegative("size", size)
+    })
+
+    loc <- text_locate(x, terms, filter,, ...)
+    nloc <- nrow(loc)
+    if (is.null(size)) {
+        size <- nloc
     }
+    o <- sample.int(nloc, min(size, nloc))
+    ans <- loc[o,]
+    row.names(ans) <- NULL
     ans
 }
 
@@ -123,22 +146,22 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
             colwidths[[i]] <- 0
             nctx <- nctx + 1
         } else {
-            w = utf8_width(nm)
+            w <- utf8_width(nm)
             j <- justify
             if (nm == "text") {
-                # use as_text to format an integer text id like
+                # use as_corpus_text to format an integer text id like
                 # a character label
-                rval[[i]] <- format(as_text(x[[i]]), width = 4,
+                rval[[i]] <- format(as_corpus_text(x[[i]]), width = 4,
                                     chars = charmax, display = display,
                                     justify = j)
             } else if (nm == "instance") {
                 j <- "centre"
-                rval[[i]] <- format(as_text(x[[i]]), width = 8,
+                rval[[i]] <- format(as_corpus_text(x[[i]]), width = 8,
                                     chars = charmax, display = display,
                                     justify = j)
             } else {
-                rval[[i]] = format(x[[i]], width = w, ...,
-                                   display = display, justify = j)
+                rval[[i]] <- format(x[[i]], width = w, ...,
+                                    display = display, justify = j)
             }
             colwidths[[i]] <- max(w, utf8_width(rval[[i]]))
             names[[i]] <- format(nm, width = colwidths[[i]],
@@ -146,7 +169,7 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
         }
     }
 
-    row_names <- format(as_text(rownames(x)), width = 0, chars = charmax,
+    row_names <- format(as_corpus_text(rownames(x)), width = 0, chars = charmax,
                         display = display, jusitfy = "left")
     colwidths <- c(colwidths, max(0, utf8_width(row_names)))
 
@@ -184,9 +207,42 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
 print.corpus_text_locate <- function(x, rows = 20L, print.gap = NULL,
                                      display = TRUE, ...)
 {
-    fmt <- format.corpus_text_locate(x, print.gap = print.gap,
+    if (!is.data.frame(x)) {
+        stop("argument is not a data frame")
+    }
+    n <- nrow(x)
+
+    with_rethrow({
+        rows <- as_rows("rows", rows)
+        print.gap <- as_print_gap("print_gap", print.gap)
+        display <- as_option("display", display)
+    })
+
+    if (is.null(rows) || rows < 0) {
+        rows <- .Machine$integer.max
+    }
+
+    trunc <- (!is.null(rows) && n > rows)
+    if (trunc) {
+        xsub <- x[seq_len(rows), , drop = FALSE]
+    } else {
+        xsub <- x
+    }
+
+    fmt <- format.corpus_text_locate(xsub, print.gap = print.gap,
                                      display = display, ...)
-    print.corpus_frame(fmt, rows = rows, chars = .Machine$integer.max,
-                       print.gap = print.gap)
+    print.corpus_frame(fmt, rows = .Machine$integer.max,
+                       chars = .Machine$integer.max, print.gap = print.gap)
+    if (trunc) {
+        name_width <- max(0, utf8_width(rownames(fmt)))
+
+        ellipsis <- ifelse(Sys.getlocale("LC_CTYPE") == "C", ".", "\u22ee")
+        ellipsis <- substr(ellipsis, 1, name_width)
+        gap <- if (is.null(print.gap)) 1 else print.gap
+
+        space <- format(ellipsis, width = name_width + gap)
+        cat(sprintf("%s(%d rows total)\n", space, n))
+    }
+
     invisible(x)
 }

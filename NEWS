@@ -1,297 +1,443 @@
-Changes in version 0.9.1
+corpus 0.9.2
+============
 
- * Fix buffer overrun for case folding some Greek letters.
+NEW FEATURES
 
- * Fix memory leak in read_ndjson.
+  * New package website, http://corpustext.com
 
- * Fix memory leak in JSON object deserialization.
+  * Add support for tm Corpus and quanteda corpus objects; all functions
+    expecting text (text_tokens(), term_matrix(), etc.) should work
+    seamlessly on these objects.
 
- * Fix memory leak in term_stats.
+  * Add gutenberg_corpus() for downloading a corpus from Project Gutenberg.
 
- * Rename 'wnaffect' to 'affect_wordnet'.
+  * Add ... arguments to all text functions, for overriding individual
+    text_filter() properties.
 
+  * Add sentiment_afinn, the AFINN sentiment lexicon.
 
-Changes in version 0.9.0 (2017-07-19)
+  * Add text_sample() for getting a random sample of term instances.
 
- * Add new vignette, "Introduction to corpus" vignette.
+  * Add na.omit(), na.exclude(), na.fail() implementations for
+    corpus_frame and corpus_text.
 
- * Add `random` argument to `text_locate` for random order.
+MINOR IMPROVEMENTS
 
- * Change format.corpus_frame to use elastic column widths for text.
+  * Switch as_utf8() default argument to normalize = FALSE.
 
- * Allow `rows = -1` for print.corpus_frame to print all rows.
+  * Re-order as_corpus_text() and as_corpus_frame() arguments; make
+    both accept ... arguments to override individual text filter properities.
 
- * Add corpus(), as_corpus(), is_corpus() functions.
+  * Add missing single-letter initials to English abbreviation list.
 
- * Make text_split() split into evenly-sized blocks, with the 'size'
-   argument specifying the maximum block size.
+  * Adaptively increase buffer size for read_ndjson() so that large
+    files can be read quickly.
 
- * Following *quanteda*, add "will" to the English stop word list.
+  * Make summary() on a corpus_text object report statistics for the
+    number of tokens and types.
 
- * Add special handling for hyphens so that, for example, "world-wide"
-   is a single token (but "-world-wide-" is three tokens).
+  * Switch to 2-letter language codes for stemming algorithms.
 
- * Merged 'url' and 'symbol' word categories.  Removed 'other' word
-   category (ignore these characters).
+BUG FIXES
 
- * Renamed term_counts() to term_stats().
+  * Fix bug in utf8_normalize() when the input contains a backslash (\).
 
- * Added text_stats() function.
+  * Fix bug in term_matrix() column names (non-ASCII names were getting
+    replaced by Unicode escapes).
 
- * Removed deprecated functions token_filter() and sentence_filter().
+  * Work around R Windows bug in converting native to UTF-8; described at
+    https://bugs.r-project.org/bugzilla/show_bug.cgi?id=17329 .
 
- * Removed 'term' column from text_locate() output.
+  * Make comparison operations on text vectors keep names if arguments
+    have them.
 
- * Added text_match() function to return matching terms as a factor.
+DEPRECATED AND DEFUNCT
 
- * Change stemmer so that it only modifies tokens of kind "letter",
-   preserving "number", "symbol", "url", etc.
+  * Renamed corpus(), as_corpus() and is_corpus() to corpus_frame(),
+    as_corpus_frame() and is_corpus_frame() to avoid name clashes with
+    other packages.
 
- * Removed 'map_compat' option from text_filter(); use utf8_normalize()
-   instead if you need to apply compatibility maps.
+  * Renamed as_text() and is_text() to as_corpus_text() and
+    is_corpus_text() to avoid name clashes with other packages.
 
- * Implemented text subset assignment operators `[<-` and `[[<-`.
+  * Rename term_frame() to term_counts().
 
- * Switched to more efficient c.corpus_text() function.
+  * Deprecate text_locate() random argument; use text_sample() instead.
 
- * Added utf8_normalize() function for translating to NFC normal form,
-   applying case and compatibility maps.
+  * Remove old deprecated term_counts() function; use term_stats() instead.
 
- * Make text_locate() return "text" column as a factor.
+  * Deprecate abbreviations() and stopwords() function in favor of data
+    objects: abbreviations_en, stopwords_en, stopwords_fr, etc.
 
- * Constrain text names() to be unique, non-missing.
 
- * Added "names" argument to as_text for overriding default names.
+corpus 0.9.1 (2017-08-20)
+=========================
 
- * Added text_sub() for getting token sub-sequences.
+BUG FIXES
 
- * Added text_length() for text length, including NA tokens.
+  * Fix buffer overrun for case folding some Greek letters.
 
- * Added checks for underflow in read_ndjson() double deserialization.
+  * Fix memory leak in read_ndjson().
 
- * Fixed bug in `text_filter<-` where assignment did not make a deep copy
-   of the object.
+  * Fix memory leak in JSON object deserialization.
 
- * Fixed bug in utf8_format, utf8_print, utf8_width where internal
-   double quotes were not escaped.
+  * Fix memory leak in term_stats().
 
- * Fixed rchk, UBSAN warnings.
+DEPRECATED AND DEFUNCT
 
+  * Rename wnaffect to affect_wordnet.
 
-Changes in version 0.8.0 (2017-07-18)
 
- * Added text_filter() generic. Deprecate token_filter() and
-   sentence_filter().
+corpus 0.9.0 (2017-08-19)
+=========================
 
- * Added text_filter()<- setter for text vectors.
+NEW FEATURES
 
- * Use a text's text_filter() attribute as a default in all text_*
-   functions expecting a filter argument.
+  * Add corpus(), as_corpus(), is_corpus() functions.
 
- * Handle @mentions, #hashtags, and URLs in word tokenizer.
+  * Make text_split() split into evenly-sized blocks, with the 'size'
+    argument specifying the maximum block size.
 
- * Added the _Federalist Papers_ dataset ("federalist").
+  * Added text_stats() function.
 
- * term_counts() now reports the "support" for each term (the number of
-   texts containing the term), and has options for restricting output by
-   the minimum and maximum support.
+  * Added text_match() function to return matching terms as a factor.
 
- * Added new class "corpus_frame" to support better printing of
-   data frame objects: left-align text data, truncate output to screen
-   width, display emoji on Mac OS. Use this class for all data frame
-   return values.
+  * Implemented text subset assignment operators [<- and [[<-.
 
- * Added functions for validating and converting to UTF-8: as_utf8(),
-   utf8_valid().
+  * Added utf8_normalize() function for translating to NFC normal form,
+    applying case and compatibility maps.
 
- * Added functions for formatting and printing utf8 text: utf8_encode(),
-   utf8_format(), utf8_print(), utf8_valid(), and utf8_width().
+  * Added text_sub() for getting token sub-sequences.
 
- * Added a "unicode" vignette.
+  * Added text_length() for text length, including NA tokens.
 
- * Converted the "chinese" demo to a vignette. Thanks to Will Lowe for
-   contributing.
+MINOR IMPROVEMENTS
 
- * Make text_split() and term_frame() return parent text as a factor.
+  * Add new vignette, "Introduction to corpus".
 
- * Remove stringsAsFactors option from read_ndjson(); deserialize all
-   JSON string fields as character by default.
+  * Add random argument to text_locate for random order.
 
- * read_ndjson() de-serializes zero-length arrays as integer(), logical(),
-   etc. instead of as NULL.
+  * Change format.corpus_frame to use elastic column widths for text.
 
- * Fixed a bug where read_ndjson() would de-serialize a boolean "null"
-   as FALSE instead of NA.
+  * Allow rows = -1 for print.corpus_frame to print all rows.
 
- * Allow user interrupts (control-c) in all long-running C computations.
+  * Following quanteda, add "will" to the English stop word list.
 
+  * Add special handling for hyphens so that, for example, "world-wide"
+    is a single token (but "-world-wide-" is three tokens).
 
-Changes in version 0.7.0 (2017-06-22)
+  * Merged "url" and "symbol" word categories.  Removed "other" word
+    category (ignore these characters).
 
- * Add text_locate(), for searching for specific terms in text,
-   reporting the contexts of the occurrences ("Key words in context").
+  * Change stemmer so that it only modifies tokens of kind "letter",
+    preserving "number", "symbol", "url", etc.
 
- * Add text_count() and text_detect() for counting term occurrences or
-   checking for a term's existence in a text.
+  * Switched to more efficient c.corpus_text() function.
 
- * Add text_types() and text_ntype() for returning the unique types in
-   a text, or counting types.
+  * Make text_locate() return "text" column as a factor.
 
- * Rename tokens() to text_tokens() for consistency; add text_ntoken().
+  * Constrain text names() to be unique, non-missing.
 
- * Add text_nsentence() for counting sentences.
+  * Added "names" argument to as_text() for overriding default names.
 
- * Add term_frame(), reporting term frequencies as a data frame with
-   columns "text", "term", and "count".
+BUG FIXES
 
- * Add transpose argument to term_matrix().
+  * Added checks for underflow in read_ndjson() double deserialization.
 
- * Add new version of format.corpus_text() that is faster and aware
-   of character widths, in particular, Emoji and East Asian character
-   widths.
+  * Fixed bug in text_filter<- where assignment did not make a deep copy
+    of the object.
 
- * Rename term_counts() "min" and "max" arguments to "min_count" and
-   "max_count".
+  * Fixed bug in utf8_format(), utf8_print(), utf8_width() where internal
+    double quotes were not escaped.
 
- * Normalize token filter combine, drop, drop_except, stem_except arguments,
-   to allow passing cased versions of these arguments.
+  * Fixed rchk, UBSAN warnings.
 
- * Set combine = abbreviations("english") by default.
+DEPRECATED AND DEFUNCT
 
- * Fixed bug where "u.s" (a unigram) stems to "u.s" (a bigram), and then
-   causes for term_matrix() select.  Thanks to Dmitriy Selivanov for
-   reporting: https://github.com/patperry/r-corpus/issues/3 .
+  * Renamed term_counts() to term_stats().
 
+  * Removed deprecated functions token_filter() and sentence_filter().
 
-Changes in version 0.6.0 (2017-06-06)
+  * Removed term column from text_locate() output.
 
- * Rename text_filter() to token_filter().
+  * Removed map_compat option from ext_filter(); use utf8_normalize()
+    instead if you need to apply compatibility maps.
 
- * Add "ngrams" options for term_counts() and term_matrix().
 
- * Add term_counts() "min" and "max" options for excluding terms with
-   counts below or above specified limits.
+corpus 0.8.0 (2017-07-18)
+=========================
 
- * Add term_counts() "limit" option to limit the number of reported terms.
+NEW FEATURES
 
- * Add term_counts() "types" option for reporting the types that make up
-   a term.
+  * Added text_filter() generic.
 
- * Remove "select" argument from token_filter(), but add "select" to
-   term_matrix() arguments.
+  * Added text_filter()<- setter for text vectors.
 
- * Replace sentences() function with text_split(), which has options for
-   breaking into multi-sentence blocks or multi-token blocks.
+  * Use a text's text_filter() attribute as a default in all text_*
+    functions expecting a filter argument.
 
- * Add sentence break suppressions (special handling for abbreviations);
-   the default behavior for text_split(, "sentences") is to use a set of
-   English abbreviations as suppressions.
+  * Added the _Federalist Papers_ dataset (federalist).
 
- * Add option to treat CR and LF like spaces when determining sentence
-   boundaries; this is now the default.
+  * Added functions for validating and converting to UTF-8: as_utf8(),
+    utf8_valid().
 
- * Add abbreviations() function with abbreviation lists for English,
-   French, German, Italian, Portuguese, and Russian (from the Unicode
-   Common Locale Data Repository).
+  * Added functions for formatting and printing utf8 text: utf8_encode(),
+    utf8_format(), utf8_print(), utf8_valid(), and utf8_width().
 
- * Add more refined control over token_filter() drop cateogries:
-   merged "kana", and "ideo" into "letter"; split off "punct", "mark",
-   and "other" from "symbol".
+MINOR IMPROVEMENTS
 
- * Remove "remove_control", "map_dash", and "remove_space" type
-   normalization options from text_filter().
+  * Handle @mentions, #hashtags, and URLs in word tokenizer.
 
- * Remove "ignore_empty" token filter option.
+  * term_counts() now reports the support for each term (the number of
+    texts containing the term), and has options for restricting output by
+    the minimum and maximum support.
 
+  * Added new class corpus_frame to support better printing of
+    data frame objects: left-align text data, truncate output to screen
+    width, display emoji on Mac OS. Use this class for all data frame
+    return values.
 
-Changes in version 0.5.1 (2017-05-25)
+  * Added a "unicode" vignette.
 
- * Rename "text" class to "corpus_text" to avoid name classes with grid.
-   Thanks to Jeroen Ooms for reporting:
-   https://github.com/patperry/corpus/issues/1
+  * Converted the "chinese" demo to a vignette. Thanks to Will Lowe for
+    contributing.
 
- * Rename "jsondata" to "corpus_json" for consistency.
+  * Make text_split() and term_frame() return parent text as a factor.
 
- * Fix bug in read_ndjson() for reading factors with missing values.
+  * Remove stringsAsFactors option from read_ndjson(); deserialize all
+    JSON string fields as character by default.
 
+  * read_ndjson() de-serializes zero-length arrays as integer(),
+    logical(), etc. instead of as NULL.
 
-Changes in version 0.5.0 (2017-05-23)
+  * Allow user interrupts (control-C) in all long-running C computations.
 
- * Add term_counts() function to tabulate term frequencies.
+DEPRECATED AND DEFUNCT
 
- * Add term_matrix() function to compute a term frequency matrix.
+  * Deprecate token_filter() and sentence_filter().
 
- * Add text_filter() option ("stem_except") to exempt specific terms from
-   stemming.
+BUG FIXES
 
- * Add text_filter() option ("drop") to drop specific terms, along with
-   option ("drop_except") to exempt specific terms from dropping.
+  * Fixed a bug where read_ndjson() would de-serialize a boolean null
+    as FALSE instead of NA.
 
- * Add text_filter() option ("combine") to combine multi-word phrases like
-   "new york city" into a single term.
 
- * Add text_filter() option ("select") to select specific terms (excluding
-   all words that are not on this list).
+corpus 0.7.0 (2017-06-22)
+=========================
 
- * Rename text_filter() options "fold_case", "fold_dash", "fold_quote"
-   to "map_case", "map_dash", "map_quote".
+NEW FEATURES
 
- * Add stopwords() function.
+  * Add text_locate(), for searching for specific terms in text,
+    reporting the contexts of the occurrences ("Key words in context").
 
- * Make read_ndjson() decode JSON strings as character or factor (according
-   to whether "stringsAsFactors" is TRUE) except for fields named "text",
-   which get decoded as text objects.
+  * Add text_count() and text_detect() for counting term occurrences or
+    checking for a term's existence in a text.
 
+  * Add text_types() and text_ntype() for returning the unique types in
+    a text, or counting types.
 
-Changes in version 0.4.0 (2017-05-16)
+  * Add text_nsentence() for counting sentences.
 
- * Allow read_ndjson() to read from connections, not just files, by
-   reading the file contents into memory first. Use this by default
-   instead of memory mapping.
+  * Add term_frame(), reporting term frequencies as a data frame with
+    columns "text", "term", and "count".
 
- * Rename text_filter() option "drop_empty" to "ignore_empty".
+MINOR IMPROVEMENTS
 
- * Add text_filter() options "drop_symbol", "drop_number", "drop_letter",
-   "drop_kana", and "drop_ideo"; these options replace the matched tokens
-   with NA.
+  * Add transpose argument to term_matrix().
 
- * Fix internal function namespace clashes on Linux and other similar
-   platforms.
+  * Add new version of format.corpus_text() that is faster and aware
+    of character widths, in particular, Emoji and East Asian character
+    widths.
 
+  * Normalize token filter combine, drop, drop_except, stem_except
+    arguments, to allow passing cased versions of these arguments.
 
-Changes in version 0.3.0 (2017-05-04)
+  * Set combine = abbreviations("english") by default.
 
- * Support for serializing dataset and text objects via readRDS() and
-   other native routines.  Unfortunately, this support doesn't come for
-   free, and the objects take a little bit more memory.
+DEPRECATED AND DEFUNCT
 
- * More convenient interface for accessing JSON arrays.
+  * Rename tokens() to text_tokens() for consistency; add text_ntoken().
 
- * Rename as.text()/is.text() to as_text()/is_text(); make as_text()
-   retain names, work on S3 objects.
+  * Rename term_counts() min and max arguments to min_count and
+    max_count.
 
- * Add support for stemming via the Snowball library.
+BUG FIXES
 
- * Rename read_json() to read_ndjson() to not clash with jsonlite.
+  * Fixed bug where "u.s" (a unigram) stems to "u.s" (a bigram), and then
+    causes for term_matrix() select.  Thanks to Dmitriy Selivanov for
+    reporting: https://github.com/patperry/r-corpus/issues/3 .
 
- * Rename "dataset" type to "jsondata".
 
- * Make read_ndjson() return a data frame by default, not a "jsondata"
-   object.
+corpus 0.6.0 (2017-06-06)
+=========================
 
+NEW FEATURES
 
-Changes in version 0.2.0 (2017-04-15)
+  * Add ngrams options for term_counts() and term_matrix().
 
- * First CRAN release.
+  * Add sentence break suppressions (special handling for abbreviations);
+    the default behavior for text_split(, "sentences") is to use a set of
+    English abbreviations as suppressions.
 
- * Added Windows support.
+  * Add option to treat CR and LF like spaces when determining sentence
+    boundaries; this is now the default.
 
- * Added support for setting names on text objects.
+MINOR IMPROVEMENTS
 
- * Added documentation.
+  * Add term_counts() min and max options for excluding terms with
+    counts below or above specified limits.
 
+  * Add term_counts() limit option to limit the number of reported terms.
 
-Changes in version 0.1.0 (2017-04-11)
+  * Add term_counts() types option for reporting the types that make up
+    a term.
 
- * First milestone, with support for JSON decoding, text segmentation,
-   and text normalization.
+  * Add abbreviations() function with abbreviation lists for English,
+    French, German, Italian, Portuguese, and Russian (from the Unicode
+    Common Locale Data Repository).
+
+  * Add more refined control over token_filter() drop cateogries:
+    merged "kana", and "ideo" into "letter"; split off "punct",
+    "mark", and "other" from "symbol".
+
+DEPRECATED AND DEFUNCT
+
+  * Rename text_filter() to token_filter().
+
+  * Remove select argument from token_filter(), but add select to
+    term_matrix() arguments.
+
+  * Replace sentences() function with text_split(), which has options for
+    breaking into multi-sentence blocks or multi-token blocks.
+
+  * Remove remove_control, map_dash, and remove_space type
+    normalization options from text_filter().
+
+  * Remove ignore_empty token filter option.
+
+
+corpus 0.5.1 (2017-05-25)
+=========================
+
+DEPRECATED AND DEFUNCT
+
+  * Rename "text" class to "corpus_text" to avoid name classes with grid.
+    Thanks to Jeroen Ooms for reporting:
+    https://github.com/patperry/corpus/issues/1
+
+  * Rename "jsondata" to "corpus_json" for consistency.
+
+BUG FIXES
+
+  * Fix bug in read_ndjson() for reading factors with missing values.
+
+
+corpus 0.5.0 (2017-05-23)
+=========================
+
+NEW FEATURES
+
+  * Add term_counts() function to tabulate term frequencies.
+
+  * Add term_matrix() function to compute a term frequency matrix.
+
+  * Add text_filter() option (stem_except) to exempt specific terms from
+    stemming.
+
+  * Add text_filter() option (drop) to drop specific terms, along with
+    option (drop_except) to exempt specific terms from dropping.
+
+  * Add text_filter() option (combine) to combine multi-word phrases like
+    "new york city" into a single term.
+
+  * Add text_filter() option (select) to select specific terms (excluding
+    all words that are not on this list).
+
+MINOR IMPROVEMENTS
+
+  * Add stopwords() function.
+
+  * Make read_ndjson() decode JSON strings as character or factor (according
+    to whether stringsAsFactors is TRUE) except for fields named "text",
+    which get decoded as text objects.
+
+DEPRECATED AND DEFUNCT
+
+  * Rename text_filter() options fold_case, fold_dash, fold_quote
+    to map_case, map_dash, map_quote.
+
+
+corpus 0.4.0 (2017-05-16)
+=========================
+
+NEW FEATURES
+
+  * Allow read_ndjson() to read from connections, not just files, by
+    reading the file contents into memory first. Use this by default
+    instead of memory mapping.
+
+MINOR IMPROVEMENTS
+
+  * Add text_filter() options drop_symbol, drop_number, drop_letter,
+    drop_kana, and drop_ideo; these options replace the matched tokens
+    with NA.
+
+BUG FIXES
+
+  * Fix internal function namespace clashes on Linux and other similar
+    platforms.
+
+DEPRECATED AND DEFUNCT
+
+  * Rename text_filter() option drop_empty to ignore_empty.
+
+
+corpus 0.3.0 (2017-05-04)
+=========================
+
+NEW FEATURES
+
+  * Support for serializing dataset and text objects via readRDS() and
+    other native routines.  Unfortunately, this support doesn't come for
+    free, and the objects take a little bit more memory.
+
+  * Add support for stemming via the Snowball library.
+
+MINOR IMPROVEMENTS
+
+  * More convenient interface for accessing JSON arrays.
+
+  * Make read_ndjson() return a data frame by default, not a "jsondata"
+    object.
+
+DEPRECATED AND DEFUNCT
+
+  * Rename as.text()/is.text() to as_text()/is_text(); make
+    as_text() retain names, work on S3 objects.
+
+  * Rename read_json() to read_ndjson() to not clash with jsonlite.
+
+  * Rename "dataset" type to "jsondata".
+
+
+corpus 0.2.0 (2017-04-15)
+=========================
+
+NEW FEATURES
+
+  * First CRAN release.
+
+  * Added Windows support.
+
+  * Added support for setting names on text objects.
+
+  * Added documentation.
+
+
+corpus 0.1.0 (2017-04-11)
+=========================
+
+NEW FEATURES
+
+  * First milestone, with support for JSON decoding, text segmentation,
+    and text normalization.

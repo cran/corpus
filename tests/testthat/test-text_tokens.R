@@ -28,7 +28,7 @@ test_that("'text_tokens' normalizes tokens by default", {
 
 
 test_that("'text_tokens' propagates names if its argument has them", {
-    text <- as_text(c(a="First sentence.", b="Second sentence!"))
+    text <- as_corpus_text(c(a="First sentence.", b="Second sentence!"))
     ctext <- c(a="First sentence.", b="Second sentence!")
 
     toks <- text_tokens(text)
@@ -67,6 +67,8 @@ test_that("'text_tokens' should work on S3 objects", {
     toks <- text_tokens(x)
     toks2 <- text_tokens(x2)
     expect_equal(toks, toks2)
+
+    remove("as.character.upper", envir = .GlobalEnv)
 })
 
 
@@ -97,7 +99,7 @@ test_that("'text_tokens' can drop letter words", {
 test_that("'text_tokens' can drop tokens", {
     x <- c("Able was I ere I saw Elba.",
            "A man, a plan, a canal: Panama.")
-    f <- text_filter(drop = stopwords("english"))
+    f <- text_filter(drop = stopwords_en)
     expect_equal(text_tokens(x, f),
                  list(c("able", NA, NA, "ere", NA, "saw", "elba", "."),
                       c(NA, "man", ",", NA, "plan", ",", NA, "canal", ":",

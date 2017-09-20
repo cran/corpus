@@ -15,7 +15,7 @@
 
 with_rethrow <- function(expr)
 {
-    parentcall <- sys.call(1)
+    parentcall <- sys.call(-1)
     eval(envir = parent.frame(),
         withCallingHandlers(expr,
             error = function(e, call = parentcall) {
@@ -29,8 +29,21 @@ with_rethrow <- function(expr)
             },
             message = function(m, call = parentcall) {
                 m$call <- call
-                message(m)
             }
         )
     )
+}
+
+
+with_package <- function(package, expr)
+{
+    if (!isNamespaceLoaded(package)) {
+        if (!requireNamespace(package, quietly = TRUE)) {
+            stop(sprintf("Failed attaching name space for package '%s'",
+                         package))
+        }
+    }
+
+    force(expr)
+    expr
 }

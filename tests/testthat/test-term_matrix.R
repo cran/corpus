@@ -118,7 +118,7 @@ test_that("'term_matrix can select ngrams", {
 test_that("'term_matrix' can select stemmed bigrams", {
     text <- "A sentence. Another sentence. Others..."
     f <- text_filter(stemmer = "english", drop_punct = TRUE,
-                      drop = stopwords("english"))
+                     drop = stopwords_en)
     select <- c("sentenc", "anoth", "anoth sentenc")
     x0 <- term_matrix(text, f, select = select)
     x <- Matrix::sparseMatrix(i = c(1, 1, 1),
@@ -172,48 +172,12 @@ test_that("'term_matrix' can select types ending in '.s", {
 })
 
 
-test_that("'term_frame' gives equivalent results to 'term_matrix'", {
-    text <- c(a="A rose is a rose is a rose.",
-              b="A Rose is red, a violet is blue!",
-              c="A rose by any other name would smell as sweet.")
-    x <- term_matrix(text)
-    tf <- term_frame(text)
-    xtf <- Matrix::sparseMatrix(i = as.integer(tf$text),
-                                j = as.integer(factor(tf$term, levels = colnames(x))),
-                                x = tf$count,
-                                dimnames = list(levels(tf$text),
-                                                colnames(x)))
-    expect_equal(x, xtf)
-})
+test_that("'term_matrix' can handle mmapped JSON with escapes", {
+    tmp <- tempfile()
+    writeLines('{"text": "\\u00a3"}', tmp)
+    on.exit(unlink(tmp))
 
-
-test_that("'term_frame' gives equivalent results to 'term_matrix' no names", {
-    text <- c("A rose is a rose is a rose.",
-              "A Rose is red, a violet is blue!",
-              "A rose by any other name would smell as sweet.")
-    x <- term_matrix(text)
-    rownames(x) <- as.character(seq_along(text))
-    tf <- term_frame(text)
-    xtf <- Matrix::sparseMatrix(i = as.integer(tf$text),
-                                j = as.integer(factor(tf$term, levels = colnames(x))),
-                                x = tf$count,
-                                dimnames = list(levels(tf$text),
-                                                colnames(x)))
-    expect_equal(x, xtf)
-})
-
-
-test_that("'term_frame' with group gives equivalent results to 'term_matrix'", {
-    text <- c(a="A rose is a rose is a rose.",
-              b="A Rose is red, a violet is blue!",
-              c="A rose by any other name would smell as sweet.")
-    g <- factor(c("X", "Y", "X"))
-    x <- term_matrix(text, group = g)
-    tf <- term_frame(text, group = g)
-    xtf <- Matrix::sparseMatrix(i = as.integer(tf$group),
-                                j = as.integer(factor(tf$term, levels = colnames(x))),
-                                x = tf$count,
-                                dimnames = list(levels(tf$group),
-                                                colnames(x)))
-    expect_equal(x, xtf)
+    data <- read_ndjson(tmp, mmap = TRUE, text = "text")
+    x <- term_matrix(data)
+    expect_equal(colnames(x), "\u00a3")
 })

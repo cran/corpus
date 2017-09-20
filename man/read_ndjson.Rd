@@ -7,7 +7,7 @@
     (NDJSON) format.
 }
 \usage{
-    read_ndjson(file, mmap = FALSE, simplify = TRUE, text = NULL)
+read_ndjson(file, mmap = FALSE, simplify = TRUE, text = NULL)
 }
 \arguments{
     \item{file}{the name of the file which the data are to be read from,
@@ -84,24 +84,24 @@
     the result is a \code{corpus_json} object.
 }
 \seealso{
-    \code{\link{as_text}}, \code{\link{as_utf8}}.
+    \code{\link{as_corpus_text}}, \code{\link{as_utf8}}.
 }
 \examples{
-    # Memory mapping
-    lines <- c('{ "a": 1, "b": true }',
-               '{ "b": false, "nested": { "c": 100, "d": false }}',
-               '{ "a": 3.14, "nested": { "d": true }}')
-    file <- tempfile()
-    writeLines(lines, file)
-    (data <- read_ndjson(file, mmap = TRUE))
+# Memory mapping
+lines <- c('{ "a": 1, "b": true }',
+           '{ "b": false, "nested": { "c": 100, "d": false }}',
+           '{ "a": 3.14, "nested": { "d": true }}')
+file <- tempfile()
+writeLines(lines, file)
+(data <- read_ndjson(file, mmap = TRUE))
 
-    data$a
-    data$b
-    data$nested.c
-    data$nested.d
+data$a
+data$b
+data$nested.c
+data$nested.d
 
-    rm("data")
-    gc() # force the garbage collector to release the memory-map
-    file.remove(file)
+rm("data")
+invisible(gc()) # force the garbage collector to release the memory-map
+file.remove(file)
 }
 \keyword{file}

@@ -1,48 +1,56 @@
 \name{corpus-deprecated}
 \alias{corpus-deprecated}
-\alias{term_counts}
+\alias{as_corpus}
+\alias{as_text}
+\alias{is_corpus}
+\alias{is_text}
+\alias{term_frame}
 \title{Deprecated Functions in Package \pkg{corpus}}
 \description{
-  These functions are provided for compatibility with older versions of
-  \pkg{corpus} only, and may be defunct as soon as the next release.
+These functions are provided for compatibility with older versions of
+\pkg{corpus} only, and may be defunct as soon as the next release.
 }
 \usage{
-    term_counts(x, filter = text_filter(x), weights = NULL,
-                ngrams = NULL, min_count = NULL, max_count = NULL,
-                min_support = NULL, max_support = NULL, types = FALSE)
+corpus(..., row.names = NULL, filter = NULL)
+
+as_corpus(x, filter = NULL, ..., row.names = NULL)
+
+as_text(x, filter = NULL, ..., names = NULL)
+
+is_corpus(x)
+
+is_text(x)
+
+term_frame(x, filter = NULL, weights = NULL,
+           ngrams = NULL, select = NULL, group = NULL, ...)
 }
 \arguments{
-    \item{x}{a text vector to tokenize.}
+\item{x}{Deprecated.}
 
-    \item{filter}{a token filter specifying the tokenization rules.}
+\item{filter}{Deprecated.}
 
-    \item{weights}{a numeric vector the same length of \code{x} assigning
-        weights to each text, or \code{NULL} for unit weights.}
+\item{group}{Deprecated.}
 
-    \item{ngrams}{an integer vector of n-gram lengths to include, or
-        \code{NULL} for length-1 n-grams only.}
+\item{names}{Deprecated.}
 
-    \item{min_count}{a numeric scalar giving the minimum term count to include
-        in the output, or \code{NULL} for no minimum count.}
+\item{ngrams}{Deprecated.}
 
-    \item{max_count}{a numeric scalar giving the maximum term count to include
-        in the output, or \code{NULL} for no maximum count.}
+\item{row.names}{Deprecated.}
 
-    \item{min_support}{a numeric scalar giving the minimum term support to
-        include in the output, or \code{NULL} for no minimum support.}
+\item{select}{Deprecated.}
 
-    \item{max_support}{a numeric scalar giving the maximum term support to
-        include in the output, or \code{NULL} for no maximum support.}
+\item{weights}{Deprecated.}
 
-    \item{types}{a logical value indicating whether to include columns for
-        the types that make up the terms.}
+\item{\dots}{Deprecated.}
 }
 \details{
-    The \code{term_counts} function is deprecated, renamed to
-    \code{\link{term_stats}}.
+These functions are deprecated; use \code{\link{corpus_frame}},
+\code{\link{as_corpus_frame}}, \code{\link{as_corpus_text}},
+\code{\link{is_corpus_frame}}, \code{\link{is_corpus_text}},
+or \code{\link{term_matrix}} instead.
 }
 \seealso{
-  \code{\link{Deprecated}}
+\code{\link{Deprecated}}
 }
 \keyword{internal}
 \keyword{misc}

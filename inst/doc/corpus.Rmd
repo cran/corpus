@@ -1,16 +1,13 @@
-<!--
-%\VignetteIndexEntry{Introduction to corpus}
-%\VignetteEngine{knitr::rmarkdown}
-%\VignetteEncoding{UTF-8}
--->
+---
+title: "Introduction to corpus"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to corpus}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
-Introduction to *corpus*
-========================
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE}
-knitr::opts_chunk$set(comment = "", fig.path = "corpus-", fig.retina = TRUE)
-options(width = 100)
-```
 
 Overview
 --------
@@ -26,7 +23,8 @@ Setup
 We load the *corpus* package, set the color palette, and set the random number
 generator seed.  We will not use any external packages in this vignette.
 
-```{r}
+
+```r
 library("corpus")
 
 # colors from RColorBrewer::brewer.pal(6, "Set1")
@@ -44,7 +42,8 @@ The *The Wonderful Wizard of Oz* is available as
 [Project Gutenberg EBook #55][gutenberg-oz]. We first download the text and
 strip off the Project Gutenberg header and footer.
 
-```{r}
+
+```r
 url <- "http://www.gutenberg.org/cache/epub/55/pg55.txt"
 raw <- readLines(url, encoding = "UTF-8")
 
@@ -61,7 +60,8 @@ The novel starts with front matter: a title page, table of contents,
 introduction, and half title page. Then, a series of chapters follow.
 We group the lines by section.
 
-```{r}
+
+```r
 # the front matter ends at the half title page
 half_title <- grep("^THE WONDERFUL WIZARD OF OZ", lines)
 
@@ -92,34 +92,106 @@ Corpus object
 -------------
 
 Now that we have obtained our raw data, we put everything together into a
-corpus object, constructed via the `corpus` function:
+corpus data frame object, constructed via the `corpus_frame()` function:
 
-```{r}
-data <- corpus(title, text)
+
+```r
+data <- corpus_frame(title, text)
 
 # set the row names; not necessary but makes results easier to read
 rownames(data) <- sprintf("ch%02d", seq_along(chapter))
 ```
 
-The `corpus` function behaves similarly to the `data.frame` function, but
-expects one of the columns to be named `"text"`. Note that we do not need
-to specify `stringsAsFactors = FALSE` when creating a corpus object.
-As an alternative to using the `corpus` function, we can construct a data
-frame using some other method (e.g., `read.csv` or `read_ndjson`) and use
-the `as_corpus` function.
+The `corpus_frame()` function behaves similarly to the `data.frame` function,
+but expects one of the columns to be named `"text"`. Note that we do not need
+to specify `stringsAsFactors = FALSE` when creating a corpus data frame
+object.  As an alternative to using the `corpus_frame()` function, we can
+construct a data frame using some other method (e.g., `read.csv` or
+`read_ndjson`) and use the `as_corpus_frame()` function.
 
 
-A corpus object is just a data frame with a column named "text" of type
-`"corpus_text"`. When using the *corpus* library, it is not strictly necessary
-to use corpus objects as inputs; most functions will accept with character
-vectors and ordinary data frames. Using a corpus object gives better
-printing behavior and allows setting a `text_filter` attribute to override
-the default text preprocessing.
+A corpus data frame object is just a data frame with a column named "text" of
+type `"corpus_text"`. When using the *corpus* library, it is not strictly
+necessary to use corpus data frame objects as inputs; most functions will
+accept with character vectors, ordinary data frames, *quanteda* corpus
+objects, and *tm* Corpus objects.. Using a native corpus object gives better
+printing behavior and allows setting a `text_filter` attribute to override the
+default text preprocessing.
 
-```{r}
+
+```r
 print(data) # better output than printing a data frame, cuts off after 20 rows
+```
+
+```
+     title                             text                                                         
+ch01 The Cyclone                       Dorothy lived in the midst of the great Kansas prairies, wit…
+ch02 The Council with the Munchkins    She was awakened by a shock, so sudden and severe that if Do…
+ch03 How Dorothy Saved the Scarecrow   When Dorothy was left alone she began to feel hungry.  So sh…
+ch04 The Road Through the Forest       After a few hours the road began to be rough, and the walkin…
+ch05 The Rescue of the Tin Woodman     When Dorothy awoke the sun was shining through the trees and…
+ch06 The Cowardly Lion                 All this time Dorothy and her companions had been walking th…
+ch07 The Journey to the Great Oz       They were obliged to camp out that night under a large tree …
+ch08 The Deadly Poppy Field            Our little party of travelers awakened the next morning refr…
+ch09 The Queen of the Field Mice       "We cannot be far from the road of yellow brick, now," remar…
+ch10 The Guardian of the Gate          It was some time before the Cowardly Lion awakened, for he h…
+ch11 The Wonderful City of Oz          Even with eyes protected by the green spectacles, Dorothy an…
+ch12 The Search for the Wicked Witch   The soldier with the green whiskers led them through the str…
+ch13 The Rescue                        The Cowardly Lion was much pleased to hear that the Wicked W…
+ch14 The Winged Monkeys                You will remember there was no road--not even a pathway--bet…
+ch15 The Discovery of Oz, the Terrible The four travelers walked up to the great gate of Emerald Ci…
+ch16 The Magic Art of the Great Humbug Next morning the Scarecrow said to his friends:\n\n"Congratu…
+ch17 How the Balloon Was Launched      For three days Dorothy heard nothing from Oz.  These were sa…
+ch18 Away to the South                 Dorothy wept bitterly at the passing of her hope to get home…
+ch19 Attacked by the Fighting Trees    The next morning Dorothy kissed the pretty green girl good-b…
+ch20 The Dainty China Country          While the Woodman was making a ladder from wood which he fou…
+⋮    (24 rows total)
+```
+
+```r
 print(data, 5) # cuts off after 5 rows
+```
+
+```
+     title                           text                                                           
+ch01 The Cyclone                     Dorothy lived in the midst of the great Kansas prairies, with …
+ch02 The Council with the Munchkins  She was awakened by a shock, so sudden and severe that if Doro…
+ch03 How Dorothy Saved the Scarecrow When Dorothy was left alone she began to feel hungry.  So she …
+ch04 The Road Through the Forest     After a few hours the road began to be rough, and the walking …
+ch05 The Rescue of the Tin Woodman   When Dorothy awoke the sun was shining through the trees and T…
+⋮    (24 rows total)
+```
+
+```r
 print(data, -1) # prints all rows
+```
+
+```
+     title                                       text                                               
+ch01 The Cyclone                                 Dorothy lived in the midst of the great Kansas pra…
+ch02 The Council with the Munchkins              She was awakened by a shock, so sudden and severe …
+ch03 How Dorothy Saved the Scarecrow             When Dorothy was left alone she began to feel hung…
+ch04 The Road Through the Forest                 After a few hours the road began to be rough, and …
+ch05 The Rescue of the Tin Woodman               When Dorothy awoke the sun was shining through the…
+ch06 The Cowardly Lion                           All this time Dorothy and her companions had been …
+ch07 The Journey to the Great Oz                 They were obliged to camp out that night under a l…
+ch08 The Deadly Poppy Field                      Our little party of travelers awakened the next mo…
+ch09 The Queen of the Field Mice                 "We cannot be far from the road of yellow brick, n…
+ch10 The Guardian of the Gate                    It was some time before the Cowardly Lion awakened…
+ch11 The Wonderful City of Oz                    Even with eyes protected by the green spectacles, …
+ch12 The Search for the Wicked Witch             The soldier with the green whiskers led them throu…
+ch13 The Rescue                                  The Cowardly Lion was much pleased to hear that th…
+ch14 The Winged Monkeys                          You will remember there was no road--not even a pa…
+ch15 The Discovery of Oz, the Terrible           The four travelers walked up to the great gate of …
+ch16 The Magic Art of the Great Humbug           Next morning the Scarecrow said to his friends:\n… 
+ch17 How the Balloon Was Launched                For three days Dorothy heard nothing from Oz.  The…
+ch18 Away to the South                           Dorothy wept bitterly at the passing of her hope t…
+ch19 Attacked by the Fighting Trees              The next morning Dorothy kissed the pretty green g…
+ch20 The Dainty China Country                    While the Woodman was making a ladder from wood wh…
+ch21 The Lion Becomes the King of Beasts         After climbing down from the china wall the travel…
+ch22 The Country of the Quadlings                The four travelers passed through the rest of the …
+ch23 Glinda The Good Witch Grants Dorothy's Wish Before they went to see Glinda, however, they were…
+ch24 Home Again                                  Aunt Em had just come out of the house to water th…
 ```
 
 
@@ -130,36 +202,93 @@ Text in *corpus* is represented as a sequence of tokens, each taking a value
 in a set of types. We can see the tokens for one or more elements using
 the `text_tokens` function:
 
-```{r}
+
+```r
 text_tokens(data["ch24",]) # Chapter 24's tokens
+```
+
+```
+$ch24
+ [1] "aunt"     "em"       "had"      "just"     "come"     "out"      "of"       "the"     
+ [9] "house"    "to"       "water"    "the"      "cabbages" "when"     "she"      "looked"  
+[17] "up"       "and"      "saw"      "dorothy"  "running"  "toward"   "her"      "."       
+[25] "\""       "my"       "darling"  "child"    "!"        "\""       "she"      "cried"   
+[33] ","        "folding"  "the"      "little"   "girl"     "in"       "her"      "arms"    
+[41] "and"      "covering" "her"      "face"     "with"     "kisses"   "."        "\""      
+[49] "where"    "in"       "the"      "world"    "did"      "you"      "come"     "from"    
+[57] "?"        "\""       "\""       "from"     "the"      "land"     "of"       "oz"      
+[65] ","        "\""       "said"     "dorothy"  "gravely"  "."        "\""       "and"     
+[73] "here"     "is"       "toto"     ","        "too"      "."        "and"      "oh"      
+[81] ","        "aunt"     "em"       "!"        "i'm"      "so"       "glad"     "to"      
+[89] "be"       "at"       "home"     "again"    "!"        "\""      
 ```
 
 The default behavior is to normalize tokens by changing the cases of the
 letters to lower case. A `text_filter` object controls the rules for
 segmentation and normalization. We can inspect the text filter:
 
-```{r}
+
+```r
 text_filter(data)
+```
+
+```
+Text filter with the following options:
+
+	map_case: TRUE
+	map_quote: TRUE
+	remove_ignorable: TRUE
+	stemmer: NULL
+	stem_dropped: FALSE
+	stem_except: NULL
+	combine:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." "Abs." "AD." "Adj." ...
+	drop_letter: FALSE
+	drop_number: FALSE
+	drop_punct: FALSE
+	drop_symbol: FALSE
+	drop: NULL
+	drop_except: NULL
+	sent_crlf: FALSE
+	sent_suppress:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." "Abs." "AD." ...
 ```
 
 We can change the text filter properties:
 
-```{r}
+
+```r
 text_filter(data)$map_case <- FALSE
 text_filter(data)$drop_punct <- TRUE
 text_tokens(data["ch24",])
 ```
 
+```
+$ch24
+ [1] "Aunt"     "Em"       "had"      "just"     "come"     "out"      "of"       "the"     
+ [9] "house"    "to"       "water"    "the"      "cabbages" "when"     "she"      "looked"  
+[17] "up"       "and"      "saw"      "Dorothy"  "running"  "toward"   "her"      NA        
+[25] NA         "My"       "darling"  "child"    NA         NA         "she"      "cried"   
+[33] NA         "folding"  "the"      "little"   "girl"     "in"       "her"      "arms"    
+[41] "and"      "covering" "her"      "face"     "with"     "kisses"   NA         NA        
+[49] "Where"    "in"       "the"      "world"    "did"      "you"      "come"     "from"    
+[57] NA         NA         NA         "From"     "the"      "Land"     "of"       "Oz"      
+[65] NA         NA         "said"     "Dorothy"  "gravely"  NA         NA         "And"     
+[73] "here"     "is"       "Toto"     NA         "too"      NA         "And"      "oh"      
+[81] NA         "Aunt"     "Em"       NA         "I'm"      "so"       "glad"     "to"      
+[89] "be"       "at"       "home"     "again"    NA         NA        
+```
+
 To restore the defaults, set the text filter to `NULL`:
 
-```{r}
+
+```r
 text_filter(data) <- NULL
 ```
 
 In addition to mapping case and quotes (the defaults), I'm going to drop
 punctuation.
 
-```{r}
+
+```r
 text_filter(data) <- text_filter(drop_punct = TRUE)
 ```
 
@@ -167,9 +296,15 @@ The tokenizer allows for precise controlling over token dropping and token
 stemming. It also allows combining two or more words into a single token as
 in the following example:
 
-```{r}
+
+```r
 text_tokens("I live in New York City, New York",
-            filter = text_filter(combine = c("new york", "new york city")))
+            combine = c("new york", "new york city"))
+```
+
+```
+[[1]]
+[1] "i"             "live"          "in"            "new york city" ","             "new york"     
 ```
 
 This example using the optional second argument to `text_tokens` to override
@@ -183,23 +318,36 @@ Texts as sequences
 ------------------
 
 The mental model of the *corpus* package is that a text is s sequence of
-tokens, some of which are droped (`NA`). Every object has a `text_filter()`
+tokens, some of which are dropped (`NA`). Every object has a `text_filter()`
 property defining its token boundaries. The default token filter transforms
 the text to Unicode composed normal form (NFC), applies Unicode case folding,
-and maps curly quotes to straight quotes. Text objects, created with `as_text`
-or `as_corpus` can have custom text filters. You cannot set the text filter
-for a character vector. However, all *corpus* text functions accept a `filter`
-argument to override the input object's text filter (this is demonstrated in
-the "New York City" example in the previous section).
+and maps curly quotes to straight quotes. Text objects, created with
+`as_corpus_text` or `as_corpus` can have custom text filters. You cannot set
+the text filter for a character vector. However, all *corpus* text functions
+accept a `filter` argument to override the input object's text filter (this is
+demonstrated in the "New York City" example in the previous section).
 
 
 To find out the length of a text, as measured in dropped and non-dropped
 tokens, use the `text_length` function.
 
 
-```{r}
+
+```r
 text_tokens("One, two, three!", filter = text_filter(drop_punct = TRUE))
+```
+
+```
+[[1]]
+[1] "one"   NA      "two"   NA      "three" NA     
+```
+
+```r
 text_length("One, two, three!", filter = text_filter(drop_punct = TRUE))
+```
+
+```
+[1] 6
 ```
 
 You can set subsequences of consecutive tokens using the `text_sub` function.
@@ -207,18 +355,30 @@ This function accepts two arguments specifying the start and then end token
 position. The following example extracts the subsequences from
 positions 2 to 4:
 
-```{r}
+
+```r
 text_sub(c("One, two, three!", "4 5 6 7 8 9 10"), 2, 4,
          filter = text_filter(drop_punct = TRUE))
+```
+
+```
+[1] ", two, "
+[2] "5 6 7 " 
 ```
 
 Negative indices count from the end of the sequence, with `-1` denoting the
 last token.
 
-```{r}
+
+```r
 # last 2 tokens
 text_sub(c("One, two, three!", "4 5 6 7 8 9 10"), -2, -1,
          filter = text_filter(drop_punct = TRUE))
+```
+
+```
+[1] "three!"
+[2] "9 10"  
 ```
 
 Note that `text_length` and `text_sub` count both dropped and non-dropped
@@ -227,8 +387,33 @@ tokens.
 
 Here's how to get the last 10 tokens in each chapter:
 
-```{r}
+
+```r
 text_sub(data, -10)
+```
+
+```
+ch01 "Dorothy soon closed her eyes and fell fast asleep."         
+ch02 "way, and was not surprised in the least."                   
+ch03 "the Scarecrow; \"it's a lighted match.\""                   
+ch04 "in another\ncorner and waited patiently until morning came."
+ch05 ", and could not live unless she was fed."                   
+ch06 "heart of course I needn't mind so much.\""                  
+ch07 "soon send her back to her own home again."                  
+ch08 "and waited for the fresh breeze to waken her."              
+ch09 "near by, which she\nate for her dinner."                    
+ch10 "the portal into the streets of the Emerald City."           
+ch11 "of a hen that had laid a\ngreen egg."                       
+ch12 "they were no longer prisoners in a strange\nland."          
+ch13 "cheers and many good wishes to\ncarry with them."           
+ch14 "it was you brought away that wonderful Cap!\""              
+ch15 "he did she was willing to forgive him everything."          
+ch16 "I don't know\nhow it can be done.\""                        
+ch17 "the Wonderful\nWizard, and would not be comforted."         
+ch18 ", for it will be a long journey.\""                         
+ch19 "for we certainly must\nclimb over the wall.\""              
+ch20 "things in the\nworld than being a Scarecrow.\""             
+⋮    (24 entries total)
 ```
 
 In this example, we do not specify the ending position, so it defaults to `-1`.
@@ -245,18 +430,75 @@ numbers of non-dropped tokens, unique types, and sentences, respectively, in a s
 texts. We can use these functions to get an overview of the section lengths
 and lexical diversities.
 
-```{r}
+
+```r
 text_ntoken(data)
+```
+
+```
+ch01 ch02 ch03 ch04 ch05 ch06 ch07 ch08 ch09 ch10 ch11 ch12 ch13 ch14 ch15 ch16 ch17 ch18 ch19 ch20 
+1142 2001 1955 1434 2054 1498 1798 1926 1383 1950 3608 3667 1188 1885 2760  921 1151 1162 1011 1500 
+ch21 ch22 ch23 ch24 
+ 891  931 1250   74 
+```
+
+```r
 text_ntype(data)
+```
+
+```
+ch01 ch02 ch03 ch04 ch05 ch06 ch07 ch08 ch09 ch10 ch11 ch12 ch13 ch14 ch15 ch16 ch17 ch18 ch19 ch20 
+ 414  567  570  454  524  458  530  517  466  539  782  788  404  557  638  316  400  379  401  511 
+ch21 ch22 ch23 ch24 
+ 360  364  404   56 
+```
+
+```r
 text_nsentence(data)
+```
+
+```
+ch01 ch02 ch03 ch04 ch05 ch06 ch07 ch08 ch09 ch10 ch11 ch12 ch13 ch14 ch15 ch16 ch17 ch18 ch19 ch20 
+  57  131  122   81  108   96   91  102   73  110  190  176   49  100  188   71   72   87   53   88 
+ch21 ch22 ch23 ch24 
+  50   50   63    8 
 ```
 
 The `text_stats` function computes all three counts and presents the results
 in a data frame:
 
-```{r}
+
+```r
 stats <- text_stats(data)
 print(stats, -1) # print all rows instead of truncating at 20
+```
+
+```
+     tokens types sentences
+ch01   1142   414        57
+ch02   2001   567       131
+ch03   1955   570       122
+ch04   1434   454        81
+ch05   2054   524       108
+ch06   1498   458        96
+ch07   1798   530        91
+ch08   1926   517       102
+ch09   1383   466        73
+ch10   1950   539       110
+ch11   3608   782       190
+ch12   3667   788       176
+ch13   1188   404        49
+ch14   1885   557       100
+ch15   2760   638       188
+ch16    921   316        71
+ch17   1151   400        72
+ch18   1162   379        87
+ch19   1011   401        53
+ch20   1500   511        88
+ch21    891   360        50
+ch22    931   364        50
+ch23   1250   404        63
+ch24     74    56         8
 ```
 
 We can see that the last chapter is the shortest, with 74 tokens, 56 unique
@@ -272,14 +514,37 @@ formally with a regression analysis.
 In this analysis, we will exclude the last chapter (Chapter 24), because it is
 much shorter than the others and has a disproportionate influence on the fit.
 
-```{r}
+
+```r
 subset <- row.names(stats) != "ch24"
 model <- lm(log(types) ~ log(tokens), stats, subset)
 summary(model)
 ```
 
+```
+
+Call:
+lm(formula = log(types) ~ log(tokens), data = stats, subset = subset)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.113568 -0.031623  0.006547  0.034415  0.086886 
+
+Coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  1.94872    0.19082   10.21 1.34e-09 ***
+log(tokens)  0.57441    0.02591   22.17 4.73e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.04894 on 21 degrees of freedom
+Multiple R-squared:  0.959,	Adjusted R-squared:  0.9571 
+F-statistic: 491.6 on 1 and 21 DF,  p-value: 4.73e-16
+```
+
 We can also inspect the relation visually
-```{r heapslaw, fig.width = 12, fig.cap = "Heaps' Law"}
+
+```r
 par(mfrow = c(1, 2))
 plot(log(types) ~ log(tokens), stats, col = 2, subset = subset)
 abline(model, col = 1, lty = 2)
@@ -293,6 +558,8 @@ text(log(stats$tokens)[subset][outlier], rstandard(model)[outlier],
      row.names(stats)[subset][outlier], cex = 0.75, adj = c(-0.25, 0.5),
      col = 2)
 ```
+
+![Heaps' Law](corpus-heapslaw-1.png)
 
 The analysis tells us that Heap's law accurately characterizes the lexical
 diversity (type-to-token ratio) for the main chapters in *The Wizard of Oz*.
@@ -312,8 +579,34 @@ Term statistics
 
 We get term statistics using the `term_stats` function:
 
-```{r}
+
+```r
 term_stats(data)
+```
+
+```
+   term    count support
+1  the      2922      24
+2  and      1661      24
+3  to       1108      24
+4  of        824      24
+5  you       489      24
+6  in        478      24
+7  dorothy   345      24
+8  so        307      24
+9  with      271      24
+10 had       263      24
+11 is        260      24
+12 at        253      24
+13 when      158      24
+14 up        106      24
+15 again      87      24
+16 a         803      23
+17 was       501      23
+18 he        453      23
+19 it        420      23
+20 her       410      23
+⋮  (2878 rows total)
 ```
 
 This returns a data frame with each row giving the count and support for each
@@ -324,11 +617,37 @@ times total in all 24 chapters. The pronoun "her" is the 20th most common
 term, appearing in all but one chapter.
 
 
-The most common words are function words, commonly known as "stop" words. We
-can exclude these terms from the tally using the `subset` argument.
+The most common words are English function words, commonly known as "stop"
+words. We can exclude these terms from the tally using the `subset` argument.
 
-```{r}
-term_stats(data, subset = !term %in% stopwords("english"))
+
+```r
+term_stats(data, subset = !term %in% stopwords_en)
+```
+
+```
+   term      count support
+1  dorothy     345      24
+2  said        332      23
+3  little      139      22
+4  one         125      22
+5  asked       114      22
+6  came        104      22
+7  back         98      22
+8  girl         93      22
+9  toto         90      22
+10 get          85      22
+11 now          82      22
+12 answered     78      22
+13 scarecrow   217      21
+14 upon         85      21
+15 shall        82      21
+16 go           72      21
+17 looked       61      21
+18 time         43      21
+19 great       138      20
+20 head         90      20
+⋮  (2734 rows total)
 ```
 
 The character names "dorothy", "toto", and "scarecrow" show up at the top of
@@ -340,21 +659,99 @@ the list of the most common terms.
 Beyond searching for single-type terms, we can also search for multi-type
 terms ("n-grams").
 
-```{r}
+
+```r
 term_stats(data, ngrams = 5)
+```
+
+```
+   term                            count support
+1  scarecrow and the tin woodman      13       9
+2  the scarecrow and the tin          13       9
+3  the wicked witch of the            20       7
+4  the road of yellow brick           12       7
+5  wicked witch of the west           12       6
+6  soldier with the green whiskers     8       6
+7  the soldier with the green          8       6
+8  send me back to kansas              6       6
+9  to get back to kansas               7       5
+10 the tin woodman and the             6       5
+11 the guardian of the gates          10       4
+12 in the middle of the                8       4
+13 wicked witch of the east            8       4
+14 until they came to the              6       4
+15 to the land of the                  5       4
+16 and the tin woodman and             4       4
+17 in the midst of a                   4       4
+18 to give me a heart                  4       4
+19 to send me back to                  4       4
+20 what shall we do now                4       4
+⋮  (20230 rows total)
 ```
 
 The `types` argument allows us to request the component types in the result:
 
-```{r}
+
+```r
 term_stats(data, ngrams = 3, types = TRUE)
+```
+
+```
+   term                type1     type2     type3     count support
+1  the tin woodman     the       tin       woodman     112      18
+2  said the scarecrow  said      the       scarecrow    36      16
+3  the emerald city    the       emerald   city         53      14
+4  back to kansas      back      to        kansas       28      14
+5  as soon as          as        soon      as           17      13
+6  and the lion        and       the       lion         24      12
+7  the little girl     the       little    girl         21      12
+8  and the tin         and       the       tin          19      12
+9  and the scarecrow   and       the       scarecrow    21      11
+10 the scarecrow and   the       scarecrow and          19      11
+11 the wicked witch    the       wicked    witch        56      10
+12 said the tin        said      the       tin          19      10
+13 the cowardly lion   the       cowardly  lion         19      10
+14 the land of         the       land      of           19      10
+15 they came to        they      came      to           19      10
+16 scarecrow and the   scarecrow and       the          17      10
+17 get back to         get       back      to           15      10
+18 asked the scarecrow asked     the       scarecrow    10      10
+19 witch of the        witch     of        the          30       9
+20 to the emerald      to        the       emerald      21       9
+⋮  (23596 rows total)
 ```
 
 Here are the most common 2-, 3-grams starting with "dorothy", where the second
 type is not a function word
-```{r}
+
+```r
 term_stats(data, ngrams = 2:3, types = TRUE,
-           subset = type1 == "dorothy" & !type2 %in% stopwords("english"))
+           subset = type1 == "dorothy" & !type2 %in% stopwords_en)
+```
+
+```
+   term              type1   type2     type3 count support
+1  dorothy went      dorothy went      <NA>      6       6
+2  dorothy looked    dorothy looked    <NA>      6       5
+3  dorothy said      dorothy said      <NA>      5       5
+4  dorothy saw       dorothy saw       <NA>      5       5
+5  dorothy walked    dorothy walked    <NA>      4       4
+6  dorothy went to   dorothy went      to        4       4
+7  dorothy asked     dorothy asked     <NA>      3       3
+8  dorothy found     dorothy found     <NA>      3       3
+9  dorothy looked at dorothy looked    at        3       3
+10 dorothy picked    dorothy picked    <NA>      3       3
+11 dorothy sat       dorothy sat       <NA>      3       3
+12 dorothy thought   dorothy thought   <NA>      3       3
+13 dorothy put       dorothy put       <NA>      3       2
+14 dorothy stood     dorothy stood     <NA>      3       2
+15 dorothy ate       dorothy ate       <NA>      2       2
+16 dorothy awoke     dorothy awoke     <NA>      2       2
+17 dorothy awoke the dorothy awoke     the       2       2
+18 dorothy carried   dorothy carried   <NA>      2       2
+19 dorothy earnestly dorothy earnestly <NA>      2       2
+20 dorothy entered   dorothy entered   <NA>      2       2
+⋮  (202 rows total)
 ```
 
 
@@ -366,8 +763,19 @@ where they appear. For this, we use the `text_locate` function.
 
 Here are all instances of the term "dorothy looked":
 
-```{r}
+
+```r
 text_locate(data, "dorothy looked")
+```
+
+```
+  text                 before                    instance                     after                 
+1 ch02 …out from\nunder a block of wood."\n\n Dorothy looked , and gave a little cry of fright.  Th…
+2 ch05 …, as if he could not stir at all.\n\n Dorothy looked  at him in amazement, and so did the S…
+3 ch12 …ve a loud cry of fear, and then, as\n Dorothy looked  at her in wonder, the Witch began to …
+4 ch14 … all the mice hurrying after her.\n\n Dorothy looked  inside the Golden Cap and saw some wo…
+5 ch14 …s the Monkey King finished his story  Dorothy looked  down and saw the\ngreen, shining wall…
+6 ch16 …rmly he went back to his friends.\n\n Dorothy looked  at him curiously.  His head was quite…
 ```
 
 Note that we match against the type of the token, not the raw token itself, so
@@ -375,30 +783,126 @@ we are able to detect capitalized "Dorothy". This is especially useful when we
 want to search for a stemmed token. Here are all instances of tokens that
 stem to "scream":
 
-```{r}
-text_locate(data, "scream", filter = text_filter(stemmer = "english"))
+
+```r
+text_locate(data, "scream", stemmer = "en") # english stemmer
+```
+
+```
+  text                  before                   instance                   after                   
+1 ch01 … by the child's laughter that she would   scream  \nand press her hand upon her heart whene…
+2 ch01 …close at hand.\n\n"Quick, Dorothy!" she  screamed .  "Run for the cellar!"\n\nToto jumped o…
+3 ch07 … loud\nand terrible a roar that Dorothy  screamed  and the Scarecrow fell over\nbackward, w…
+4 ch12  …away.\n\n"See what you have done!" she  screamed .  "In a minute I shall melt\naway."\n\n"…
+5 ch17 …he air without her.\n\n"Come back!" she  screamed .  "I want to go, too!"\n\n"I can't come …
 ```
 
 If we would like, we can search for multiple phrases at the same time:
 
-```{r}
+
+```r
 text_locate(data, c("wicked witch", "toto", "oz"))
 ```
 
-We can also request that the results be returned in random order. This is
-useful for inspecting a random sample of the matches:
+```
+   text                 before                    instance                    after                 
+1  ch01 …d solemn, and rarely spoke.\n\nIt was      Toto      that made Dorothy laugh, and saved he…
+2  ch01 … as gray\nas her other surroundings.       Toto      was not gray; he was a little black\n…
+3  ch01  …either side of his funny, wee nose.       Toto      played all day long, and\nDorothy pla…
+4  ch01 …sual.  Dorothy stood in the door with      Toto      in her arms, and looked at\nthe sky t…
+5  ch01 …e screamed.  "Run for the cellar!"\n\n     Toto      jumped out of Dorothy's arms and hid …
+6  ch01 …he small, dark\nhole.  Dorothy caught      Toto      at last and started to follow her aun…
+7  ch01 …d gently, like a baby in a cradle.\n\n     Toto      did not like it.  He ran about the ro…
+8  ch01 …ed to\nsee what would happen.\n\nOnce      Toto      got too near the open trap door, and …
+9  ch01 …fall.  She crept to the hole,\ncaught      Toto      by the ear, and dragged him into the …
+10 ch01 …o her bed, and lay down upon it; and\n     Toto      followed and lay down beside her.\n\n…
+11 ch02 …th and wonder what had happened; and\n     Toto      put his cold little nose into her fac…
+12 ch02 …om.  She sprang from her bed and with      Toto      at her heels ran\nand opened the door…
+13 ch02 …grateful to you for having killed the  Wicked Witch  of the\nEast, and for setting our peo…
+14 ch02 …eress, and saying she had\nkilled the  Wicked Witch  of the East?  Dorothy was an innocent…
+15 ch02 … she?" asked Dorothy.\n\n"She was the  Wicked Witch  of the East, as I said," answered the…
+16 ch02 … in this land of the East\n where the  Wicked Witch  ruled."\n\n"Are you a Munchkin?" aske…
+17 ch02 …love me.  I am not as powerful as the  Wicked Witch  was who\nruled here, or I should have…
+18 ch02 … only four witches in all the Land of       Oz      , and two of them,\nthose who live in …
+19 ch02 … killed one of them, there is but one  Wicked Witch \nin all the Land of Oz--the one who l…
+20 ch02 … one Wicked Witch\nin all the Land of       Oz      --the one who lives in the West."\n\n"…
+⋮  (303 rows total)
+```
 
-```{r}
-text_locate(data, c("wicked witch", "toto", "oz"), random = TRUE)
+We can also request that the results be returned in random order, using the
+`text_sample()` function. This function takes the results from `text_locate()`
+and randomly orders the rows; this is useful for inspecting a random sample of
+the matches:
+
+
+```r
+text_sample(data, c("wicked witch", "toto", "oz"))
+```
+
+```
+   text                 before                    instance                    after                 
+1  ch17 …ket just touched the\nground.\n\nThen       Oz       got into the basket and said to all t…
+2  ch06 … are so tender of?"\n\n"He is my dog,      Toto     ," answered Dorothy.\n\n"Is he made of…
+3  ch10  …"Why do you wish to see the terrible       Oz      ?" asked the man.\n\n"I want him to gi…
+4  ch12 … friends.\n\n"Which road leads to the  Wicked Witch  of the West?" asked Dorothy.\n\n"Ther…
+5  ch24 …" said Dorothy gravely.  "And here is      Toto     , too.\nAnd oh, Aunt Em!  I'm so glad …
+6  ch05 …e was scarcely enough for herself and      Toto      for the day.\n\nWhen she had finished…
+7  ch17 …d\nthen a strip of emerald green; for       Oz       had a fancy to make the balloon\nin d…
+8  ch18 …I should like to cry a little because       Oz       is gone,\nif you will kindly wipe awa…
+9  ch12 …he would cry bitterly for hours, with      Toto      sitting at her feet and\nlooking into…
+10 ch12 …came out of the dark sky to show\nthe  Wicked Witch  surrounded by a crowd of monkeys, eac…
+11 ch02 … killed one of them, there is but one  Wicked Witch \nin all the Land of Oz--the one who l…
+12 ch23 …o the Emerald City," he replied, "for       Oz       has made me\nits ruler and the people…
+13 ch03 ….  "If you will come with me I'll ask       Oz       to do all he can for\nyou."\n\n"Thank…
+14 ch13 …ion was much pleased to hear that the  Wicked Witch  had\nbeen melted by a bucket of water…
+15 ch10 …m that pleases him.  But who the real       Oz      \nis, when he is in his own form, no l…
+16 ch15 …nt into the Throne Room\nof the Great       Oz      .\n\nOf course each one of them expect…
+17 ch11 … the Wicked Witch of the East," said\n      Oz      .\n\n"That just happened," returned Do…
+18 ch14 … they sat down and looked at her, and      Toto      found that\nfor the first time in his…
+19 ch18 …ver crossed the\ndesert, unless it is       Oz       himself."\n\n"Is there no one who can…
+20 ch10 …ity," said Dorothy, "to see the Great       Oz      ."\n\n"Oh, indeed!" exclaimed the man.…
+⋮  (303 rows total)
 ```
 
 Other functions allow counting term occurrences, testing for whether a term
 appears in a text, and getting the subset of texts containing a term:
 
-```{r}
+
+```r
 text_count(data, "the great oz")
+```
+
+```
+ch01 ch02 ch03 ch04 ch05 ch06 ch07 ch08 ch09 ch10 ch11 ch12 ch13 ch14 ch15 ch16 ch17 ch18 ch19 ch20 
+   0    0    3    1    1    1    0    0    0    5    3    1    0    0    2    0    0    0    0    0 
+ch21 ch22 ch23 ch24 
+   0    0    0    0 
+```
+
+```r
 text_detect(data, "the great oz")
+```
+
+```
+ ch01  ch02  ch03  ch04  ch05  ch06  ch07  ch08  ch09  ch10  ch11  ch12  ch13  ch14  ch15  ch16 
+FALSE FALSE  TRUE  TRUE  TRUE  TRUE FALSE FALSE FALSE  TRUE  TRUE  TRUE FALSE FALSE  TRUE FALSE 
+ ch17  ch18  ch19  ch20  ch21  ch22  ch23  ch24 
+FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE 
+```
+
+```r
 text_subset(data, "the great oz")
+```
+
+```
+ch03 "When Dorothy was left alone she began to feel hungry.  So she went to\nthe cupboard and cut …"
+ch04 "After a few hours the road began to be rough, and the walking grew so\ndifficult that the Sc…"
+ch05 "When Dorothy awoke the sun was shining through the trees and Toto had\nlong been out chasing…"
+ch06 "All this time Dorothy and her companions had been walking through the\nthick woods.  The roa…"
+ch10 "It was some time before the Cowardly Lion awakened, for he had lain\namong the poppies a lon…"
+ch11 "Even with eyes protected by the green spectacles, Dorothy and her\nfriends were at first daz…"
+ch12 "The soldier with the green whiskers led them through the streets of the\nEmerald City until …"
+ch15 "The four travelers walked up to the great gate of Emerald City and rang\nthe bell.  After ri…"
 ```
 
 
@@ -411,8 +915,23 @@ Segmenting text
 `text_split` function. By default, this function splits into sentences. Here,
 for example, are the last 10 sentences in the book:
 
-```{r}
+
+```r
 tail(text_split(data), 10)
+```
+
+```
+     parent index text                                                                              
+2207 ch23      62 Dorothy stood up and found she was in her stocking-feet.                          
+2208 ch23      63 For the\nSilver Shoes had fallen off in her flight through the air, and were\nlos…
+2209 ch24       1 Aunt Em had just come out of the house to water the cabbages when she\nlooked up …
+2210 ch24       2 "My darling child!"                                                               
+2211 ch24       3 she cried, folding the little girl in her arms and\ncovering her face with kisses…
+2212 ch24       4 "Where in the world did you come from?"\n\n                                       
+2213 ch24       5 "From the Land of Oz," said Dorothy gravely.                                      
+2214 ch24       6 "And here is Toto, too.\n                                                         
+2215 ch24       7 And oh, Aunt Em!                                                                  
+2216 ch24       8 I'm so glad to be at home again!"                                                 
 ```
 
 The result of `text_split` is a data frame, with one row for each segment
@@ -429,9 +948,23 @@ no segment being larger than the specified size.
 Here is an example of splitting two texts into segments of size at most four
 tokens.
 
-```{r}
+
+```r
 text_split(c("the wonderful wizard of oz", paste(LETTERS, collapse = " ")),
            "tokens", 4)
+```
+
+```
+  parent index text                 
+1 1          1 the wonderful wizard 
+2 1          2 of oz                
+3 2          1 A B C D              
+4 2          2 E F G H              
+5 2          3 I J K L              
+6 2          4 M N O P              
+7 2          5 Q R S T              
+8 2          6 U V W                
+9 2          7 X Y Z                
 ```
 
 ### Application: Witch tracking
@@ -441,7 +974,8 @@ for the term "witch" over the course of the novel.  Here, the chunks have
 varying sizes, so we look at the rates rather than the raw counts.
 
 
-```{r witch-occurences, fig.width = 12, fig.cap = "'witch' Occurences"}
+
+```r
 chunks <- text_split(data, "tokens", 500)
 size <- text_ntoken(chunks)
 
@@ -456,6 +990,8 @@ plot(i, rate, type = "l", xlab = "Segment",
 points(i, rate, pch = 16, cex = 0.5, col = 2)
 ```
 
+!['witch' Occurences](corpus-witch-occurrences-1.png)
+
 We can see Dorothy's house landing on the Wicked Witch of the East in the and
 the subsequent fallout in the beginning of the novel. Around segment 40, we
 see the events surrounding Dorothy's battle with the Wicked Witch of the West.
@@ -467,11 +1003,16 @@ Term frequency matrix
 ---------------------
 
 Many downstream text analysis tasks require tabulating a matrix of text-term
-occurence counts. We can get such a matrix using the `term_matrix` function:
+occurrence counts. We can get such a matrix using the `term_matrix` function:
 
-```{r}
+
+```r
 x <- term_matrix(data)
 dim(x)
+```
+
+```
+[1]   24 2878
 ```
 
 This function returns a sparse matrix object from the *Matrix* package. In the
@@ -479,26 +1020,51 @@ default usage, the rows of the matrix correspond to texts, and the columns
 correspond to terms. For a "term-by-document" matrix, you can use the
 `transpose` option:
 
-```{r}
+
+```r
 xt <- term_matrix(data, transpose = TRUE)
 ```
 
-Alternatively, to get a data frame of the (text, term, count) tripples, use
-ther `term_frame` function:
-
-```{r}
-(xf <- term_frame(data))
-```
-
 You can include n-grams in the result if you would like:
-```{r}
+
+```r
 x3 <- term_matrix(data, ngrams = 1:3) # 1-, 2-, and 3-grams
 ```
 
 Or, you can specify the columns to include in the matrix
 
-```{r}
+
+```r
 (x <- term_matrix(data, select = c("dorothy", "toto", "wicked witch", "the great oz")))
+```
+
+```
+24 x 4 sparse Matrix of class "dgCMatrix"
+     dorothy toto wicked witch the great oz
+ch01      15   10            .            .
+ch02      31    3            8            .
+ch03      24   14            3            3
+ch04       8    3            .            1
+ch05      13    4            5            1
+ch06      12    9            .            1
+ch07      13    4            .            .
+ch08      16    5            1            .
+ch09       5    5            .            .
+ch10      18    6            .            5
+ch11      32    1           11            3
+ch12      33    7           19            1
+ch13      11    1            2            .
+ch14      15    2            2            .
+ch15      18    2            6            2
+ch16       3    .            .            .
+ch17      10    2            .            .
+ch18      15    .            .            .
+ch19       8    2            .            .
+ch20      20    3            .            .
+ch21       4    2            .            .
+ch22       7    2            .            .
+ch23      12    2            1            .
+ch24       2    1            .            .
 ```
 
 The columns of `x` will be in the same order as specified by the `select`
@@ -511,29 +1077,116 @@ Emotion lexicon
 *Corpus* provides a lexicon of terms connoting emotional affect, the
 [WordNet Affect Lexicon][wn-affect].
 
-```{r}
+
+```r
 affect_wordnet
+```
+
+```
+   term             pos  category emotion 
+1  jollity          NOUN Joy      Positive
+2  joviality        NOUN Joy      Positive
+3  chaff            VERB Joy      Positive
+4  kid              VERB Joy      Positive
+5  banter           VERB Joy      Positive
+6  jolly            VERB Joy      Positive
+7  merry            ADJ  Joy      Positive
+8  jovial           ADJ  Joy      Positive
+9  jolly            ADJ  Joy      Positive
+10 jocund           ADJ  Joy      Positive
+11 gay              ADJ  Joy      Positive
+12 mirthful         ADJ  Joy      Positive
+13 riotously        ADV  Joy      Positive
+14 exuberantly      ADV  Joy      Positive
+15 expansively      ADV  Joy      Positive
+16 ebulliently      ADV  Joy      Positive
+17 exuberance       NOUN Joy      Positive
+18 lightheartedness NOUN Joy      Positive
+19 carefreeness     NOUN Joy      Positive
+20 lightsomeness    NOUN Joy      Positive
+⋮  (1641 rows total)
 ```
 
 This lexicon classifies a large set of terms correlated with emotional affect
 into four main categories: "Positive", "Negative", "Ambiguous", and "Neutral",
 and a variety of sub-categories. Here is a summary:
 
-```{r}
+
+```r
 summary(affect_wordnet)
+```
+
+```
+     term             pos         category        emotion   
+ Length:1641        NOUN:532   Dislike:338   Positive :541  
+ Class :character   ADJ :642   Sadness:199   Negative :978  
+ Mode  :character   VERB:267   Joy    :191   Neutral  : 32  
+                    ADV :200   Fear   :171   Ambiguous: 90  
+                               Liking :106                  
+                               Anxiety: 97                  
+                               (Other):539                  
 ```
 
 Here are the term counts broken down by category:
 
-```{r}
+
+```r
 with(affect_wordnet, table(category, emotion))
+```
+
+```
+              emotion
+category       Positive Negative Neutral Ambiguous
+  Joy               191        0       0         0
+  Love               40        0       0         0
+  Affection          20        0       0         0
+  Liking            106        0       0         0
+  Enthusiasm         27        0       0         0
+  Gratitude           8        0       0         0
+  Pride              22        0       0         0
+  Levity             14        0       0         0
+  Calmness           64        0       0         0
+  Fearlessness       19        0       0         0
+  Expectation         7        0       0        18
+  Fear                7      151       0        13
+  Hope               16        0       0         0
+  Sadness             0      199       0         0
+  Dislike             0      338       0         0
+  Ingratitude         0        2       0         0
+  Shame               0       82       0         0
+  Compassion          0       29       0         0
+  Humility            0       19       0         0
+  Despair             0       47       0         0
+  Anxiety             0       97       0         0
+  Daze                0       14       0         0
+  Apathy              0        0      20         0
+  Unconcern           0        0      12         0
+  Gravity             0        0       0        11
+  Surprise            0        0       0         8
+  Agitation           0        0       0        27
+  Pensiveness         0        0       0        13
 ```
 
 Terms can appear in multiple categories, or with multiple parts of speech.
 
-```{r}
+
+```r
 # some duplicate terms
 subset(affect_wordnet, term %in% c("caring", "chill", "hopeful"))
+```
+
+```
+     term    pos  category    emotion  
+209  caring  NOUN Love        Positive 
+248  caring  ADJ  Affection   Positive 
+309  caring  ADJ  Liking      Positive 
+462  chill   VERB Calmness    Positive 
+520  chill   NOUN Fear        Positive 
+526  hopeful ADJ  Hope        Positive 
+626  chill   NOUN Fear        Negative 
+628  chill   VERB Fear        Negative 
+1337 caring  ADJ  Compassion  Negative 
+1624 hopeful ADJ  Expectation Ambiguous
 ```
 
 The term "chill", for example, is listed as denoting both positive calmness
@@ -555,7 +1208,8 @@ and then measure the occurrence rates of emotion words in these chunks.
 We will first need a lexicon of emotion words. We will take as a starting
 point the WordNet-Affect lexicon, but we will remove "Neutral" emotion words.
 
-```{r}
+
+```r
 affect <- subset(affect_wordnet, emotion != "Neutral")
 affect$emotion <- droplevels(affect$emotion) # drop the unused "Neutral" level
 affect$category <- droplevels(affect$category) # drop unused categories
@@ -564,8 +1218,34 @@ affect$category <- droplevels(affect$category) # drop unused categories
 Rather than blindly applying the lexicon, we first check to see what the most
 common emotion terms are.
 
-```{r}
+
+```r
 term_stats(data, subset = term %in% affect$term)
+```
+
+```
+   term       count support
+1  down          93      22
+2  great        138      20
+3  good          74      20
+4  like          64      19
+5  heart         67      16
+6  yellow        33      14
+7  near          20      14
+8  glad          19      14
+9  afraid        29      13
+10 still         20      12
+11 surprise      15      12
+12 happy         15      11
+13 wicked        72      10
+14 low           15      10
+15 close         13      10
+16 terrible      27       9
+17 sorry         14       9
+18 frightened    13       9
+19 blue          21       8
+20 dark          16       8
+⋮  (168 rows total)
 ```
 
 A few terms jump out as unusual: "yellow" is probably for the yellow brick
@@ -573,28 +1253,106 @@ road; "down" and "near" probably do not evoke emotions.  We can inspect the
 usages of the most common terms using the `text_locate` function, which shows
 these terms in context.
 
-```{r}
-text_locate(data, "down", random = TRUE)
+
+```r
+text_sample(data, "down")
 ```
 
-Here, we use the `random = TRUE` option to return the matches in random order.
-Since we are only looking at a subset of the matches, we use this option to
-ensure that we don't make conclusions about these words using a biased sample.
-With the default option (`random = FALSE`), we would only see the matches at
-the beginning of the novel.
+```
+   text                  before                   instance                   after                  
+1  ch12 … Toto and\nthe Lion were tired, and lay    down    upon the grass and fell asleep, with\nt…
+2  ch11 …ssed the night moving his joints up and    down   \nto make sure they kept in good working…
+3  ch08 …s grew heavy\nand she felt she must sit    down    to rest and to sleep.\n\nBut the Tin Wo…
+4  ch22 …struck by a cannon ball.\n\nDorothy ran    down    and helped the Scarecrow to his feet, a…
+5  ch04 …ly stuffed with straw.'\nThen he hopped    down    at my feet and ate all the corn he want…
+6  ch19 …ame\nunder the first branches they bent    down    and twined around him, and the\nnext mi…
+7  ch02 …e saw.\n\nThe cyclone had set the house    down    very gently--for a cyclone--in the\nmid…
+8  ch22 …ades safely\nover the hill and set them    down    in the beautiful country of the\nQuadli…
+9  ch03 …er in a friendly way.  Then she climbed    down    from the fence\nand walked up to it, wh…
+10 ch04 …f dried leaves in one\ncorner.  She lay    down    at once, and with Toto beside her soon …
+11 ch17 …Room he greeted her pleasantly:\n\n"Sit    down   , my dear; I think I have found the way …
+12 ch14 …e could\ndo.  At his word the band flew    down    and seized Quelala, carried him in\nthe…
+13 ch07 …er Dorothy with dry leaves when she lay    down    to sleep.\nThese kept her very snug and…
+14 ch10 …so surprised at this answer that he sat    down    to think it\nover.\n\n"It has been many…
+15 ch02 …u shall have them to wear." She reached    down    and picked up\nthe shoes, and after sha…
+16 ch07 …ould not leap across it.\n\nSo they sat    down    to consider what they should do, and af…
+17 ch20 …ich he found in the\nforest Dorothy lay    down    and slept, for she was tired by the lon…
+18 ch12 …She thanked him for saving them and sat    down   \nto breakfast, after which they started…
+19 ch12 …back to their work, after which she sat    down    to\nthink what she should do next.  She…
+20 ch07 …that is certain.  Neither can\nwe climb    down    into this great ditch.  Therefore, if w…
+⋮  (93 rows total)
+```
+
+Here, we use the `text_sample()` instead of `text_locate()` to return the
+matches in random order.  Since we are only looking at a subset of the
+matches, we use this option to ensure that we don't make conclusions about
+these words using a biased sample.  Using `text_locate()`, we would would only
+see the matches at the beginning of the novel.
 
 It looks like "down" is mostly used as a preposition, not an emotion. We will
 exclude it form the lexicon.
 
-```{r}
-text_locate(data, "good", random = TRUE)
+
+```r
+text_sample(data, "good")
+```
+
+```
+   text                  before                   instance                   after                  
+1  ch11 …tinued the voice.\n\n"That is where the    Good    Witch of the North kissed me when she b…
+2  ch15 …the Witches of the North and South were    good   , and I knew\nthey would do me no harm; …
+3  ch10 …e of\neverything, and was glad to get a    good    supper again.\n\nThe woman now gave Dor…
+4  ch11 … up and down\nto make sure they kept in    good    working order.  The Lion would have\npr…
+5  ch04 …ad\nbrains in your head you would be as    good    a man as any of them, and a\nbetter man…
+6  ch15 …\n\n"Just to amuse myself, and keep the    good    people busy, I ordered them to\nbuild t…
+7  ch05 … they were quite free from rust\nand as    good    as new.\n\nThe Tin Woodman gave a sigh …
+8  ch22 …he leader to Dorothy;\n"so good-bye and    good    luck to you."\n\n"Good-bye, and thank y…
+9  ch19 …He knew how to give me brains, and very    good    brains, too," said the\nScarecrow.\n\n"…
+10 ch21 …me, O King of Beasts!  You have come in    good    time to fight our\nenemy and bring peac…
+11 ch15 …n jewels and precious metals, and every    good    thing\nthat is needed to make one happy…
+12 ch10 …nt.  And we have been told that Oz is a    good   \nWizard."\n\n"So he is," said the green…
+13 ch23 …rom her\nloving comrades.\n\nGlinda the    Good    stepped down from her ruby throne to gi…
+14 ch02 …answered the little woman.  "But I am a    good    witch, and\nthe people love me.  I am n…
+15 ch18 …her until she starts back to Kansas for    good    and all."\n\n"Thank you," said Dorothy …
+16 ch19 …our lovely City, and everyone has\nbeen    good    to me.  I cannot tell you how grateful …
+17 ch07 …dreamed of the Emerald City, and of the    good   \nWizard Oz, who would soon send her bac…
+18 ch14 …ollowed by all his band.\n\n"That was a    good    ride," said the little girl.\n\n"Yes, a…
+19 ch15 …as Dorothy," said the Lion gravely.\n\n"   Good    gracious!" exclaimed the man, and he bo…
+20 ch14 … was never known to hurt anyone who was    good   .  Her name\nwas Gayelette, and she live…
+⋮  (74 rows total)
 ```
 
 "Good" seems to be an appropriate emotion work, evoking positive affection or
 love. We will keep it in the lexicon.
 
-```{r}
-text_locate(data, "heart", random = TRUE)
+
+```r
+text_sample(data, "heart")
+```
+
+```
+   text                  before                   instance                   after                  
+1  ch15 …crow.\n\n"And you promised to give me a   heart   ," said the Tin Woodman.\n\n"And you pro…
+2  ch09 …you," replied the Woodman.  "I have no\n  heart   , you know, so I am careful to help all …
+3  ch18 …ourn for the man who gave\nme my lovely   heart   .  I should like to cry a little because…
+4  ch14 … anywhere at all."\n\nThen Dorothy lost   heart   .  She sat down on the grass and looked …
+5  ch07 …eatures\nfrightened me so badly that my   heart    is beating yet."\n\n"Ah," said the Tin …
+6  ch05 …rth; but no one\ncan love who has not a   heart   , and so I am resolved to ask Oz to give…
+7  ch06 …appy.\nBut whenever there is danger, my   heart    begins to beat fast."\n\n"Perhaps you h…
+8  ch15 …hout a murmur, if you will\ngive me the   heart   ."\n\n"Very well," answered Oz meekly.  …
+9  ch19 …" said the Tin Woodman, as he\nfelt his   heart    rattling around in his breast.\n\n"He k…
+10 ch08 … like them better."\n\n"If I only had a   heart   , I should love them," added the Tin Woo…
+11 ch11 …said, gruffly: "If you indeed desire a\n  heart   , you must earn it."\n\n"How?" asked the…
+12 ch11 …u, I am such a fool."\n\n"I haven't the   heart    to harm even a Witch," remarked the Tin…
+13 ch05 …new why he was so anxious to get a\nnew   heart   .\n\n"All the same," said the Scarecrow,…
+14 ch18 …n Woodman, "am well-pleased with my new   heart   ;\nand, really, that was the only thing …
+15 ch15 …knew it, you are in\nluck not to have a   heart   ."\n\n"That must be a matter of opinion,…
+16 ch23 …oving\nlittle girl.\n\n"Bless your dear   heart   ," she said, "I am sure I can tell you o…
+17 ch16  …\n"Oh, very!" answered Oz.  He put the   heart    in the Woodman's breast and\nthen repla…
+18 ch05 …, "I shall ask for brains instead of\na   heart   ; for a fool would not know what to do w…
+19 ch01 …uld scream\nand press her hand upon her   heart    whenever Dorothy's merry voice\nreached…
+20 ch16 …hole\nin your breast, so I can put your   heart    in the right place.  I hope it\nwon't h…
+⋮  (67 rows total)
 ```
 
 "Heart" is mostly used as an object (noun), not an emotion meaning compassion.
@@ -602,33 +1360,53 @@ The Tin Woodman's search for a heart is a central plot of the novel, so it is
 not surprising that the term shows up frequently. We can look for
 co-occurrences of "heart" with "woodman":
 
-```{r}
+
+```r
 loc <- text_locate(data, "heart")
 before <- text_detect(text_sub(loc$before, -25, -1), "woodman")
 after <- text_detect(text_sub(loc$after, 1, 25), "woodman")
 summary(before | after)
 ```
 
+```
+   Mode   FALSE    TRUE 
+logical      22      45 
+```
+
 "Woodman" appears within 25 tokens of "heart" in in 45 of the 67 contexts
 where the latter word appears.
 
-The decision of whether to include or exclude "heart" is a difficult judgement
+The decision of whether to include or exclude "heart" is a difficult judgment
 call. Most of the time it appears, it describes an object, not an emotion.
 Still, that object does have an emotional association.  I'm deciding to
 include "heart", but this is not a clear-cut decision.
 
 We can also inspect the first token after each appearance of "yellow":
 
-```{r}
+
+```r
 term_stats(text_sub(text_locate(data, "yellow")$after, 1, 1))
+```
+
+```
+   term     count support
+1  brick       16      16
+2  and          3       3
+3  winkies      3       3
+4  bricks       2       2
+5  castle       2       2
+6  daisies      1       1
+7  flowers      1       1
+8  in           1       1
+9  land         1       1
+10 road-bed     1       1
+11 rooms        1       1
+12 wildcat      1       1
 ```
 
 Over half the time, "yellow" prefaces "brick" or "bricks", and otherwise it
-describes objects. There it does not describe or evoke emotion.
-
-```{r}
-term_stats(text_sub(text_locate(data, "yellow")$after, 1, 1))
-```
+describes objects. It does not describe or evoke emotion, and we should
+exclude it from the lexicon.
 
 Similar analysis not shown here indicates that "great" is mostly used to
 describe size, not positive enthusiasm; "like" is often used to mean "similar
@@ -637,7 +1415,8 @@ to", not "affection for"; "blue" is mostly used as a color, not an emotion.
 All of this analysis shows that we should probably exclude some of the common
 terms from the lexicon.
 
-```{r}
+
+```r
 affect <- subset(affect, !term %in% c("down", "great", "like", "yellow", "near", "low", "blue"))
 ```
 
@@ -645,22 +1424,35 @@ affect <- subset(affect, !term %in% c("down", "great", "like", "yellow", "near",
 
 Now that we have a lexicon, our plan is to segment the text into smaller
 chunks and then compute the emotion occurrence rates in each chunk, broken
-down by category ("Positive", "Negative", or "Ambigous").
+down by category ("Positive", "Negative", or "Ambiguous").
 
 To facilitate the rate computations, we will form a term-by-emotion rate for
 the lexicon:
 
-```{r}
+
+```r
 term_scores <- with(affect, unclass(table(term, emotion)))
 head(term_scores)
+```
+
+```
+            emotion
+term         Positive Negative Ambiguous
+  abase             0        2         0
+  abash             0        1         0
+  abashed           0        1         0
+  abashment         0        1         0
+  abhor             0        1         0
+  abhorrence        0        1         0
 ```
 
 Here, `term_scores` is a matrix with entry *(i,j)* indicating the number of
 times that term *i* appeared in the affect lexicon with emotion *j*.
 
-We re-classify any term appearing in two or more categories as ambigous:
+We re-classify any term appearing in two or more categories as ambiguous:
 
-```{r}
+
+```r
 ncat <- rowSums(term_scores > 0)
 term_scores[ncat > 1, c("Positive", "Negative", "Ambiguous")] <- c(0, 0, 1)
 ```
@@ -669,7 +1461,8 @@ At this point, every term is in one category, but the score for the term could
 be 2, 3, or more, depending on the number of sub-categories the term appeared
 in. We replace these larger values with one.
 
-```{r}
+
+```r
 term_scores[term_scores > 1] <- 1
 ```
 
@@ -682,7 +1475,8 @@ somewhat arbitrary, but not entirely so. We want the segments to be large enough
 so that our rate estimates are reliable, but not so large that the emotion
 usage is heterogeneous within the segment.
 
-```{r}
+
+```r
 chunks <- text_split(data, "tokens", 500)
 ```
 
@@ -690,8 +1484,16 @@ Within a chapter, the segments all have approximately the same size. However,
 since the chapters have different lengths, there is some variation in segment
 size across chapters:
 
-```{r}
+
+```r
 (n <- text_ntoken(chunks))
+```
+
+```
+ [1] 381 381 380 401 400 400 400 400 489 489 489 488 478 478 478 411 411 411 411 410 500 499 499 450
+[25] 450 449 449 482 482 481 481 461 461 461 488 488 487 487 451 451 451 451 451 451 451 451 459 459
+[49] 459 458 458 458 458 458 396 396 396 472 471 471 471 460 460 460 460 460 460 461 460 384 384 383
+[73] 388 387 387 337 337 337 500 500 500 446 445 466 465 417 417 416  74
 ```
 
 (If we wanted equal sized segments, we could have concatenated the chapters
@@ -704,15 +1506,17 @@ is that some segments would be split across multiple chapters.)
 For the count of each emotion category in each segment, we form a text-by-term
 matrix of counts, and then multiply this by the term-by-emotion score matrix.
 
-```{r}
+
+```r
 x <- term_matrix(chunks, select = rownames(term_scores))
 text_scores <- x %*% term_scores
 ```
 
-For the occurence rates, we divide the counts by the segment sizes. We then
-multiply by 1000 so that rates are given as occurences per 1000 tokens.
+For the occurrence rates, we divide the counts by the segment sizes. We then
+multiply by 1000 so that rates are given as occurrences per 1000 tokens.
 
-```{r}
+
+```r
 # compute the rates per 1000 tokens
 unit <- 1000
 rate <- list(pos = text_scores[, "Positive"] / n * unit,
@@ -723,7 +1527,8 @@ rate$total <- rate$pos + rate$neg + rate$ambig
 
 We use the binomial variance formula to get the standard errors:
 
-```{r}
+
+```r
 # compute the standard errors
 se <- lapply(rate, function(r) sqrt(r * (unit - r) / n))
 ```
@@ -737,13 +1542,14 @@ measured rates.
 ### Plotting the results
 
 We plot the four rate curves as time series. Our main focus is on the total
-emotion usage. For this curve, we also put a horizonal dashed line at its
+emotion usage. For this curve, we also put a horizontal dashed line at its
 mean, and we indicating the "interesting" segments, those that appear more
 than two standard deviations away from the main, by putting error bars on
 these points.
 
 
-```{r emotion, fig.width = 12, fig.cap = "Emotion in Oz"}
+
+```r
 # set up segment IDs
 i <- seq_len(nrow(chunks))
 
@@ -812,6 +1618,8 @@ for (t in c("ambig", "neg", "pos", "total")) {
     }
 }
 ```
+
+![Emotion in Oz](corpus-emotion-1.png)
 
 ### Discussion
 

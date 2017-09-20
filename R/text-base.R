@@ -30,61 +30,55 @@ Summary.corpus_text <- function(..., na.rm = FALSE)
 Ops.corpus_text <- function(e1, e2)
 {
     if (nargs() == 1)
-        stop(gettextf("unary %s not defined for text objects",
+        stop(gettextf("unary %s is not defined for text objects",
             .Generic), domain = NA)
     boolean <- switch(.Generic, `<` = , `>` = , `==` = , `!=` = ,
         `<=` = , `>=` = TRUE, FALSE)
     if (!boolean)
-        stop(gettextf("%s not defined for text objects",
+        stop(gettextf("%s is not defined for text objects",
             .Generic), domain = NA)
-    e1 <- as.character(e1)
-    e2 <- as.character(e2)
+    e1 <- structure(as.character(e1), names = names(e1))
+    e2 <- structure(as.character(e2), names = names(e2))
     NextMethod(.Generic)
 }
 
 
-all.equal.corpus_text <- function(target, current, ...)
+all.equal.corpus_text <- function(target, current, ..., check.attributes = TRUE)
 {
-    if (!is_text(current)) {
-        return(c(paste("Modes: text,", mode(current)),
-                 paste("target is text, current is", mode(current))))
+    if (is.null(target) && is.null(current)) {
+        return(TRUE)
     }
 
-    nt <- names(target)
-    ft <- text_filter(target)
-    at <- attributes(target)
-    target <- as.character(target)
-    names(target) <- nt
-
-    for (a in names(at)) {
-        if (!(a %in% c("names", "class"))) {
-            attr(target, a) <- at[[a]]
-        }
+    if (!is_corpus_text(target)) {
+        stop("'target' is not a valid text object")
     }
 
-    nc <- names(current)
-    fc <- text_filter(current)
-    ac <- attributes(current)
-    current <- as.character(current)
-    names(current) <- nc
-
-    for (a in names(ac)) {
-        if (!(a %in% c("names", "class"))) {
-            attr(current, a) <- ac[[a]]
-        }
+    if (!inherits(current, "corpus_text")) {
+        return(sprintf("target is corpus_text, current is %s",
+                       class(current)[[1]]))
     }
 
-    ans <- all.equal(target, current, ...)
-
-    f <- all.equal(ft, fc)
-    if (!isTRUE(f)) {
-        if (isTRUE(ans)) {
-            ans <- character()
-        }
-        ans <- c(ans, paste("Filter:", f))
+    msg <- NULL
+    if (check.attributes) {
+        msg <- attr.all.equal(target, current, ..., check.names = FALSE)
     }
 
-    ans
+    fmsg <- all.equal(text_filter(target), text_filter(current))
+    if (!isTRUE(fmsg)) {
+        msg <- c(msg, paste("Filter:", fmsg))
+    }
+
+    xmsg <- all.equal(structure(as.character(target), names = names(target)),
+                      structure(as.character(current), names = names(current)),
+                      ...)
+
+    if (!isTRUE(xmsg)) {
+        msg <- c(msg, xmsg)
+    }
+
+    if (is.null(msg))
+        TRUE
+    else msg
 }
 
 
@@ -94,59 +88,24 @@ as.Date.corpus_text <- function(x, format, ...)
 }
 
 
-as.data.frame.corpus_text <- function(x, row.names = NULL,
-                                      optional = FALSE, ...)
-{
-    nm <- deparse(substitute(x), width.cutoff = 500L)
-    nrows <- length(x)
-
-    # get row names
-    if (!is.null(row.names)) {
-        if (!(is.character(row.names) && length(row.names) == nrows)) {
-            stop("'row.names' is not a character vector of length %d", nrows)
-        }
-    } else if (is.null(row.names)) {
-        if (nrows == 0L) {
-            row.names <- character()
-        } else {
-            row.names <- names(x)
-            if (is.null(row.names)) {
-                row.names <- .set_row_names(nrows)
-            }
-        }
-    }
-
-    names(x) <- NULL
-    value <- list(x)
-    if (!optional)  {
-        names(value) <- nm
-    }
-
-    structure(value, row.names = row.names, class = "data.frame")
-}
+as.data.frame.corpus_text <- as.data.frame.vector
 
 
 as.matrix.corpus_text <- function(x, ...)
 {
-    stop("'as.matrix' is invalid for text objects")
+    stop("'as.matrix' is not defined for text objects")
 }
 
 
 as.vector.corpus_text <- function(x, mode = "any")
 {
-    if (mode == "any") {
-        names(x) <- NULL
-        ans <- x
-    } else {
-        ans <- as.vector(as.character(x), mode = mode)
-    }
-    ans
+    as.vector(as.character(x), mode)
 }
 
 
 cbind.corpus_text <- function(..., deparse.level = 1)
 {
-    stop("'cbind' is invalid for text objects")
+    stop("'cbind' is not defined for text objects")
 }
 
 
@@ -157,7 +116,7 @@ format.corpus_text <- function(x, trim = FALSE, chars = NULL,
                                ...)
 {
     with_rethrow({
-        x <- as_text(x)
+        x <- as_corpus_text(x)
         trim <- as_option("trim", trim)
         chars <- as_chars("chars", chars)
         justify <- as_justify("justify", justify)
@@ -206,8 +165,8 @@ print.corpus_text <- function(x, rows = 20L, chars = NULL, quote = TRUE,
         return(invisible(NULL))
     }
 
-    if (!is_text(x)) {
-        stop("argument is not a text vector")
+    if (!is_corpus_text(x)) {
+        stop("argument is not a valid text object")
     }
 
     with_rethrow({
@@ -276,19 +235,31 @@ print.corpus_text <- function(x, rows = 20L, chars = NULL, quote = TRUE,
 
 rbind.corpus_text <- function(..., deparse.level = 1)
 {
-    stop("'rbind' is invalid for text objects")
+    stop("'rbind' is not defined for text objects")
 }
 
 
 solve.corpus_text <- function(a, b, ...)
 {
-    stop("'solve' is invalid for text objects")
+    stop("'solve' is not defined for text objects")
 }
 
 
 summary.corpus_text <- function(object, ...)
 {
-    value <- c(Length = length(object), Class = "text", Mode = "character")
+    ntok <- text_ntoken(object)
+    ntype <- text_ntype(object, collapse = TRUE)
+
+    isna <- is.na(ntok)
+    value <- summary(ntok[!isna], ...)
+    nas <- sum(isna)
+
+    names(value) <- paste(names(value), "Toks.")
+    value[["Types"]] <- ntype
+    if (nas > 0) {
+        value[["NA's"]] <- nas
+    }
+
     class(value) <- c("summaryDefault", "table")
     value
 }
@@ -296,5 +267,5 @@ summary.corpus_text <- function(object, ...)
 
 t.corpus_text <- function(x)
 {
-    stop("'t' is invalid for text objects")
+    stop("'t' is not defined for text objects")
 }

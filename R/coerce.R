@@ -20,7 +20,7 @@ as_character_scalar <- function(name, value, utf8 = TRUE)
     }
     value <- as_character_vector(name, value, utf8)
     if (length(value) != 1) {
-        stop("'", name, "' must be a scalar character string")
+        stop(sprintf("'%s' must be a scalar character string", name))
     }
     value
 }
@@ -28,9 +28,9 @@ as_character_scalar <- function(name, value, utf8 = TRUE)
 
 as_character_vector <- function(name, value, utf8 = TRUE)
 {
-    if (!(is.null(value) || is.character(value) || is_text(value)
+    if (!(is.null(value) || is.character(value) || is_corpus_text(value)
           || all(is.na(value)))) {
-        stop(paste0("'", name, "' must be text, a character vector, or NULL"))
+        stop(sprintf("'%s' must be text, a character vector, or NULL", name))
     }
     if (is.null(value)) {
         return(NULL)
@@ -43,51 +43,18 @@ as_character_vector <- function(name, value, utf8 = TRUE)
 }
 
 
-as_chars <- function(name, value)
-{
-    if (is.null(value)) {
-        return(NULL)
-    }
-
-    value <- as_integer_scalar(name, value)
-    if (is.na(value) || value < 0) {
-        stop(sprintf("'%s' must be NULL, or a non-negative integer", name))
-    }
-    value
-}
-
-
-as_digits <- function(name, value)
-{
-    if (is.null(value)) {
-        return(NULL)
-    }
-
-    value <- as_integer_scalar(name, value)
-    if (is.na(value)) {
-        value <- getOption("digits")
-    }
-    if (value < 0) {
-        stop(paste0("'", name, "' must be non-negative"))
-    } else if (value >= 23) {
-        stop(paste0("'", name, "' must be less than 23"))
-    }
-    value
-}
-
-
 as_double_scalar <- function(name, value, allow_null = FALSE)
 {
     if (is.null(value)) {
         if (allow_null) {
             return(NULL)
         } else {
-            stop(sprintf("'%s' cannot be NULL"))
+            stop(sprintf("'%s' cannot be NULL", name))
         }
     }
 
     if (length(value) != 1) {
-        stop(sprintf("'%s' must have length 1"))
+        stop(sprintf("'%s' must have length 1", name))
     }
 
     if (!(is.numeric(value) && !is.nan(value) && !is.na(value))) {
@@ -102,13 +69,13 @@ as_double_scalar <- function(name, value, allow_null = FALSE)
 as_enum <- function(name, value, choices)
 {
     if (!(is.character(value) && length(value) == 1 && !is.na(value))) {
-        stop(paste0("'", name, "' must be a character string"))
+        stop(sprintf("'%s' must be a character string", name))
     }
 
     i <- pmatch(value, choices, nomatch = 0)
     if (all(i == 0)) {
-        stop(paste0("'", name, "' must be one of ",
-             paste(dQuote(choices), collapse = ", ")))
+        stop(sprintf("'%s' must be one of the following: ", name),
+             paste(dQuote(choices), collapse = ", "))
     }
     i <- i[i > 0]
     choices[[i]]
@@ -131,7 +98,7 @@ as_filter <- function(name, filter)
     unknown <- !(keys %in% props)
     if (any(unknown)) {
         key <- keys[unknown][1]
-        stop(sprintf("unrecognized text filter property: \"%s\"", key))
+        stop(sprintf("unrecognized text filter property: '%s'", key))
     }
 
     ans <- structure(list(), class = "corpus_text_filter")
@@ -157,23 +124,35 @@ as_group <- function(group, n)
 }
 
 
-as_integer_scalar <- function(name, value, null = NA_integer_)
+as_integer_scalar <- function(name, value, nonnegative = FALSE)
 {
     if (is.null(value)) {
-        return(null)
+        return(NULL)
     }
-
-    if (!((is.numeric(value) || is.na(value)) && length(value) == 1)) {
-        stop(paste0("'", name, "' must be an integer scalar"))
+    value <- as_integer_vector(name, value, nonnegative)
+    if (length(value) != 1) {
+        stop(sprintf("'%s' must have length 1", name))
     }
-    
-    as.integer(value)
+    value
 }
 
 
-as_justify <- function(name, value)
+as_integer_vector <- function(name, value, nonnegative = FALSE)
 {
-    as_enum(name, value, c("left", "right", "centre", "none"))
+    if (is.null(value)) {
+        return(NULL)
+    }
+
+    if (!(is.numeric(value) || all(is.na(value)))) {
+        stop(sprintf("'%s' must be integer-valued", name))
+    }
+
+    value <- as.integer(value)
+    if (nonnegative && any(!is.na(value) & value < 0)) {
+        stop(sprintf("'%s' must be non-negative", name))
+    }
+
+    value
 }
 
 
@@ -190,22 +169,6 @@ as_kind <- function(kind)
 }
 
 
-as_max_print <- function(name, value)
-{
-    if (is.null(value)) {
-        return(NULL)
-    }
-    value <- as_integer_scalar(name, value)
-    if (is.na(value)) {
-        stop(sprintf("'%s' cannot be NA", name))
-    }
-    if (value < 0) {
-        stop(sprintf("'%s' must be non-negative", name))
-    }
-    value
-}
-
-
 as_na_print <- function(name, value)
 {
     if (is.null(value)) {
@@ -213,21 +176,28 @@ as_na_print <- function(name, value)
     }
     value <- as_character_scalar(name, value)
     if (is.na(value)) {
-        stop(sprintf("'%s' must not be NA", name))
+        stop(sprintf("'%s' cannot be NA", name))
     }
     value
 }
 
 
-as_names <- function(name, value, n)
+as_names <- function(name, value, n, unique = TRUE)
 {
+    if (is.null(value)) {
+        return(NULL)
+    }
+
     value <- as_character_vector(name, value)
-    if (length(value) == 1) {
+    if (!unique && length(value) == 1) {
         value <- rep(value, n)
     }
     if (length(value) != n) {
         stop(sprintf("'%s' has wrong length (%d); must be %d",
                      name, length(value), n))
+    }
+    if (unique && anyDuplicated(value)) {
+        stop(sprintf("'%s' contains duplicate values", name))
     }
     value
 }
@@ -244,20 +214,32 @@ as_ngrams <- function(ngrams)
     }
 
     if (anyNA(ngrams) || !all(is.finite(ngrams) & ngrams >= 1)) {
-        stop("'ngrams' vector must contain positive integer values")
+        stop("'ngrams' entries must be positive integer values")
     }
 
     if (any(ngrams >= 128)) {
-        stop(sprintf("'ngrams' entries must be below 128"))
+        stop("'ngrams' entries must be below 128")
     }
 
     if (length(ngrams) == 0) {
-        stop("'ngrams' vector cannot have length 0")
+        stop("'ngrams' argument cannot have length 0")
     }
 
-    ngrams <- unique(sort(ngrams))
+    ngrams <- sort(unique(as.integer(ngrams)))
+    ngrams
+}
 
-    as.integer(ngrams)
+
+as_nonnegative <- function(name, value)
+{
+    if (is.null(value)) {
+        return(NULL)
+    }
+    value <- as_integer_scalar(name, value, nonnegative = TRUE)
+    if (is.na(value)) {
+        stop(sprintf("'%s' cannot be NA", name))
+    }
+    value
 }
 
 
@@ -268,26 +250,9 @@ as_option <- function(name, value)
     }
 
     if (!(length(value) == 1 && is.logical(value) && !is.na(value))) {
-        stop(paste0("'", name, "' must be TRUE or FALSE"))
+        stop(sprintf("'%s' must be TRUE or FALSE", name))
     }
     as.logical(value)
-}
-
-
-as_print_gap <- function(name, value)
-{
-    if (is.null(value)) {
-        return(NULL)
-    }
-    value <- as_integer_scalar(name, value)
-    if (is.na(value)) {
-        stop(paste0("'", name, "' cannot be NA"))
-    } else if (value < 0) {
-        stop(paste0("'", name, "' must be non-negative"))
-    } else if (value > 1024) {
-        stop(paste0("'", name, "' must be less than or equal to 1024"))
-    }
-    value
 }
 
 
@@ -299,7 +264,7 @@ as_rows <- function(name, value)
 
     value <- as_integer_scalar(name, value)
     if (is.na(value)) {
-        stop(paste0("'", name, "' cannot be NA"))
+        stop(sprintf("'%s' cannot be NA", name))
     }
 
     value
@@ -323,27 +288,23 @@ as_size <- function(size)
 
 as_stemmer <- function(stemmer)
 {
-    stemmers <- c("arabic", "danish", "dutch", "english", "finnish",
-                  "french", "german", "hungarian", "italian", "norwegian",
-                  "porter", "portuguese", "romanian", "russian", "spanish",
-                  "swedish", "tamil", "turkish")
-
     if (is.null(stemmer)) {
         return(NULL)
     }
 
-    if (anyNA(stemmer) || length(stemmer) != 1 || !is.character(stemmer)) {
-        stop("'stemmer' argument must be a character string or NULL")
+    isocodes <- c(ar = "arabic", da = "danish", de = "german",
+                  en = "english", es = "spanish", fi = "finnish",
+                  fr = "french", hu = "hungarian", it = "italian",
+                  nl = "dutch", no = "norwegian", pt = "portuguese",
+                  ro = "romanian", ru = "russian", sv = "swedish",
+                  ta = "tamil", tr = "turkish")
+    extra <- "porter"
+
+    stemmers <- c(names(isocodes), sort(c(isocodes, extra)))
+    stemmer <- as_enum("stemmer", stemmer, stemmers)
+    if (!is.na(i <- match(stemmer, isocodes))) {
+        stemmer <- names(isocodes)[[i]]
     }
-
-    stemmer <- as.character(stemmer)
-
-    if (!stemmer %in% stemmers) {
-        stop(paste0("invalid 'stemmer' argument (\"", stemmer, "\");",
-                    " must be NA or one of the following: ",
-                    paste0('"', stemmers, '"', collapse=", ")))
-    }
-
     stemmer
 }
 
@@ -357,16 +318,43 @@ as_weights <- function(weights, n)
             stop(paste0("'weights' argument has wrong length (",
                         length(weights), ", must be ", n, ")"))
         }
-        if (anyNA(weights)) {
-            stop("'weights' argument contains a missing value");
-        }
         if (any(is.nan(weights))) {
-            stop("'weights' argument contains a NaN value");
+            stop("'weights' argument contains a NaN value")
+        }
+        if (anyNA(weights)) {
+            stop("'weights' argument contains a missing value")
         }
         if (any(is.infinite(weights))) {
-            stop("'weights' argument contains an infinite value");
+            stop("'weights' argument contains an infinite value")
         }
     }
 
     weights
+}
+
+as_chars <- as_nonnegative
+
+as_digits <- function(name, value)
+{
+    value <- as_nonnegative(name, value)
+    if (!is.null(value) && value > 22) {
+        stop(sprintf("'%s' must be less than or equal to 22", name))
+    }
+    value
+}
+
+as_justify <- function(name, value)
+{
+    as_enum(name, value, c("left", "right", "centre", "none"))
+}
+
+as_max_print <- as_nonnegative
+
+as_print_gap <- function(name, value)
+{
+    value <- as_nonnegative(name, value)
+    if (!is.null(value) && value > 1024) {
+        stop(sprintf("'%s' must be less than or equal to 1024", name))
+    }
+    value
 }

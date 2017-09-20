@@ -100,7 +100,7 @@ static void text_init_charsxp(struct text *text, SEXP charsxp)
 		size = (size_t)XLENGTH(charsxp);
 
 		if (!encodes_utf8(ce)) {
-			ptr2 = (const uint8_t *)translateCharUTF8(charsxp);
+			ptr2 = (const uint8_t *)translate_utf8(charsxp);
 			if (ptr2 != ptr) {
 				ptr = ptr2;
 				size = strlen((const char *)ptr);
@@ -367,7 +367,11 @@ static void grow_buffer(uint8_t **bufptr, int *nbufptr, int nadd)
 		      INT_MAX);
 	}
 
-	buf = (void *)S_realloc((char *)buf, nbuf, nbuf0, sizeof(uint8_t));
+	if (nbuf0 > 0) {
+		buf = (void *)S_realloc((char *)buf, nbuf, nbuf0, sizeof(uint8_t));
+	} else {
+		buf = (void *)R_alloc(nbuf, sizeof(uint8_t));
+	}
 
 	*bufptr = buf;
 	*nbufptr = nbuf;
@@ -648,10 +652,14 @@ SEXP utf8_format(SEXP sx, SEXP strim, SEXP schars, SEXP sjustify, SEXP swidth,
 		trim = 1;
 	}
 
-	PROTECT(swidth = coerceVector(swidth, INTSXP)); nprot++;
-	width_max = INTEGER(swidth)[0];
-	if (width_max == NA_INTEGER || width_max < 0) {
+	if (swidth == R_NilValue) {
 		width_max = 0;
+	} else {
+		PROTECT(swidth = coerceVector(swidth, INTSXP)); nprot++;
+		width_max = INTEGER(swidth)[0];
+		if (width_max == NA_INTEGER || width_max < 0) {
+			width_max = 0;
+		}
 	}
 
 	PROTECT(sna_encode = coerceVector(sna_encode, LGLSXP)); nprot++;

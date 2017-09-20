@@ -14,24 +14,24 @@
    a sequence of tokens or sentences.
 }
 \usage{
-    text_filter(x = NULL, ...)
-    text_filter(x) <- value
+text_filter(x = NULL, ...)
+text_filter(x) <- value
 
-    \method{text_filter}{corpus_text}(x = NULL, ...)
+\method{text_filter}{corpus_text}(x = NULL, ...)
 
-    \method{text_filter}{data.frame}(x = NULL, ...)
+\method{text_filter}{data.frame}(x = NULL, ...)
 
-    \method{text_filter}{default}(x = NULL, ...,
-                        map_case = TRUE, map_quote = TRUE,
-                        remove_ignorable = TRUE,
-                        stemmer = NULL, stem_dropped = FALSE,
-                        stem_except = NULL,
-                        combine = abbreviations("english"),
-                        drop_letter = FALSE, drop_number = FALSE,
-                        drop_punct = FALSE, drop_symbol = FALSE,
-                        drop = NULL, drop_except = NULL,
-                        sent_crlf = FALSE,
-                        sent_suppress = abbreviations("english"))
+\method{text_filter}{default}(x = NULL, ...,
+            map_case = TRUE, map_quote = TRUE,
+            remove_ignorable = TRUE,
+            stemmer = NULL, stem_dropped = FALSE,
+            stem_except = NULL,
+            combine = corpus::abbreviations_en,
+            drop_letter = FALSE, drop_number = FALSE,
+            drop_punct = FALSE, drop_symbol = FALSE,
+            drop = NULL, drop_except = NULL,
+            sent_crlf = FALSE,
+            sent_suppress = corpus::abbreviations_en)
 }
 \arguments{
     \item{x}{text or corpus object.}
@@ -57,12 +57,24 @@
         algorithms are provided by the
         \href{http://snowballstem.org/algorithms/}{Snowball stemming library};
         the following stemming algorithms are available:
-            \code{"arabic"}, \code{"danish"}, \code{"dutch"},
-            \code{"english"}, \code{"finnish"}, \code{"french"},
-	        \code{"german"}, \code{"hungarian"}, \code{"italian"},
-            \code{"norwegian"}, \code{"porter"}, \code{"portuguese"},
-	        \code{"romanian"}, \code{"russian"}, \code{"spanish"},
-            \code{"swedish"}, \code{"tamil"}, and \code{"turkish"}.
+            \code{"ar"} (\code{"arabic"}),
+            \code{"da"} (\code{"danish"}),
+	        \code{"de"} (\code{"german"}),
+            \code{"en"} (\code{"english"}),
+            \code{"es"} (\code{"spanish"}),
+            \code{"fi"} (\code{"finnish"}),
+            \code{"fr"} (\code{"french"}),
+            \code{"hu"} (\code{"hungarian"}),
+            \code{"it"} (\code{"italian"}),
+            \code{"nl"} (\code{"dutch"}),
+            \code{"no"} (\code{"norwegian"}),
+            \code{"pt"} (\code{"portuguese"}),
+	        \code{"ro"} (\code{"romanian"}),
+            \code{"ru"} (\code{"russian"}),
+            \code{"sv"} (\code{"swedish"}),
+            \code{"ta"} (\code{"tamil"}),
+            \code{"tr"} (\code{"turkish"}),
+            and \code{"porter"}.
         }
 
     \item{stem_dropped}{a logical value indicating whether to stem words
@@ -76,7 +88,7 @@
         \code{NULL}; see \sQuote{Combining words}.}
 
     \item{drop_letter}{a logical value indicating whether to replace
-        \code{"letter"} tokens (cased letters, kana, idoegraphic, letter-like
+        \code{"letter"} tokens (cased letters, kana, ideographic, letter-like
         numeric characters and other letters) with \code{NA}.}
 
     \item{drop_number}{a logical value indicating whether to replace
@@ -119,40 +131,40 @@
     column of type \code{"corpus_text"}.
 }
 \seealso{
-    \code{\link{as_text}}, \code{\link{text_tokens}},
+    \code{\link{as_corpus_text}}, \code{\link{text_tokens}},
     \code{\link{text_split}}, \code{\link{abbreviations}},
     \code{\link{stopwords}}.
 }
 \examples{
-    # text filter with default options set
-    text_filter()
+# text filter with default options set
+text_filter()
 
-    # specify some options but leave others unchanged
-    f <- text_filter(map_case = FALSE, drop = stopwords("english"))
+# specify some options but leave others unchanged
+f <- text_filter(map_case = FALSE, drop = stopwords_en)
 
-    # set the text filter property
-    x <- as_text(c("Marnie the Dog is #1 on the internet."))
-    text_filter(x) <- f
-    text_tokens(x) # by default, uses x's text_filter to tokenize
+# set the text filter property
+x <- as_corpus_text(c("Marnie the Dog is #1 on the internet."))
+text_filter(x) <- f
+text_tokens(x) # by default, uses x's text_filter to tokenize
 
-    # change a filter property
-    f2 <- text_filter(x, map_case = TRUE)
-    # equivalent to:
-    # f2 <- text_filter(x)
-    # f2$map_case <- TRUE
+# change a filter property
+f2 <- text_filter(x, map_case = TRUE)
+# equivalent to:
+# f2 <- text_filter(x)
+# f2$map_case <- TRUE
 
-    text_tokens(x, f2) # override text_filter(x)
+text_tokens(x, f2) # override text_filter(x)
 
-    # setting text_filter on a data frame is allowed if it has a
-    # column names "text" of type "corpus_text"
-    d <- data.frame(text = x)
-    text_filter(d) <- f2
-    text_tokens(d)
+# setting text_filter on a data frame is allowed if it has a
+# column names "text" of type "corpus_text"
+d <- data.frame(text = x)
+text_filter(d) <- f2
+text_tokens(d)
 
-    # but you can't set text filters on character objects
-    y <- "hello world"
-    \dontrun{text_filter(y) <- f2} # gives an error
+# but you can't set text filters on character objects
+y <- "hello world"
+\dontrun{text_filter(y) <- f2 # gives an error}
 
-    d2 <- data.frame(text = "hello world", stringsAsFactors = FALSE)
-    \dontrun{text_filter(d2) <- f2} # gives an error
+d2 <- data.frame(text = "hello world", stringsAsFactors = FALSE)
+\dontrun{text_filter(d2) <- f2 # gives an error}
 }

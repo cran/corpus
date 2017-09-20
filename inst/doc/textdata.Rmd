@@ -1,0 +1,573 @@
+---
+title: "Text data in Corpus and other packages"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Text data in Corpus and other packages}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+Text data type
+--------------
+
+The *corpus* package does not define a special corpus object, but it does
+define a new data type, `corpus_text`, for storing a collection of texts. You
+can create values of this type using the `as_corpus_text()` or
+`as_corpus_frame()` function.
+
+Take, for example, the following sample text, created as an R character
+vector.
+
+
+```r
+# raw text for the first two paragraphs of _The Tale of Peter Rabbit_,
+# by Beatrix Potter
+raw <- c(
+    para1 =
+        paste("Once upon a time there were four little Rabbits,",
+	          "and their names were: Flopsy, Mopsy, Cottontail, and Peter.",
+	          "They lived with their Mother in a sandbank,",
+              "underneath the root of a very big fir tree.",
+              sep = "\n"),
+    para2 =
+        paste("'Now, my dears,' said old Mrs. Rabbit one morning,",
+              "'you may go into the fields or down the lane,",
+              "but don't go into Mr. McGregor's garden --",
+              "your Father had an accident there;",
+              "he was put in a pie by Mrs. McGregor.'",
+              sep = "\n"))
+```
+
+We can convert the text to a `corpus_text` object using the `as_corpus_text()`
+function:
+
+
+```r
+text <- as_corpus_text(raw)
+```
+
+Alternatively, we can convert it to a data frame with a column named `"text"`
+of type `corpus_text` using the `as_corpus_frame()` function:
+
+
+```r
+data <- as_corpus_frame(raw)
+```
+
+Both `as_corpus_frame()` and `as_corpus_text()` are generic; they work on
+character vectors, data frames, *tm* `Corpus` objects, and *quanteda* `corpus`
+objects.  Whenever you call a *corpus* function expecting text, that function
+calls `as_corpus_text()` on its input. We will see some examples of converting
+*tm* and *quanteda* objects below.
+
+
+The `corpus_text` type behaves like an R character vector in most respects,
+but using this type enables some new features.
+
+
+Text filter
+-----------
+
+Each `corpus_text` object has a `text_filter` property that can be get or set
+using the `text_filter()` generic function. This property allows us to specify
+the preprocessing decisions that define the text normalization, token, and
+sentence boundaries.
+
+
+```r
+# get the text filter
+print(text_filter(text))
+```
+
+```
+Text filter with the following options:
+
+	map_case: TRUE
+	map_quote: TRUE
+	remove_ignorable: TRUE
+	stemmer: NULL
+	stem_dropped: FALSE
+	stem_except: NULL
+	combine:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." "Abs." "AD." "Adj." ...
+	drop_letter: FALSE
+	drop_number: FALSE
+	drop_punct: FALSE
+	drop_symbol: FALSE
+	drop: NULL
+	drop_except: NULL
+	sent_crlf: FALSE
+	sent_suppress:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." "Abs." "AD." ...
+```
+
+```r
+# set a new text filter
+text_filter(text) <- text_filter(drop_punct = TRUE, drop = stopwords_en)
+
+# update a text filter property
+text_filter(text)$drop_punct <- TRUE
+
+# switch to the default text filter
+text_filter(text) <- NULL
+```
+
+
+Valid UTF-8
+-----------
+
+All `corpus_text` objects contain valid UTF-8 data. It is impossible to create
+a `corpus_text` object with invalid UTF-8:
+
+
+```r
+# the input is encoded in Latin-1, but declared as UTF-8
+x <- "fa\xE7ile"
+Encoding(x) <- "UTF-8"
+as_corpus_text(x) ## fails
+```
+
+```
+Error in as_corpus_text.character(x): argument entry 1 is marked as "UTF-8" but contains an invalid byte in position 3 (\xe7)
+```
+
+```r
+as_corpus_text(iconv(x, "Latin1", "UTF-8")) ## succeeds
+```
+
+```
+[1] "façile"
+```
+
+
+Unique names
+------------
+
+All `corpus_text` objects have unique names. When you coerce an object
+with duplicate names to `corpus_text`, the duplicates get renamed with a
+warning:
+
+
+```r
+x <- as_corpus_text(c(a = "hello", b = "world", a = "repeated name")) # fails
+```
+
+```
+Warning in as_corpus_text.character(c(a = "hello", b = "world", a = "repeated name")): renaming
+entries with duplicate names
+```
+
+```r
+names(x)
+```
+
+```
+[1] "a"   "b"   "a.1"
+```
+
+Setting repeated names fails:
+
+
+```r
+# fails, duplicate names
+names(x) <- c("a", "b", "a")
+```
+
+```
+Error in `names<-.corpus_text`(`*tmp*`, value = c("a", "b", "a")): duplicate 'names' are not allowed
+```
+
+You can set the `names` to `NULL` if you don't want them:
+
+```r
+names(x) <- NULL
+print(names(x))
+```
+
+```
+NULL
+```
+
+
+Reference memory-mapped data 
+----------------------------
+
+`corpus_text` objects can manage collections of texts that do not fit
+into memory, through the memory-map interface provided by
+`read_ndjson()`. When dealing with such objects, internally the
+`corpus_text` object just stores an offset into the file containing the
+text, not the text itself.
+
+
+```r
+# store some sample data in a newline-delimited JSON file
+tmp <- tempfile()
+writeLines(c('{"text": "A sample text", "metadata": 7 }',
+             '{"text": "Another text."}',
+             '{"text": "A third text.", "metadata": -100}'),
+           tmp)
+
+# memory-map the "text" field
+data <- read_ndjson(tmp, text = "text", mmap = TRUE)
+
+# display the internal representation of the resulting 'corpus_text' object
+unclass(data$text)
+```
+
+```
+$handle
+<pointer: 0x7fc2576e75f0>
+
+$sources
+$sources[[1]]
+JSON data set with 3 rows of type text
+
+
+$table
+  source row start stop
+1      1   1     1   13
+2      1   2     1   13
+3      1   3     1   13
+
+$names
+NULL
+
+$filter
+NULL
+```
+
+Above, the `handle` component of the text object is a memory-mapped view of
+the file. The `table` component stores the row numbers for the data, along
+with the start and stop indices of the text.
+
+
+Reference substrings of other objects
+-------------------------------------
+
+`corpus_text` objects can reference substrings of other R character
+objects, without copying the parent object. This allows functions like
+`text_split()` and `text_locate()` to quickly split a text into smaller
+segments without allocating new character strings.
+
+
+```r
+# segment text into chunks of at most 10 tokens
+(chunks <- text_split(text, "tokens", 10))
+```
+
+```
+   parent index text                                           
+1  para1      1 Once upon a time there were four little Rabbits
+2  para1      2 ,\nand their names were: Flopsy, Mopsy         
+3  para1      3 , Cottontail, and Peter.\nThey lived with      
+4  para1      4 their Mother in a sandbank,\nunderneath the    
+5  para1      5 root of a very big fir tree.                   
+6  para2      1 'Now, my dears,' said old                      
+7  para2      2 Mrs. Rabbit one morning,\n'you may go          
+8  para2      3 into the fields or down the lane,\nbut         
+9  para2      4 don't go into Mr. McGregor's garden --\nyour   
+10 para2      5 Father had an accident there;\nhe was put      
+11 para2      6 in a pie by Mrs. McGregor.'                    
+```
+
+```r
+# segmenting does not allocate new objects for the segments
+unclass(chunks$text) # inspect text internals
+```
+
+```
+$handle
+<pointer: 0x7fc25b131600>
+
+$sources
+$sources[[1]]
+                                                                                                                                                                                                                      para1 
+                  "Once upon a time there were four little Rabbits,\nand their names were: Flopsy, Mopsy, Cottontail, and Peter.\nThey lived with their Mother in a sandbank,\nunderneath the root of a very big fir tree." 
+                                                                                                                                                                                                                      para2 
+"'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into the fields or down the lane,\nbut don't go into Mr. McGregor's garden --\nyour Father had an accident there;\nhe was put in a pie by Mrs. McGregor.'" 
+
+
+$table
+   source row start stop
+1       1   1     1   47
+2       1   1    48   84
+3       1   1    85  125
+4       1   1   126  168
+5       1   1   169  196
+6       1   2     1   26
+7       1   2    27   63
+8       1   2    64  101
+9       1   2   102  145
+10      1   2   146  186
+11      1   2   187  213
+
+$names
+NULL
+
+$filter
+NULL
+```
+
+The call to `text_split()` did not allocate any new character objects; the
+result uses the same sources, but with different start and stop indices.
+
+
+Better printing
+---------------
+
+Printing `corpus_text` objects truncates the output at the end of the line
+instead of printing the entire contents.
+
+
+```r
+# print a character object
+print(raw)
+```
+
+```
+                                                                                                                                                                                                                      para1 
+                  "Once upon a time there were four little Rabbits,\nand their names were: Flopsy, Mopsy, Cottontail, and Peter.\nThey lived with their Mother in a sandbank,\nunderneath the root of a very big fir tree." 
+                                                                                                                                                                                                                      para2 
+"'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into the fields or down the lane,\nbut don't go into Mr. McGregor's garden --\nyour Father had an accident there;\nhe was put in a pie by Mrs. McGregor.'" 
+```
+
+```r
+# print a corpus_text object
+print(text)
+```
+
+```
+para1 "Once upon a time there were four little Rabbits,\nand their names were: Flopsy, Mopsy, Cott…"
+para2 "'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into the fields or down the…"
+```
+
+If you'd like to print the entire contents, you can convert the text to
+character and then print:
+
+
+```r
+# print entire contents
+print(as.character(text))
+```
+
+```
+[1] "Once upon a time there were four little Rabbits,\nand their names were: Flopsy, Mopsy, Cottontail, and Peter.\nThey lived with their Mother in a sandbank,\nunderneath the root of a very big fir tree."                  
+[2] "'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into the fields or down the lane,\nbut don't go into Mr. McGregor's garden --\nyour Father had an accident there;\nhe was put in a pie by Mrs. McGregor.'"
+```
+
+
+Conversion to character
+-----------------------
+
+The one disadvantage of using a `corpus_text` object instead of an R character
+vector is that many functions from other packages that expect R character
+vectors will not work on `corpus_text`. To get around this, you can call
+`as.character` on a `corpus_text` object to convert it to an R character
+vector.
+
+
+```r
+# some R methods coerce their inputs to character; 'message' is one example
+message(as_corpus_text("hello world"))
+```
+
+```
+hello world
+```
+
+```r
+# others do not;
+cat(as_corpus_text("hello world"), "\n") # fails
+```
+
+```
+Error in cat(as_corpus_text("hello world"), "\n"): argument 1 (type 'list') cannot be handled by 'cat'
+```
+
+```r
+# we must call 'as.character' on the inputs
+cat(as.character(as_corpus_text("hello world")), "\n")
+```
+
+```
+hello world 
+```
+
+
+Interface with *quanteda*
+-------------------------
+
+All *corpus* functions expecting text work on *quanteda* corpus objects:
+
+```r
+uk2010immigCorpus <- 
+    quanteda::corpus(quanteda::data_char_ukimmig2010,
+           docvars = data.frame(party = names(quanteda::data_char_ukimmig2010)),
+           metacorpus = list(notes = "Immigration-related sections of 2010 UK party manifestos"))
+
+# search for terms in a quanteda corpus that stem to "immigr":
+text_locate(uk2010immigCorpus, "immigr", stemmer = "en")
+```
+
+```
+   text                 before                   instance                    after                  
+1  BNP                                          IMMIGRATION : AN UNPARALLELED CRISIS WHICH ONLY THE…
+2  BNP  …Y THE BNP CAN SOLVE. \n\n- At current  immigration  and birth rates, indigenous British pe…
+3  BNP  …ps will include a halt to all further  immigration , the deportation of all illegal immigr…
+4  BNP  …ation, the deportation of all illegal  immigrants  , a halt to the "asylum" swindle and th…
+5  BNP  …rimes in Britain, regardless of their  immigration  status.\n\n- The BNP will review all c…
+6  BNP  …admission that they orchestrated mass  immigration  to change forcibly Britain's demograph…
+7  BNP  …ence is in grave peril, threatened by  immigration  and multiculturalism. In the absence o…
+8  BNP  …l Statistics (ONS), legal Third World  immigrants   made up 14.7 percent (7.5 million) of …
+9  BNP  …births to second and third generation   immigrant   mothers. Figures released by the ONS i…
+10 BNP  … When these figures are added in, the   immigrant   birth rate is estimated to be around 5…
+11 BNP  … Wales.\n\n- The majority of the 'new  immigrants  ' are not from Eastern Europe, as is of…
+12 BNP  …laimed. According to the ONS figures,  immigrants   from Eastern Europe had 25,000 childre…
+13 BNP  …mber exponentially, and given current  immigration  and birth rates, will utterly overwhel…
+14 BNP  …ars.\n\nThe Disastrous Effect of Mass  Immigration  on British Society\n\nThere is no esca…
+15 BNP  …ewhere that it is 'racist' to discuss  immigration  and population density.\n\nThe word 'r…
+16 BNP  …f between 300,000-500,000 Third World  immigrants   each year is an issue that all three o…
+17 BNP  …and so on.\n\nA Case Study: Crime and  Immigration \n\nImmigration has had a dramatic effe…
+18 BNP  … Case Study: Crime and Immigration\n\n Immigration  has had a dramatic effect on Britain's…
+19 BNP  …tionately involving ethnic groups.\n\n Immigration  Has Harmed British Jobs\n\nThe concept…
+20 BNP  …ons working than in 1997.\n\nOverall,  immigrants   have taken up more than 1.64 million o…
+⋮  (87 rows total)
+```
+
+You can convert a *quanteda* corpus to a data frame using `as_corpus_frame()`,
+or extract its text using `as_corpus_text()`:
+
+
+```r
+# convert to corpus_text:
+print(as_corpus_text(uk2010immigCorpus))
+```
+
+```
+BNP          "IMMIGRATION: AN UNPARALLELED CRISIS WHICH ONLY THE BNP CAN SOLVE. \n\n- At current i…"
+Coalition    "IMMIGRATION. \n\nThe Government believes that immigration has enriched our culture a…"
+Conservative "Attract the brightest and best to our country.\n\nImmigration has enriched our natio…"
+Greens       "Immigration.\n\nMigration is a fact of life.  People have always moved from one coun…"
+Labour       "Crime and immigration\n\nThe challenge for Britain\n\nWe will control immigration wi…"
+LibDem       "firm but fair immigration system\n\nBritain has always been an open, welcoming count…"
+PC           "As a welcoming nation, Plaid Cymru recognises the invaluable contribution that migra…"
+SNP          "And we will argue for Scotland to take responsibility for immigration so that we can…"
+UKIP         "Immigration & Asylum.\n\nAs a member of the EU, Britain has lost control of her bord…"
+```
+
+```r
+# convert to data frame:
+print(as_corpus_frame(uk2010immigCorpus))
+```
+
+```
+             party        text                                                                      
+BNP          BNP          IMMIGRATION: AN UNPARALLELED CRISIS WHICH ONLY THE BNP CAN SOLVE. \n\n- A…
+Coalition    Coalition    IMMIGRATION. \n\nThe Government believes that immigration has enriched ou…
+Conservative Conservative Attract the brightest and best to our country.\n\nImmigration has enriche…
+Greens       Greens       Immigration.\n\nMigration is a fact of life.  People have always moved fr…
+Labour       Labour       Crime and immigration\n\nThe challenge for Britain\n\nWe will control imm…
+LibDem       LibDem       firm but fair immigration system\n\nBritain has always been an open, welc…
+PC           PC           As a welcoming nation, Plaid Cymru recognises the invaluable contribution…
+SNP          SNP          And we will argue for Scotland to take responsibility for immigration so …
+UKIP         UKIP         Immigration & Asylum.\n\nAs a member of the EU, Britain has lost control …
+```
+
+
+Interface with *tm*
+-------------------
+
+All *corpus* functions expecting text also work on *tm* Corpus objects:
+
+```r
+data("crude", package = "tm")
+
+# get the top terms in a tm corpus:
+term_stats(crude, drop_punct = TRUE, drop = stopwords_en)
+```
+
+```
+   term      count support
+1  oil          85      20
+2  said         73      20
+3  reuter       20      20
+4  prices       48      15
+5  last         24      12
+6  one          17      12
+7  dlrs         23      11
+8  opec         44      10
+9  barrel       15      10
+10 mln          31       9
+11 crude        21       9
+12 new          14       9
+13 pct          14       9
+14 price        13       9
+15 also          9       9
+16 petroleum     9       9
+17 market       20       8
+18 barrels      11       8
+19 industry     10       8
+20 world        10       8
+⋮  (1042 rows total)
+```
+
+The `as_corpus_frame()` and `as_corpus_text()` functions also work on *tm*
+Corpus objects:
+
+
+```r
+# convert to corpus_text
+print(as_corpus_text(crude))
+```
+
+```
+127 "Diamond Shamrock Corp said that\neffective today it had cut its contract prices for crude oil…"
+144 "OPEC may be forced to meet before a\nscheduled June session to readdress its production cutti…"
+191 "Texaco Canada said it lowered the\ncontract price it will pay for crude oil 64 Canadian cts a…"
+194 "Marathon Petroleum Co said it reduced\nthe contract price it will pay for all grades of crude…"
+211 "Houston Oil Trust said that independent\npetroleum engineers completed an annual study that e…"
+236 "Kuwait\"s Oil Minister, in remarks\npublished today, said there were no plans for an emergenc…"
+237 "Indonesia appears to be nearing a\npolitical crossroads over measures to deregulate its prote…"
+242 "Saudi riyal interbank deposits were\nsteady at yesterday's higher levels in a quiet market.\n…"
+246 "The Gulf oil state of Qatar, recovering\nslightly from last year's decline in world oil price…"
+248 "Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last December…"
+273 "Saudi crude oil output last month fell\nto an average of 3.5 mln barrels per day (bpd) from 3…"
+349 "Deputy oil ministers from six Gulf\nArab states will meet in Bahrain today to discuss coordin…"
+352 "Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last December…"
+353 "Kuwait's oil minister said in a newspaper\ninterview that there were no plans for an emergenc…"
+368 "The port of Philadelphia was closed\nwhen a Cypriot oil tanker, Seapride II, ran aground afte…"
+489 "A study group said the United States\nshould increase its strategic petroleum reserve to one …"
+502 "A study group said the United States\nshould increase its strategic petroleum reserve to one …"
+543 "Unocal Corp's Union Oil Co said it\nlowered its posted prices for crude oil one to 1.50 dlrs …"
+704 "The New York Mercantile Exchange set\nApril one for the debut of a new procedure in the energ…"
+708 "Argentine crude oil production was\ndown 10.8 pct in January 1987 to 12.32 mln barrels, from …"
+```
+
+```r
+# convert to data frame
+print(as_corpus_frame(crude))
+```
+
+```
+    text                                                                                            
+127 Diamond Shamrock Corp said that\neffective today it had cut its contract prices for crude oil b…
+144 OPEC may be forced to meet before a\nscheduled June session to readdress its production cutting…
+191 Texaco Canada said it lowered the\ncontract price it will pay for crude oil 64 Canadian cts a\n…
+194 Marathon Petroleum Co said it reduced\nthe contract price it will pay for all grades of crude o…
+211 Houston Oil Trust said that independent\npetroleum engineers completed an annual study that est…
+236 Kuwait"s Oil Minister, in remarks\npublished today, said there were no plans for an emergency O…
+237 Indonesia appears to be nearing a\npolitical crossroads over measures to deregulate its protect…
+242 Saudi riyal interbank deposits were\nsteady at yesterday's higher levels in a quiet market.\n  …
+246 The Gulf oil state of Qatar, recovering\nslightly from last year's decline in world oil prices,…
+248 Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last December's…
+273 Saudi crude oil output last month fell\nto an average of 3.5 mln barrels per day (bpd) from 3.8…
+349 Deputy oil ministers from six Gulf\nArab states will meet in Bahrain today to discuss coordinat…
+352 Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last December's…
+353 Kuwait's oil minister said in a newspaper\ninterview that there were no plans for an emergency …
+368 The port of Philadelphia was closed\nwhen a Cypriot oil tanker, Seapride II, ran aground after… 
+489 A study group said the United States\nshould increase its strategic petroleum reserve to one ml…
+502 A study group said the United States\nshould increase its strategic petroleum reserve to one ml…
+543 Unocal Corp's Union Oil Co said it\nlowered its posted prices for crude oil one to 1.50 dlrs a… 
+704 The New York Mercantile Exchange set\nApril one for the debut of a new procedure in the energy… 
+708 Argentine crude oil production was\ndown 10.8 pct in January 1987 to 12.32 mln barrels, from 13…
+```

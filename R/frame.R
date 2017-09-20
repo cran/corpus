@@ -10,6 +10,7 @@
 #  distributed under the License is distributed on an "AS IS" BASIS,
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
+#  limitations under the License.
 
 format.corpus_frame <- function(x, chars = NULL, justify = "left",
                                 na.encode = TRUE, quote = FALSE,
@@ -31,7 +32,6 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
         na.print <- as_na_print("na.print", na.print)
         print.gap <- as_print_gap("print.gap", print.gap)
     })
-
 
     if ((stretch <- is.null(chars))) {
         width <- getOption("width")
@@ -55,6 +55,7 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
     nr <- .row_names_info(x, 2L)
     nc <- ncol(x)
     names <- names(x)
+    names[is.na(names)] <- "NA"
 
     cols <- vector("list", nc)
 
@@ -68,7 +69,12 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
         fac <- FALSE
 
         if (stretch) {
-            chars <- max(chars_min, chars_left)
+            if (chars_left < chars_min) {
+                # allow wrap to next line
+                chars <- chars_max
+            } else {
+                chars <- chars_left
+            }
         }
 
         if (is.factor(elt) && (identical(cl, "factor")
@@ -80,7 +86,7 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
 
         if (is.character(elt) && (identical(cl, "character")
                                   || identical(cl, "AsIs"))) {
-            w <- if (is.na(names[[i]])) 2 else utf8_width(names[[i]])
+            w <- utf8_width(names[[i]])
             cols[[i]] <- utf8_format(elt, chars = chars, justify = justify,
                                      width = w, na.encode = na.encode,
                                      quote = quote, na.print = na.print)
@@ -91,7 +97,7 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
                                 na.encode = na.encode, quote = quote,
                                 na.print = na.print,
                                 print.gap = print.gap, ...)
-            char <- is_text(elt)
+            char <- is_corpus_text(elt)
         }
 
         if (char) {
@@ -105,14 +111,17 @@ format.corpus_frame <- function(x, chars = NULL, justify = "left",
 
         if (stretch) {
             cn <- names[[i]]
-            if (is.na(cn)) {
-                cn <- "NA"
-            }
-
             cw <- utf8_width(cols[[i]], quote = quote)
             cw[is.na(cw)] <- if (char && !quote) 4 else 2
 
-            chars_left <- (chars_left - gap - max(cw, utf8_width(cn)))
+            w <- max(cw, utf8_width(cn))
+            if (w > chars_left) {
+                # wrapped to next line
+                chars_left <- chars_max - gap - w
+            } else {
+                chars_left <- chars_left - gap - w
+            }
+
             if (chars_left < 0) {
                 chars_left <- chars_max
             }
@@ -168,7 +177,7 @@ print.corpus_frame <- function(x, rows = 20L, chars = NULL, digits = NULL,
             if (identical(row.names, FALSE)) {
                 row.names <- rep("", n)
             } else {
-                row.names <- as_names("row.names", row.names, n)
+                row.names <- as_names("row.names", row.names, n, unique = FALSE)
             }
         }
         max <- as_max_print("max", max)

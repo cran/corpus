@@ -1,23 +1,25 @@
 \name{text_types}
 \alias{text_ntype}
 \alias{text_types}
-\title{Text Type Sets.}
+\title{Text Type Sets}
 \description{
     Get or measure the set of types (unique token values).
 }
 \usage{
-    text_types(x, filter = text_filter(x), collapse = FALSE)
+text_types(x, filter = NULL, collapse = FALSE, ...)
 
-    text_ntype(x, filter = text_filter(x), collapse = FALSE)
+text_ntype(x, filter = NULL, collapse = FALSE, ...)
 }
 \arguments{
-    \item{x}{a text or character vector.}
+\item{x}{a text or character vector.}
 
-    \item{filter}{a text filter defining the token boundaries and
-        normalization.}
+\item{filter}{if non-\code{NULL}, a text filter to to use instead of
+    the default text filter for \code{x}.}
 
-    \item{collapse}{a logical value indicating whether to collapse the
-        aggregation over all rows of the input.}
+\item{collapse}{a logical value indicating whether to collapse the
+    aggregation over all rows of the input.}
+
+\item{\dots}{additional properties to set on the text filter.}
 }
 \details{
     \code{text_ntype} counts the number of unique types in each text;
@@ -41,16 +43,16 @@
     \code{\link{text_filter}}, \code{\link{text_tokens}}.
 }
 \examples{
-    text <- c("I saw Mr. Jones today.",
-              "Split across\na line.",
-              "What. Are. You. Doing????",
-              "She asked 'do you really mean that?' and I said 'yes.'")
+text <- c("I saw Mr. Jones today.",
+          "Split across\na line.",
+          "What. Are. You. Doing????",
+          "She asked 'do you really mean that?' and I said 'yes.'")
 
-    # count the number of unique types
-    text_ntype(text)
-    text_ntype(text, collapse = TRUE)
+# count the number of unique types
+text_ntype(text)
+text_ntype(text, collapse = TRUE)
 
-    # get the type sets
-    text_types(text)
-    text_types(text, collapse = TRUE)
+# get the type sets
+text_types(text)
+text_types(text, collapse = TRUE)
 }

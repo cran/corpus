@@ -12,13 +12,45 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-term_counts <- function(x, filter = text_filter(x), weights = NULL,
-                        ngrams = NULL, min_count = NULL, max_count = NULL,
-                        min_support = NULL, max_support = NULL, types = FALSE)
+as_corpus <- function(x, filter = NULL, ..., row.names = NULL)
 {
-    .Deprecated("term_stats")
-    term_stats(x = x, filter = filter, weights = weights, ngrams = ngrams,
-               min_count = min_count, max_count = max_count,
-               min_support = min_support, max_support = max_support,
-               types = types)
+    .Deprecated("as_corpus_frame")
+    as_corpus_frame(x, filter = filter, ..., row.names = row.names)
+}
+
+
+as_text <- function(x, filter = NULL, ..., names = NULL)
+{
+    .Deprecated("as_corpus_text")
+    as_corpus_text(x, filter = filter, ..., names = names)
+}
+
+
+corpus <- function(..., row.names = NULL, filter = NULL)
+{
+    .Deprecated("corpus_frame")
+    call <- match.call()
+    call[[1L]] <- quote(corpus_frame)
+    eval(call, parent.frame())
+}
+
+
+is_corpus <- function(x)
+{
+    .Deprecated("is_corpus_frame")
+    is_corpus_frame(x)
+}
+
+
+is_text <- function(x)
+{
+    .Deprecated("is_corpus_text")
+    is_corpus_text(x)
+}
+
+
+term_frame <- function(x, filter = NULL, weights = NULL, ngrams = NULL,
+                       select = NULL, group = NULL, ...)
+{
+    .Deprecated("term_counts")
 }

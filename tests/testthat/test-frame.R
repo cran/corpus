@@ -311,3 +311,92 @@ test_that("'print.corpus_frame' does not need a gap at the end", {
     expect_equal(length(strsplit(capture_output(print.corpus_frame(d)),
                                  "\n")[[1]]), 2)
 })
+
+
+test_that("'print.corpus_frame' can wrap 4 columns", {
+    ctype <- switch_ctype("C")
+    on.exit(Sys.setlocale("LC_CTYPE", ctype), add = TRUE)
+
+    oldwidth <- options()$width
+    options(width = 80)
+    on.exit(options(width = oldwidth), add = TRUE)
+
+    x <- corpus_frame(
+        title = "The Declaration of Independence of The United States of America",
+        author = "Founding Fathers",
+        language = "English",
+        text = "The Declaration of Independence of The United States of America\n\n\nWhen in the course of human events")
+
+    lines <- c(
+'  title                                                          ',
+'1 The Declaration of Independence of The United States of America',
+'  author           language text                                                ',
+'1 Founding Fathers English  The Declaration of Independence of The United Sta...')
+
+    expect_equal(strsplit(capture_output(print.corpus_frame(x)), "\n")[[1]],
+                 lines)
+})
+
+
+test_that("'as_corpus_frame' works on list", {
+    actual <- as_corpus_frame(list(text = c("hello", "world")))
+    expected <- as_corpus_frame(data.frame(text = as_corpus_text(c("hello", "world"))))
+    expect_equal(actual, expected)
+})
+
+
+test_that("'as_corpus_frame' works on character", {
+    actual <- as_corpus_frame(c("hello", "world"))
+    expected <- as_corpus_frame(data.frame(text = as_corpus_text(c("hello", "world"))))
+    expect_equal(actual, expected)
+})
+
+
+test_that("'as_corpus_frame' works on JSON scalar", {
+    tmp <- tempfile()
+    writeLines(c('"hello"', 'null', '"world"'), tmp)
+    obj <- read_ndjson(tmp, simplify = FALSE)
+    actual <- as_corpus_frame(obj)
+    expected <- as_corpus_frame(data.frame(text = c("hello", NA, "world")))
+    expect_equal(actual, expected)
+})
+
+
+test_that("'as_corpus_frame' works on JSON record", {
+    tmp <- tempfile()
+    writeLines(c('{"text": "hello"}', 'null', '{"a": 1, "text": "world"}'), tmp)
+    obj <- read_ndjson(tmp, simplify = FALSE)
+    actual <- as_corpus_frame(obj)
+    expected <- as_corpus_frame(data.frame(text = c("hello", NA, "world"),
+                                           a = c(NA_integer_, NA_integer_, 1L)))
+    expect_equal(actual, expected)
+})
+
+
+test_that("'as_corpus_frame' errors on invalid inputs", {
+    expect_error(as_corpus_frame.corpus_text("hello"),
+                 "argument is not a valid text object")
+
+    expect_error(as_corpus_frame.data.frame(list(text = "hello")),
+                 "argument is not a valid data frame")
+
+    expect_error(as_corpus_frame(data.frame(txt = "hello")),
+                 "no column named \"text\" in data frame")
+})
+
+
+test_that("'as_corpus_frame' can set row names", {
+    x <- data.frame(text = c("a", "b", "c", "d"))
+    y <- as_corpus_frame(x, row.names = c("w", "x", "y", "z"))
+    expect_equal(y, corpus_frame(text = c("a", "b", "c", "d"),
+                                 row.names = c("w", "x", "y", "z")))
+})
+
+
+test_that("'is_corpus_frame' works correctly", {
+    expect_false(is_corpus_frame(list(text = "hello")))
+    expect_false(is_corpus_frame(data.frame(txt = "hello")))
+    expect_false(is_corpus_frame(data.frame(text = "hello",
+                                            stringsAsFactors = FALSE)))
+    expect_true(is_corpus_frame(data.frame(text = as_corpus_text("hello"))))
+})

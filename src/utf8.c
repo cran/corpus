@@ -479,7 +479,7 @@ static SEXP charsxp_encode(SEXP sx, int display, int utf8, char **bufptr,
 
 	ce = getCharCE(sx);
 	if (!encodes_utf8(ce)) {
-		str2 = (const uint8_t *)translateCharUTF8(sx);
+		str2 = (const uint8_t *)translate_utf8(sx);
 		ce = CE_UTF8;
 		if (str2 != str) {
 			str = str2;
@@ -551,7 +551,7 @@ SEXP utf8_coerce(SEXP sx)
 			str = (const uint8_t *)CHAR(sstr);
 			size = (size_t)XLENGTH(sstr);
 		} else {
-			str = (const uint8_t *)translateCharUTF8(sstr);
+			str = (const uint8_t *)translate_utf8(sstr);
 			size = strlen((const char *)str);
 		}
 
@@ -648,7 +648,7 @@ SEXP utf8_valid(SEXP sx)
 			str = (const uint8_t *)CHAR(sstr);
 			size = (size_t)XLENGTH(sstr);
 		} else {
-			str = (const uint8_t *)translateCharUTF8(sstr);
+			str = (const uint8_t *)translate_utf8(sstr);
 			size = strlen((const char *)str);
 		}
 
@@ -744,3 +744,67 @@ SEXP utf8_encode(SEXP sx, SEXP sdisplay, SEXP sutf8)
 
 	return ans;
 }
+
+#if (defined(_WIN32) || defined(_WIN64))
+#include <windows.h>
+extern unsigned int localeCP;
+
+const char *translate_utf8(SEXP x)
+{
+	LPWSTR wstr;
+	const char *raw;
+	char *str;
+	cetype_t ce;
+	int len, wlen, n;
+	UINT cp;
+
+	ce = getCharCE(x);
+	raw = CHAR(x);
+	n = LENGTH(x);
+
+	if (encodes_utf8(ce) || n == 0) {
+		return raw;
+	}
+
+	if (ce != CE_NATIVE && ce != CE_LATIN1) {
+		return translateCharUTF8(x);
+	}
+
+	if (ce == CE_LATIN1) {
+		// R seems to mark native strings as "latin1" when the code page
+		// is set to 1252, but this doesn't seem to be correct. Work
+		// around this behavior by decoding "latin1" as Windows-1252.
+		cp = 1252;
+	} else {
+		cp = localeCP;
+		if (cp == 0) {
+			// Failed determining code page from locale. Use native
+			// code page, which R interprets to be the ANSI Code Page
+			// **not GetConsoleCP(), even if CharacterMode == RTerm**.
+			// See src/extra/win_iconv.c; name_to_codepage().
+			cp = GetACP();
+		}
+	}
+
+	// translate from current code page to UTF-16
+	wlen = MultiByteToWideChar(cp, 0, raw, n, NULL, 0);
+	wstr = (LPWSTR)R_alloc(wlen, sizeof(*wstr));
+	MultiByteToWideChar(cp, 0, raw, n, wstr, wlen);
+
+	// convert from UTF-16 to UTF-8
+	len = WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, NULL, 0, NULL, NULL);
+	str = R_alloc(len + 1, 1); // add space for NUL
+	WideCharToMultiByte(CP_UTF8, 0, wstr, wlen, str, len, NULL, NULL);
+	str[len] = '\0';
+
+	return str;
+}
+
+#else
+
+const char *translate_utf8(SEXP x)
+{
+	return translateCharUTF8(x);
+}
+
+#endif

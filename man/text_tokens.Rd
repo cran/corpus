@@ -8,17 +8,19 @@
    a particular \sQuote{type}.
 }
 \usage{
-    text_tokens(x, filter = text_filter(x))
+text_tokens(x, filter = NULL, ...)
 
-    text_ntoken(x, filter = text_filter(x))
+text_ntoken(x, filter = NULL, ...)
 
-    text_length(x, filter = text_filter(x))
+text_length(x, filter = NULL, ...)
 }
 \arguments{
-    \item{x}{object to be tokenized.}
+\item{x}{object to be tokenized.}
 
-    \item{filter}{filter specifying the transformation from text to
-        token sequence.}
+\item{filter}{if non-\code{NULL}, a text filter to to use instead of
+    the default text filter for \code{x}.}
+
+\item{\dots}{additional properties to set on the text filter.}
 }
 \details{
     \code{text_tokens} splits texts into token sequences. Each token is an
@@ -107,7 +109,7 @@
     cause consecutive instances of the words \code{new} and \code{york}
     to get replaced by a single token, \code{new york}.
 
-    By default, we set \code{combine = abbreviations("english")}, so
+    By default, we set \code{combine = abbreviations_en}, so
     that abbreviations like \code{"Ms."} get treated as single tokens;
     with \code{combine = NULL}, trailing punctuation gets split off, and
     \code{"Ms."} gets tokenized into two tokens, for "Ms" and ".".
@@ -128,42 +130,42 @@
     \code{\link{term_matrix}}.
 }
 \examples{
-    text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?")
+text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?")
 
-    # count non-dropped tokens:
-    text_ntoken("The quick ('brown') fox can't jump 32.3 feet, right?")
+# count non-dropped tokens:
+text_ntoken("The quick ('brown') fox can't jump 32.3 feet, right?")
 
-    # count dropped and non-dropped tokens:
-    text_length("The quick ('brown') fox can't jump 32.3 feet, right?")
+# count dropped and non-dropped tokens:
+text_length("The quick ('brown') fox can't jump 32.3 feet, right?")
 
-    # don't change case or quotes:
-    f <- text_filter(map_case = FALSE, map_quote = FALSE)
-    text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?", f)
+# don't change case or quotes:
+f <- text_filter(map_case = FALSE, map_quote = FALSE)
+text_tokens("The quick ('brown') fox can't jump 32.3 feet, right?", f)
 
-    # drop common function words ('stop' words):
-    text_tokens("Able was I ere I saw Elba.",
-                text_filter(drop = stopwords("english")))
+# drop common function words ('stop' words):
+text_tokens("Able was I ere I saw Elba.",
+            text_filter(drop = stopwords_en))
 
-    # drop numbers, with some exceptions:"
-    text_tokens("0, 1, 2, 3, 4, 5",
-                text_filter(drop_number = TRUE,
-                            drop_except = c("0", "2", "4")))
+# drop numbers, with some exceptions:"
+text_tokens("0, 1, 2, 3, 4, 5",
+            text_filter(drop_number = TRUE,
+                        drop_except = c("0", "2", "4")))
 
-    # apply stemming...
-    text_tokens("Mary is running", text_filter(stemmer = "english"))
+# apply stemming...
+text_tokens("Mary is running", text_filter(stemmer = "english"))
 
-    # ...except for certain words
-    text_tokens("Mary is running",
-                text_filter(stemmer = "english", stem_except = "mary"))
+# ...except for certain words
+text_tokens("Mary is running",
+            text_filter(stemmer = "english", stem_except = "mary"))
 
-    # combine abbreviations by default
-    text_tokens("Ms. Jones")
+# combine abbreviations by default
+text_tokens("Ms. Jones")
 
-    # disable default combinations
-    text_tokens("Ms. Jones", text_filter(combine = NULL))
+# disable default combinations
+text_tokens("Ms. Jones", text_filter(combine = NULL))
 
-    # add new combinations
-    text_tokens("Ms. Jones is from New York City, New York.",
-                text_filter(combine = c(abbreviations("english"),
-                                        "new york", "new york city")))
+# add new combinations
+text_tokens("Ms. Jones is from New York City, New York.",
+            text_filter(combine = c(abbreviations_en,
+                                    "new york", "new york city")))
 }
