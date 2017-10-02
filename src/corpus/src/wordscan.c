@@ -121,6 +121,8 @@ void corpus_wordscan_reset(struct corpus_wordscan *scan)
 
 int corpus_wordscan_advance(struct corpus_wordscan *scan)
 {
+	int in_extend = 0;
+
 	scan->current.ptr = (uint8_t *)scan->ptr;
 	scan->current.attr = 0;
 
@@ -133,7 +135,7 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 		goto Break;
 
 	case WORD_BREAK_CR:
-		scan->type = CORPUS_WORD_SPACE;
+		scan->type = CORPUS_WORD_NONE;
 		
 		if (scan->iter_prop == WORD_BREAK_LF) {
 			// Do not break within CRLF
@@ -148,7 +150,7 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 
 	case WORD_BREAK_NEWLINE:
 	case WORD_BREAK_LF:
-		scan->type = CORPUS_WORD_SPACE;
+		scan->type = CORPUS_WORD_NONE;
 
 		// Break after Newlines
 		// WB3a: (Newline | LF) +
@@ -156,7 +158,7 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 		goto Break;
 
 	case WORD_BREAK_ZWJ:
-		scan->type = CORPUS_WORD_OTHER;
+		scan->type = CORPUS_WORD_NONE;
 
 		if (scan->iter_prop == WORD_BREAK_GLUE_AFTER_ZWJ) {
 			scan->type = CORPUS_WORD_SYMBOL;
@@ -194,27 +196,12 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 		goto Numeric;
 
 	case WORD_BREAK_EXTENDNUMLET:
-		scan->type = CORPUS_WORD_LETTER;
-		NEXT();
-
-		switch (scan->prop) {
-			case WORD_BREAK_EXTENDNUMLET:
-			case WORD_BREAK_ALETTER:
-			case WORD_BREAK_HEBREW_LETTER:
-				scan->type = CORPUS_WORD_LETTER;
-				break;
-
-			case WORD_BREAK_NUMERIC:
-				scan->type = CORPUS_WORD_NUMBER;
-				break;
-
-			case WORD_BREAK_KATAKANA:
-				scan->type = CORPUS_WORD_LETTER;
-				break;
-
-			default:
-				break;
+		in_extend = 1;
+		// special handling for U+202F Narrow NBSP
+		if (scan->code != 0x202f) {
+			scan->type = CORPUS_WORD_PUNCT;
 		}
+		NEXT();
 		goto ExtendNumLet;
 
 	case WORD_BREAK_HEBREW_LETTER:
@@ -292,12 +279,8 @@ int corpus_wordscan_advance(struct corpus_wordscan *scan)
 	case WORD_BREAK_EXTEND: // marks
 	case WORD_BREAK_FORMAT: // Cf format controls
 	case WORD_BREAK_OTHER:
-		scan->type = CORPUS_WORD_OTHER;
-		NEXT();
-		goto Break;
-
 	case WORD_BREAK_WHITE_SPACE:
-		scan->type = CORPUS_WORD_SPACE;
+		scan->type = CORPUS_WORD_NONE;
 		NEXT();
 		goto Break;
 	}
@@ -632,26 +615,50 @@ ExtendNumLet:
 
 	switch (scan->prop) {
 	case WORD_BREAK_ALETTER:
+		if (in_extend) {
+			scan->type = CORPUS_WORD_LETTER;
+			in_extend = 0;
+		}
+
 		// WB13b: ExtendNumLet * AHLetter
 		NEXT();
 		goto ALetter;
 
 	case WORD_BREAK_NUMERIC:
+		if (in_extend) {
+			scan->type = CORPUS_WORD_NUMBER;
+			in_extend = 0;
+		}
+
 		// WB13b: ExtendNumLet * Numeric
 		NEXT();
 		goto Numeric;
 
 	case WORD_BREAK_EXTENDNUMLET:
+		if (in_extend && scan->code != 0x202f) {
+			scan->type = CORPUS_WORD_PUNCT;
+		}
+
 		// WB13a: ExtendNumLet * ExtendNumLet
 		NEXT();
 		goto ExtendNumLet;
 
 	case WORD_BREAK_HEBREW_LETTER:
+		if (in_extend) {
+			scan->type = CORPUS_WORD_LETTER;
+			in_extend = 0;
+		}
+
 		// WB13b: ExtendNumLet * AHLetter
 		NEXT();
 		goto Hebrew_Letter;
 
 	case WORD_BREAK_KATAKANA:
+		if (in_extend) {
+			scan->type = CORPUS_WORD_LETTER;
+			in_extend = 0;
+		}
+
 		// WB13c: ExtendNumLet * Katakana
 		NEXT();
 		goto Katakana;

@@ -1,0 +1,391 @@
+---
+title: "Stemming Words"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Stemming Words}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## Snowball stemmer
+
+*Corpus* comes with built-in support for the algorithmic stemmers provided by
+the [Snowball Stemming Library][snowball], which supports the following
+languages: arabic (ar), danish (da), german (de), english (en), spanish (es),
+finnish (fi), french (fr), hungarian (hu), italian (it), dutch (nl), norwegian
+(no), portuguese (pt), romanian (ro), russian (ru), swedish (sv), tamil (ta),
+and turkish (tr). You can select one of these stemmers using either the full
+name of the language of the two-letter country code:
+
+
+```r
+text <- "love loving lovingly loved lover lovely love"
+text_tokens(text, stemmer = "en") # english stemmer
+```
+
+```
+[[1]]
+[1] "love"  "love"  "love"  "love"  "lover" "love"  "love" 
+```
+
+These stemmers are purely algorithmic; they mostly just strip off common
+suffixes. 
+
+
+## Hunspell stemmer
+
+If you want more precise stemming behavior, you can provide a custom stemming
+function.  The stemming function should, when given a term as an input, return
+the stem of the term as the output.
+
+
+Here's an example that uses the `hunspell` dictionary to do the stemming.
+
+
+```r
+stem_hunspell <- function(term) {
+    # look up the term in the dictionary
+    stems <- hunspell::hunspell_stem(term)[[1]]
+
+    if (length(stems) == 0) { # if there are no stems, use the original term
+        stem <- term
+    } else { # if there are multiple stems, use the last one
+        stem <- stems[[length(stems)]]
+    }
+
+    stem
+}
+
+text_tokens(text, stemmer = stem_hunspell)
+```
+
+```
+[[1]]
+[1] "love"     "love"     "lovingly" "love"     "love"     "love"     "love"    
+```
+
+
+## Dictionary stemmer
+
+One common way to build a stemmer is from a list of (term, stem) pairs. Many
+such lists are available at [lexoconista.com][lexiconista]. Here's an example
+stemmer for English:
+
+
+```r
+# download the list
+url <- "http://www.lexiconista.com/Datasets/lemmatization-en.zip"
+tmp <- tempfile()
+download.file(url, tmp)
+
+# extract the contents
+con <- unz(tmp, "lemmatization-en.txt", encoding = "UTF-8")
+tab <- read.delim(con, header=FALSE, stringsAsFactors = FALSE)
+names(tab) <- c("stem", "term")
+```
+
+The first column of this table contains the stem; the second column contains
+the raw term:
+
+
+```r
+head(tab)
+```
+
+```
+        stem       term
+1          1      first
+2         10      tenth
+3        100  hundredth
+4       1000 thousandth
+5    1000000  millionth
+6 1000000000  billionth
+```
+We can see that, for example, `"first"` stems to `"1"`.
+
+
+Here a custom stemming function that uses the list:
+
+
+```r
+stem_list <- function(term) {
+    i <- match(term, tab$term)
+    if (is.na(i)) {
+        stem <- term
+    } else {
+        stem <- tab$stem[[i]]
+    }
+    stem
+}
+
+text_tokens(text, stemmer = stem_list)
+```
+
+```
+[[1]]
+[1] "love"     "love"     "lovingly" "love"     "lover"    "lovely"   "love"    
+```
+
+This pattern is so common that *corpus* provides a convenience function that
+will build a stemmer from the input term and stem lists:
+
+
+```r
+stem_list2 <- new_stemmer(tab$term, tab$stem)
+text_tokens(text, stemmer = stem_list2)
+```
+
+```
+[[1]]
+[1] "love"     "love"     "lovingly" "love"     "lover"    "lovely"   "love"    
+```
+
+
+## Application: Emotion word usage
+
+Here's how to use a custom stemmer to get counts of emotion word usage. We
+will use the text of _The Wizard of Oz_ (Project Gutenberg Work #55)
+to demonstrate.
+
+
+```r
+data <- gutenberg_corpus(55, verbose = FALSE)
+text_filter(data)$stemmer <-
+    with(affect_wordnet,
+        new_stemmer(term, interaction(category, emotion),
+                    default = NA, duplicates = "omit"))
+```
+
+This stemmer replaces terms by the emotional affect, as listed in the
+`affect_wordnet` lexicon. Setting `default = NA` specifies that terms
+that are not in the lexicon get dropped. We also specify
+`duplicates = "omit"` so that words listed in multiple categories
+get replaced with the default (i.e., they get dropped).
+
+Here are the (stemmed) term statistics:
+
+
+```r
+print(term_stats(data), -1)
+```
+
+```
+   term                  count support
+1  Sadness.Negative        207       1
+2  Enthusiasm.Positive     146       1
+3  Dislike.Negative        109       1
+4  Joy.Positive             97       1
+5  Liking.Positive          94       1
+6  Love.Positive            81       1
+7  Affection.Positive       77       1
+8  Fear.Negative            75       1
+9  Agitation.Ambiguous      38       1
+10 Anxiety.Negative         24       1
+11 Calmness.Positive        24       1
+12 Gravity.Ambiguous        21       1
+13 Shame.Negative           20       1
+14 Surprise.Ambiguous       12       1
+15 Gratitude.Positive       10       1
+16 Expectation.Ambiguous     9       1
+17 Pride.Positive            7       1
+18 Compassion.Negative       5       1
+19 Despair.Negative          3       1
+20 Daze.Negative             2       1
+21 Fear.Positive             1       1
+22 Fearlessness.Positive     1       1
+```
+
+We can also get a sample of the instances of the stemmed terms:
+
+
+```r
+text_sample(data, "Joy.Positive")
+```
+
+```
+   text                before                  instance                   after                
+1  1    … Scarecrow and the Tin Woodman were     glad      to be of\nuse to her.  As for the L…
+2  1    …rs and\nfruit trees and sunshine to     cheer     them, and had they not felt so sorr…
+3  1    …te a little of\neverything, and was     glad      to get a good supper again.\n\nThe …
+4  1    …Dorothy and her friends spent a few     happy    \ndays at the Yellow Castle, where t…
+5  1    …ever thought of that!" said Dorothy   joyfully   .  "It's just the\nthing.  I'll go a…
+6  1    …d the Tin Woodman, "you ought to be     glad     , for it\nproves you have a heart.  …
+7  1    …of this beautiful City, I am\nquite   satisfied   with my lot."\n\n"I also," said the…
+8  1    …y don't belong there.  We\nshall be     glad      to serve you in any way in our powe…
+9  1    …der, "we were a free people, living    happily    in the\ngreat forest, flying from t…
+10 1    …get my brains," added the Scarecrow   joyfully   .\n\n"And I shall get my courage," s…
+11 1    …hing and singing, while a big table     near      by was\nloaded with delicious fruit…
+12 1    … brains do not\nmake one happy, and   happiness   is the best thing in the world."\n… 
+13 1    …know enough," replied the Scarecrow  cheerfully  .  "My head is\nstuffed with straw, …
+14 1    …ut it, if you wish."\n\n"I shall be     glad      to hear it," she replied.\n\n"Once,…
+15 1    …such little\nthings as flowers came     near      to killing me, and such small anima…
+16 1    …apid flight of the Monkeys, but was     glad      the journey was over.\nThe strange …
+17 1    …tle room in the world, with a soft\n comfortable  bed that had sheets of green silk a…
+18 1    …ued the Scarecrow, "we might all be     happy     together."\n\n"But I don't want to …
+19 1    …\nThus each of the little party was   satisfied   except Dorothy, who longed\nmore th…
+20 1    …ught Dorothy some fruit from a tree     near      by, which she\nate for her dinner.… 
+⋮  (97 rows total)
+```
+
+
+## Application: Spell-corrected tokens
+
+Suppose we want to analyze texts with spelling errors, using our best
+guess of the intended word rather than the literal spelling in the text. We
+can do this by using a stemmer that tries to correct spelling errors in the
+tokens:
+
+
+```r
+stem_spellcorrect <- function(term) {
+    # if the term is spelled correctly, leave it as-is
+    if (hunspell::hunspell_check(term)) {
+        return(term)
+    }
+
+    suggestions <- hunspell::hunspell_suggest(term)[[1]]
+
+    # if hunspell found a suggestion, use the first one
+    if (length(suggestions) > 1) {
+        suggestions[[1]]
+    } else {
+        # otherwise, use the original term
+        term
+    }
+}
+```
+
+Here's an example use of the stemmer:
+
+```r
+text <- "spell checkers are not neccessairy for langauge ninja's"
+text_tokens(text, stemmer = stem_spellcorrect)
+```
+
+```
+[[1]]
+[1] "spell"     "checkers"  "are"       "not"       "necessary" "for"       "language" 
+[8] "ninjas"   
+```
+
+
+## Efficiency considerations
+
+When you stem a text, the result gets cached, so you never have to stem the
+same type twice. If the input is a `corpus_text` object, these cached values
+are shared across multiple tokenizations.
+
+Here's a stemmer that prepends "bunny" to every word, keeping track of how
+many times it gets called:
+
+
+```r
+nbunny <- 0
+stem_bunny <- function(term) {
+    nbunny <<- nbunny + 1
+    paste("bunny", term)
+}
+```
+
+We will set this as the stemmer for a corpus (a data frame with a "text"
+column of type `corpus_text`):
+
+```r
+corpus <- as_corpus_frame(federalist)
+text_filter(corpus)$stemmer <- stem_bunny
+```
+
+Here's how long it takes to tokenize the text once and compute the term
+statistics:
+
+```r
+system.time(stats <- term_stats(corpus))
+```
+
+```
+   user  system elapsed 
+  0.109   0.004   0.117 
+```
+
+Here's how many times the stemmer got called:
+
+```r
+print(nbunny)
+```
+
+```
+[1] 8766
+```
+
+We will now set the bunny count to zero and run the same computation:
+
+
+```r
+nbunny <- 0
+system.time(stats2 <- term_stats(corpus))
+```
+
+```
+   user  system elapsed 
+  0.045   0.001   0.047 
+```
+
+It took us half the time. How many additional calls to the stemmer were there?
+
+
+```r
+print(nbunny)
+```
+
+```
+[1] 0
+```
+
+No additional calls. We used the cached stems from the first call to
+`term_stats`. We can verify that the results were the same both times.
+
+
+```r
+identical(stats, stats2)
+```
+
+```
+[1] TRUE
+```
+
+Just for fun, here are the results:
+
+
+```r
+stats
+```
+
+```
+   term        count support
+1  bunny_the   17743      85
+2  bunny_,     13251      85
+3  bunny_of    11798      85
+4  bunny_to     7052      85
+5  bunny_.      5400      85
+6  bunny_and    5080      85
+7  bunny_in     4439      85
+8  bunny_a      3984      85
+9  bunny_be     3832      85
+10 bunny_that   2788      85
+11 bunny_it     2544      85
+12 bunny_is     2190      85
+13 bunny_which  2061      85
+14 bunny_by     1745      85
+15 bunny_as     1720      85
+16 bunny_;      1496      85
+17 bunny_this   1409      85
+18 bunny_would  1277      85
+19 bunny_have   1258      85
+20 bunny_will   1250      85
+⋮  (8766 rows total)
+```
+
+[lexiconista]: http://www.lexiconista.com/datasets/lemmatization/ "Lexiconista Lemmatization Lists"
+[snowball]: https://snowballstem.org/ "Snowball Stemming Library"

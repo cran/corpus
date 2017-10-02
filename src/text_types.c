@@ -19,22 +19,7 @@
 #include <string.h>
 #include "corpus/src/table.h"
 #include "corpus/src/intset.h"
-#include "corpus/src/text.h"
-#include "corpus/src/textset.h"
-#include "corpus/src/tree.h"
-#include "corpus/src/typemap.h"
-#include "corpus/src/symtab.h"
-#include "corpus/src/sentscan.h"
-#include "corpus/src/wordscan.h"
-#include "corpus/src/filter.h"
-#include "corpus/src/sentfilter.h"
 #include "rcorpus.h"
-
-// the R 'error' is a #define (to Rf_error) that clashes with the 'error'
-// member of struct corpus_sentfilter
-#ifdef error
-#  undef error
-#endif
 
 
 struct types_context {
@@ -81,8 +66,7 @@ static void types_context_init(struct types_context *ctx, SEXP sx,
 			continue;
 		}
 
-		TRY(corpus_filter_start(ctx->filter, &text[i],
-					CORPUS_FILTER_SCAN_TOKENS));
+		TRY(corpus_filter_start(ctx->filter, &text[i]));
 
 		while (corpus_filter_advance(ctx->filter)) {
 			if (ctx->filter->type_id < 0) {
@@ -185,7 +169,7 @@ SEXP text_types(SEXP sx, SEXP scollapse)
 
 		for (i = 0; i < n; i++) {
 			type_id = types->items[i];
-			type = corpus_filter_type(ctx->filter, type_id);
+			type = &ctx->filter->symtab.types[type_id].text;
 			SET_STRING_ELT(set, i, mkchar_get(&mkchar, type));
 		}
 

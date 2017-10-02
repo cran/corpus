@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <assert.h>
 #include <inttypes.h>
 #include <math.h>
 #include <stddef.h>
@@ -28,6 +29,7 @@
 #include "corpus/src/ngram.h"
 #include "corpus/src/text.h"
 #include "corpus/src/textset.h"
+#include "corpus/src/stem.h"
 #include "corpus/src/typemap.h"
 #include "corpus/src/symtab.h"
 #include "corpus/src/wordscan.h"
@@ -224,13 +226,12 @@ SEXP term_counts_text(SEXP sx, SEXP sweights, SEXP sngrams,
 			continue;
 		}
 
-		TRY(corpus_filter_start(filter, &text[i],
-					CORPUS_FILTER_SCAN_TOKENS));
+		TRY(corpus_filter_start(filter, &text[i]));
 
 		while (corpus_filter_advance(filter)) {
 			type_id = filter->type_id;
 
-			if (type_id == CORPUS_FILTER_IGNORED) {
+			if (type_id == CORPUS_TYPE_NONE) {
 				continue;
 			} else if (type_id < 0) {
 				TRY(corpus_ngram_break(&ctx->ngram));
@@ -305,9 +306,11 @@ SEXP term_counts_text(SEXP sx, SEXP sweights, SEXP sngrams,
 			continue;
 		}
 
+		assert(term->length <= ctx->ngram_max);
+
 		for (j = 0; j < term->length; j++) {
 			type_id = term->type_ids[j];
-			type = corpus_filter_type(filter, type_id);
+			type = &filter->symtab.types[type_id].text;
 
 			if (output_types) {
 				stype = mkchar_get(&mkchar, type);

@@ -9,7 +9,7 @@ test_that("'text_filter' has the right defaults", {
     expect_equal(f$stemmer, NULL)
     expect_equal(f$stem_dropped, FALSE)
     expect_equal(f$stem_except, NULL)
-    expect_equal(f$combine, abbreviations_en)
+    expect_equal(f$combine, NULL)
     expect_equal(f$drop_letter, FALSE)
     expect_equal(f$drop_number, FALSE)
     expect_equal(f$drop_punct, FALSE)
@@ -246,6 +246,8 @@ test_that("invalid operations send errors", {
 
 
 test_that("text filter printing works", {
+    skip_if_not(with(R.Version(), paste(major, minor, sep = ".")) >= "3.4.0",
+                "Setting width fails on R < 3.4.0")
     oldwidth <- options()$width
     options(width = 80)
     on.exit(options(width = oldwidth), add = TRUE)
@@ -254,21 +256,22 @@ test_that("text filter printing works", {
 expected <- c(
 'Text filter with the following options:',
 '',
-'\tmap_case: TRUE',
-'\tmap_quote: TRUE',
-'\tremove_ignorable: TRUE',
-'\tstemmer: NULL',
-'\tstem_dropped: FALSE',
-'\tstem_except: NULL',
-'\tcombine:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." ...',
-'\tdrop_letter: FALSE',
-'\tdrop_number: FALSE',
-'\tdrop_punct: FALSE',
-'\tdrop_symbol: FALSE',
-'\tdrop: NULL',
-'\tdrop_except: NULL',
-'\tsent_crlf: FALSE',
-'\tsent_suppress:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." ...')
+'    map_case: TRUE',
+'    map_quote: TRUE',
+'    remove_ignorable: TRUE',
+'    combine: NULL',
+'    stemmer: NULL',
+'    stem_dropped: FALSE',
+'    stem_except: NULL',
+'    drop_letter: FALSE',
+'    drop_number: FALSE',
+'    drop_punct: FALSE',
+'    drop_symbol: FALSE',
+'    drop: NULL',
+'    drop_except: NULL',
+'    connector: _',
+'    sent_crlf: FALSE',
+'    sent_suppress:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." ...')
 
     actual <- strsplit(capture_output(print(f)), "\n")[[1]]
     expect_equal(actual, expected)

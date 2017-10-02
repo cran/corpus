@@ -23,41 +23,40 @@
 #include "../src/text.h"
 #include "../src/textset.h"
 #include "../src/tree.h"
+#include "../src/stem.h"
 #include "../src/typemap.h"
 #include "../src/symtab.h"
 #include "../src/wordscan.h"
+#include "../src/render.h"
 #include "../src/filter.h"
 #include "../src/census.h"
 #include "testutil.h"
 
-#define IGNORE_SPACE CORPUS_FILTER_IGNORE_SPACE
 #define DROP_LETTER CORPUS_FILTER_DROP_LETTER
 #define DROP_MARK CORPUS_FILTER_DROP_MARK
 #define DROP_NUMBER CORPUS_FILTER_DROP_NUMBER
 #define DROP_PUNCT CORPUS_FILTER_DROP_PUNCT
 #define DROP_SYMBOL CORPUS_FILTER_DROP_SYMBOL
-#define DROP_OTHER CORPUS_FILTER_DROP_OTHER
 
 #define ID_EOT	  (-1)
-#define ID_IGNORE (-2)
-#define ID_DROP	  (-3)
+#define ID_DROP	  (-2)
 #define TYPE_EOT    ((const struct corpus_text *)&type_eot)
-#define TYPE_IGNORE ((const struct corpus_text *)&type_ignore)
 #define TYPE_DROP   ((const struct corpus_text *)&type_drop)
 
-static struct corpus_text type_eot, type_ignore, type_drop;
+static struct corpus_text type_eot, type_drop;
 static struct corpus_filter filter;
 static int has_filter;
+static struct corpus_stem_snowball snowball;
+static int has_snowball;
 
 
 static void setup_filter(void)
 {
 	setup();
 	has_filter = 0;
+	has_snowball = 0;
 	type_eot.ptr = (uint8_t *)"<eot>";
 	type_eot.attr = strlen("<eot>");
-	type_ignore.ptr = (uint8_t *)"<ignore>";
-	type_ignore.attr = strlen("<ignore>");
 	type_drop.ptr = (uint8_t *)"<drop>";
 	type_drop.attr = strlen("<drop>");
 }
@@ -69,25 +68,40 @@ static void teardown_filter(void)
 		corpus_filter_destroy(&filter);
 		has_filter = 0;
 	}
+	if (has_snowball) {
+		corpus_stem_snowball_destroy(&snowball);
+		has_snowball = 0;
+	}
 	teardown();
 }
 
 
-static void init(const char *stemmer, int flags)
+static void init(const char *stem_alg, int flags)
 {
+	corpus_stem_func stemmer = NULL;
+	void *context = NULL;
 	int type_kind = (CORPUS_TYPE_MAPCASE | CORPUS_TYPE_MAPCOMPAT
 			 | CORPUS_TYPE_MAPQUOTE | CORPUS_TYPE_RMDI);
 
+	ck_assert(!has_snowball);
+	if (stem_alg) {
+		ck_assert(!corpus_stem_snowball_init(&snowball, stem_alg));
+		has_snowball = 1;
+		stemmer = corpus_stem_snowball;
+		context = &snowball;
+	}
+
 	ck_assert(!has_filter);
-	ck_assert(!corpus_filter_init(&filter, type_kind, stemmer, flags));
+	ck_assert(!corpus_filter_init(&filter, flags, type_kind,
+				      CORPUS_FILTER_CONNECTOR,
+				      stemmer, context));
 	has_filter = 1;
 }
 
 
 static void start(const struct corpus_text *text)
 {
-	ck_assert(!corpus_filter_start(&filter, text,
-				       CORPUS_FILTER_SCAN_TOKENS));
+	ck_assert(!corpus_filter_start(&filter, text));
 }
 
 
@@ -96,24 +110,24 @@ static void combine(const struct corpus_text *text)
 	ck_assert(!corpus_filter_combine(&filter, text));
 }
 
+static void drop(const struct corpus_text *text)
+{
+	ck_assert(!corpus_filter_drop(&filter, text));
+}
+
 static int next_id(void)
 {
-	int type_id, symbol_id;
+	int type_id;
 	int has = corpus_filter_advance(&filter);
 
 	ck_assert(!filter.error);
 
 	if (has) {
 		type_id = filter.type_id;
-		if (type_id == CORPUS_FILTER_IGNORED) {
-			return ID_IGNORE;
-		} else if (type_id < 0) {
+		if (type_id == CORPUS_TYPE_NONE) {
 			return ID_DROP;
 		}
-		ck_assert(type_id < filter.ntype);
-		symbol_id = filter.symbol_ids[type_id];
-		ck_assert(0 <= symbol_id);
-		ck_assert(symbol_id < filter.symtab.ntype);
+		ck_assert(type_id < filter.symtab.ntype);
 		return type_id;
 	} else {
 		return ID_EOT;
@@ -124,18 +138,14 @@ static int next_id(void)
 static const struct corpus_text *next_type(void)
 {
 	int type_id = next_id();
-	int symbol_id;
 
 	switch (type_id) {
 	case ID_EOT:
 		return TYPE_EOT;
-	case ID_IGNORE:
-		return TYPE_IGNORE;
 	case ID_DROP:
 		return TYPE_DROP;
 	default:
-		symbol_id = filter.symbol_ids[type_id];
-		return &filter.symtab.types[symbol_id].text;
+		return &filter.symtab.types[type_id].text;
 	}
 }
 
@@ -148,50 +158,50 @@ static const struct corpus_text *token(void)
 
 START_TEST(test_basic)
 {
-	init(NULL, IGNORE_SPACE);
+	init(NULL, 0);
 
 	start(T("A rose is a Rose is a ROSE."));
 
 	assert_text_eq(next_type(), T("a"));
 	assert_text_eq(token(), T("A"));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
 	assert_text_eq(next_type(), T("rose"));
 	assert_text_eq(token(), T("rose"));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
 	assert_text_eq(next_type(), T("is"));
 	assert_text_eq(token(), T("is"));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
 	assert_text_eq(next_type(), T("a"));
 	assert_text_eq(token(), T("a"));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
 	assert_text_eq(next_type(), T("rose"));
 	assert_text_eq(token(), T("Rose"));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
 	assert_text_eq(next_type(), T("is"));
 	assert_text_eq(token(), T("is"));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
 	assert_text_eq(next_type(), T("a"));
 	assert_text_eq(token(), T("a"));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
 	assert_text_eq(next_type(), T("rose"));
@@ -207,27 +217,43 @@ END_TEST
 
 START_TEST(test_combine)
 {
-	init(NULL, IGNORE_SPACE | DROP_PUNCT);
-	combine(T("new york"));
-	combine(T("new york city"));
+	init(NULL, DROP_PUNCT);
+	combine(T("  new   "));
+	combine(T("  new york  "));
+	combine(T("New York City"));
 
 	start(T("New York City, New York."));
 
-	assert_text_eq(next_type(), T("new york city"));
+	assert_text_eq(next_type(), T("new_york_city"));
 	assert_text_eq(token(), T("New York City"));
 
 	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(","));
 
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T(" "));
 
-	assert_text_eq(next_type(), T("new york"));
+	assert_text_eq(next_type(), T("new_york"));
 	assert_text_eq(token(), T("New York"));
 
 	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(token(), T("."));
 
+	assert_text_eq(next_type(), TYPE_EOT);
+}
+END_TEST
+
+
+START_TEST(test_drop_combine)
+{
+	init(NULL, 0);
+	drop(T("a"));
+	combine(T("a."));
+
+	start(T("."));
+
+	assert_text_eq(next_type(), T("."));
+	assert_text_eq(token(), T("."));
 	assert_text_eq(next_type(), TYPE_EOT);
 }
 END_TEST
@@ -240,7 +266,7 @@ START_TEST(test_basic_census)
 
 	ck_assert(!corpus_census_init(&census));
 
-	init(NULL, IGNORE_SPACE);
+	init(NULL, 0);
 	start(T("A rose is a rose is a rose."));
 
 	while ((type_id = next_id()) != ID_EOT) {
@@ -280,12 +306,12 @@ END_TEST
 
 START_TEST(test_url)
 {
-	init(NULL, IGNORE_SPACE);
+	init(NULL, 0);
 	start(T("http PTRCKPRRY http://www.PTRCKPRRY.com/"));
 	assert_text_eq(next_type(), T("http"));
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(next_type(), T("ptrckprry"));
-	assert_text_eq(next_type(), TYPE_IGNORE);
+	assert_text_eq(next_type(), TYPE_DROP);
 	assert_text_eq(next_type(), T("http://www.ptrckprry.com/"));
 	assert_text_eq(next_type(), TYPE_EOT);
 }
@@ -294,7 +320,7 @@ END_TEST
 
 START_TEST(test_hashtag)
 {
-	init(NULL, IGNORE_SPACE);
+	init(NULL, 0);
 	start(T("#useR2017"));
 	assert_text_eq(next_type(), T("#user2017"));
 	assert_text_eq(next_type(), TYPE_EOT);
@@ -304,13 +330,12 @@ END_TEST
 
 START_TEST(test_mention)
 {
-	init(NULL, IGNORE_SPACE);
+	init(NULL, 0);
 	start(T("@PtrckPrry"));
 	assert_text_eq(next_type(), T("@ptrckprry"));
 	assert_text_eq(next_type(), TYPE_EOT);
 }
 END_TEST
-
 
 
 Suite *filter_suite(void)
@@ -324,6 +349,7 @@ Suite *filter_suite(void)
 	tcase_add_checked_fixture(tc, setup_filter, teardown_filter);
         tcase_add_test(tc, test_basic);
         tcase_add_test(tc, test_combine);
+        tcase_add_test(tc, test_drop_combine);
         tcase_add_test(tc, test_basic_census);
         tcase_add_test(tc, test_drop_ideo);
         tcase_add_test(tc, test_url);

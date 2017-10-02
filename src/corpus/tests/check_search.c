@@ -23,9 +23,11 @@
 #include "../src/termset.h"
 #include "../src/text.h"
 #include "../src/textset.h"
+#include "../src/stem.h"
 #include "../src/typemap.h"
 #include "../src/symtab.h"
 #include "../src/wordscan.h"
+#include "../src/render.h"
 #include "../src/filter.h"
 #include "../src/search.h"
 #include "testutil.h"
@@ -41,8 +43,9 @@ int size;
 static void setup_search(void)
 {
 	setup();
-	ck_assert(!corpus_filter_init(&filter, CORPUS_TYPE_MAPCASE, NULL,
-				      CORPUS_FILTER_IGNORE_SPACE));
+	ck_assert(!corpus_filter_init(&filter, CORPUS_FILTER_KEEP_ALL,
+				      CORPUS_TYPE_MAPCASE,
+				      CORPUS_FILTER_CONNECTOR, NULL, NULL));
 	ck_assert(!corpus_search_init(&search));
 }
 
@@ -60,8 +63,7 @@ static int add(const struct corpus_text *term)
 	int type_ids[256];
 	int length, term_id;
 
-	ck_assert(!corpus_filter_start(&filter, term,
-				       CORPUS_FILTER_SCAN_TYPES));
+	ck_assert(!corpus_filter_start(&filter, term));
 	length = 0;
 	while (corpus_filter_advance(&filter)) {
 		if (filter.type_id < 0) {

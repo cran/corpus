@@ -28,6 +28,7 @@
 #include "corpus/src/termset.h"
 #include "corpus/src/text.h"
 #include "corpus/src/textset.h"
+#include "corpus/src/stem.h"
 #include "corpus/src/typemap.h"
 #include "corpus/src/symtab.h"
 #include "corpus/src/wordscan.h"
@@ -170,7 +171,8 @@ SEXP term_matrix_text(SEXP sx, SEXP sweights, SEXP sngrams, SEXP sselect,
 
 	weights = as_weights(sweights, n);
 	if (sgroup != R_NilValue) {
-		srow_names = getAttrib(sgroup, R_LevelsSymbol);
+		PROTECT(srow_names = getAttrib(sgroup, R_LevelsSymbol));
+		nprot++;
 		ngroup = XLENGTH(srow_names);
 		group = INTEGER(sgroup);
 	} else {
@@ -197,12 +199,11 @@ SEXP term_matrix_text(SEXP sx, SEXP sweights, SEXP sngrams, SEXP sselect,
 
 		w = weights ? weights[i] : 1;
 
-		TRY(corpus_filter_start(filter, &text[i],
-					CORPUS_FILTER_SCAN_TOKENS));
+		TRY(corpus_filter_start(filter, &text[i]));
 
 		while (corpus_filter_advance(filter)) {
 			type_id = filter->type_id;
-			if (type_id == CORPUS_FILTER_IGNORED) {
+			if (type_id == CORPUS_TYPE_NONE) {
 				continue;
 			} else if (type_id < 0) {
 				TRY(corpus_ngram_break(&ctx->ngram[g]));
@@ -281,7 +282,7 @@ SEXP term_matrix_text(SEXP sx, SEXP sweights, SEXP sngrams, SEXP sselect,
 		m = terms->items[i].length;
 
 		for (j = 0; j < m; j++) {
-			type = corpus_filter_type(filter, type_ids[j]);
+			type = &filter->symtab.types[type_ids[j]].text;
 			if (j > 0) {
 				corpus_render_char(&ctx->render, ' ');
 			}

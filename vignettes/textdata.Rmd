@@ -84,21 +84,22 @@ print(text_filter(text))
 ```
 Text filter with the following options:
 
-	map_case: TRUE
-	map_quote: TRUE
-	remove_ignorable: TRUE
-	stemmer: NULL
-	stem_dropped: FALSE
-	stem_except: NULL
-	combine:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." "Abs." "AD." "Adj." ...
-	drop_letter: FALSE
-	drop_number: FALSE
-	drop_punct: FALSE
-	drop_symbol: FALSE
-	drop: NULL
-	drop_except: NULL
-	sent_crlf: FALSE
-	sent_suppress:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." "Abs." "AD." ...
+    map_case: TRUE
+    map_quote: TRUE
+    remove_ignorable: TRUE
+    combine: NULL
+    stemmer: NULL
+    stem_dropped: FALSE
+    stem_except: NULL
+    drop_letter: FALSE
+    drop_number: FALSE
+    drop_punct: FALSE
+    drop_symbol: FALSE
+    drop: NULL
+    drop_except: NULL
+    connector: _
+    sent_crlf: FALSE
+    sent_suppress:  chr [1:155] "A." "A.D." "a.m." "A.M." "A.S." "AA." "AB." "Abs." "AD." ...
 ```
 
 ```r
@@ -216,7 +217,7 @@ unclass(data$text)
 
 ```
 $handle
-<pointer: 0x7fc2576e75f0>
+<pointer: 0x7f978d7534c0>
 
 $sources
 $sources[[1]]
@@ -262,10 +263,10 @@ segments without allocating new character strings.
 3  para1      3 , Cottontail, and Peter.\nThey lived with      
 4  para1      4 their Mother in a sandbank,\nunderneath the    
 5  para1      5 root of a very big fir tree.                   
-6  para2      1 'Now, my dears,' said old                      
-7  para2      2 Mrs. Rabbit one morning,\n'you may go          
-8  para2      3 into the fields or down the lane,\nbut         
-9  para2      4 don't go into Mr. McGregor's garden --\nyour   
+6  para2      1 'Now, my dears,' said old Mrs                  
+7  para2      2 . Rabbit one morning,\n'you may go into        
+8  para2      3 the fields or down the lane,\nbut don't        
+9  para2      4 go into Mr. McGregor's garden --\nyour         
 10 para2      5 Father had an accident there;\nhe was put      
 11 para2      6 in a pie by Mrs. McGregor.'                    
 ```
@@ -277,7 +278,7 @@ unclass(chunks$text) # inspect text internals
 
 ```
 $handle
-<pointer: 0x7fc25b131600>
+<pointer: 0x7f978d6e4bc0>
 
 $sources
 $sources[[1]]
@@ -294,10 +295,10 @@ $table
 3       1   1    85  125
 4       1   1   126  168
 5       1   1   169  196
-6       1   2     1   26
-7       1   2    27   63
-8       1   2    64  101
-9       1   2   102  145
+6       1   2     1   29
+7       1   2    30   68
+8       1   2    69  107
+9       1   2   108  145
 10      1   2   146  186
 11      1   2   187  213
 

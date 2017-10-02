@@ -29,6 +29,8 @@
 #include "corpus/src/termset.h"
 #include "corpus/src/text.h"
 #include "corpus/src/textset.h"
+#include "corpus/src/render.h"
+#include "corpus/src/stem.h"
 #include "corpus/src/typemap.h"
 #include "corpus/src/symtab.h"
 #include "corpus/src/datatype.h"
@@ -130,15 +132,39 @@ struct json {
 	int kind;
 };
 
+enum stemmer_type {
+	STEMMER_NONE = 0,
+	STEMMER_RFUNC,
+	STEMMER_SNOWBALL,
+};
+
+struct stemmer_rfunc {
+	SEXP fn;
+	SEXP rho;
+};
+
+struct stemmer {
+	union {
+		struct stemmer_rfunc rfunc;
+		struct corpus_stem_snowball snowball;
+	} value;
+	int type;
+	corpus_stem_func stem_func;
+	void *stem_context;
+	int error;
+};
+
 struct rcorpus_text {
 	struct corpus_text *text;
 	struct corpus_filter filter;
 	struct corpus_sentfilter sentfilter;
+	struct stemmer stemmer;
 	R_xlen_t length;
 	int has_filter;
 	int valid_filter;
 	int has_sentfilter;
 	int valid_sentfilter;
+	int has_stemmer;
 };
 
 struct termset {
@@ -171,11 +197,21 @@ SEXP decode_charsxp(struct decode *d, const struct corpus_data *val);
 SEXP decode_sexp(struct decode *d, const struct corpus_data *val,
 		 const struct corpus_schema *s);
 
+/* stemmer */
+void stemmer_init_none(struct stemmer *s);
+void stemmer_init_snowball(struct stemmer *s, const char *algorithm);
+void stemmer_init_rfunc(struct stemmer *s, SEXP fn, SEXP rho);
+void stemmer_destroy(struct stemmer *s);
+const char *stemmer_snowball_name(const char *alias);
+
+SEXP stem_snowball(SEXP x, SEXP algorithm);
+
+
 /* logging */
 SEXP logging_off(void);
 SEXP logging_on(void);
 
-/* data set */
+/* json */
 SEXP alloc_json(SEXP buffer, SEXP field, SEXP rows, SEXP text);
 int is_json(SEXP data);
 struct json *as_json(SEXP data);
@@ -230,6 +266,9 @@ SEXP anyNA_text(SEXP text);
 SEXP text_c(SEXP args, SEXP names, SEXP filter);
 SEXP text_valid(SEXP x);
 
+/* text filter */
+SEXP as_text_filter_connector(SEXP value);
+
 /* search */
 SEXP alloc_search(SEXP sterms, const char *name, struct corpus_filter *filter);
 int is_search(SEXP search);
@@ -247,7 +286,6 @@ SEXP items_termset(SEXP termset);
 SEXP abbreviations(SEXP kind);
 SEXP text_count(SEXP x, SEXP terms);
 SEXP text_detect(SEXP x, SEXP terms);
-SEXP text_length(SEXP x);
 SEXP text_locate(SEXP x, SEXP terms);
 SEXP text_match(SEXP x, SEXP terms);
 SEXP text_nsentence(SEXP x);

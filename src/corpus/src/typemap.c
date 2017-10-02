@@ -19,7 +19,6 @@
 #include <inttypes.h>
 #include <stdint.h>
 #include <string.h>
-#include "../lib/libstemmer_c/include/libstemmer.h"
 #include "private/stopwords.h"
 #include "error.h"
 #include "memory.h"
@@ -40,13 +39,6 @@ static int corpus_typemap_set_ascii(struct corpus_typemap *map,
 static int corpus_typemap_set_utf32(struct corpus_typemap *map,
 				    const uint32_t *ptr,
 				    const uint32_t *end);
-static int corpus_typemap_stem(struct corpus_typemap *map);
-
-
-const char **corpus_stemmer_names(void)
-{
-	return sb_stemmer_list();
-}
 
 
 const uint8_t **corpus_stopword_list(const char *name, int *lenptr)
@@ -61,42 +53,17 @@ const char **corpus_stopword_names(void)
 }
 
 
-int corpus_typemap_init(struct corpus_typemap *map, int kind,
-			const char *stemmer)
+int corpus_typemap_init(struct corpus_typemap *map, int kind)
 {
 	int err;
 
-	if ((err = corpus_textset_init(&map->excepts))) {
-		corpus_log(err, "failed initializing stem exception set");
-		goto out;
-	}
-
-	if (stemmer) {
-		errno = 0;
-		map->stemmer = sb_stemmer_new(stemmer, "UTF_8");
-		if (!map->stemmer) {
-		       if (errno == ENOMEM) {
-			       err = CORPUS_ERROR_NOMEM;
-			       corpus_log(err, "failed allocating stemmer");
-		       } else {
-				err = CORPUS_ERROR_INVAL;
-				corpus_log(err,
-					   "unrecognized stemming algorithm"
-					   " (%s)", stemmer);
-		       }
-		       goto out;
-		}
-	} else {
-		map->stemmer = NULL;
-	}
-
 	map->type.ptr = NULL;
+	map->type.attr = 0;
 	map->codes = NULL;
 	map->size_max = 0;
 
 	corpus_typemap_clear_kind(map);
 	err = corpus_typemap_set_kind(map, kind);
-out:
 	return err;
 }
 
@@ -105,10 +72,6 @@ void corpus_typemap_destroy(struct corpus_typemap *map)
 {
 	corpus_free(map->codes);
 	corpus_free(map->type.ptr);
-	if (map->stemmer) {
-		sb_stemmer_delete(map->stemmer);
-	}
-	corpus_textset_destroy(&map->excepts);
 }
 
 
@@ -194,10 +157,7 @@ int corpus_typemap_set(struct corpus_typemap *map,
 	int err;
 
 	if (CORPUS_TEXT_IS_ASCII(tok)) {
-		if ((err = corpus_typemap_set_ascii(map, tok))) {
-			goto error;
-		}
-		goto stem;
+		return corpus_typemap_set_ascii(map, tok);
 	}
 
 	// For most inputs, mapping to type reduces or preserves the size.
@@ -234,102 +194,10 @@ int corpus_typemap_set(struct corpus_typemap *map,
 		goto error;
 	}
 
-stem:
-	err = corpus_typemap_stem(map);
 	return err;
 
 error:
 	corpus_log(err, "failed normalizing token");
-	return err;
-}
-
-
-int corpus_typemap_stem_except(struct corpus_typemap *map,
-			       const struct corpus_text *typ)
-{
-	int err;
-
-	if ((err = corpus_textset_add(&map->excepts, typ, NULL))) {
-		corpus_log(err, "failed adding type to stem exception set");
-	}
-
-	return err;
-}
-
-static int count_words(const struct corpus_text *text, int *kind_ptr)
-{
-	struct corpus_wordscan scan;
-	int nword, kind;
-
-	nword = 0;
-	kind = CORPUS_WORD_NONE;
-	corpus_wordscan_make(&scan, text);
-	while (corpus_wordscan_advance(&scan)) {
-		if (nword == 0) {
-			kind = scan.type;
-		}
-		nword++;
-	}
-	*kind_ptr = kind;
-	return nword;
-}
-
-
-int corpus_typemap_stem(struct corpus_typemap *map)
-{
-	struct corpus_text stem;
-	size_t size;
-	const uint8_t *buf;
-	int err, kind0, kind, nword0, nword;
-
-	if (!map->stemmer) {
-		return 0;
-	}
-
-	nword0 = count_words(&map->type, &kind0);
-	if (kind0 != CORPUS_WORD_LETTER) {
-		return 0;
-	}
-
-	if (corpus_textset_has(&map->excepts, &map->type, NULL)) {
-		return 0;
-	}
-
-	size = CORPUS_TEXT_SIZE(&map->type);
-	if (size >= INT_MAX) {
-		err = CORPUS_ERROR_OVERFLOW;
-		corpus_log(err, "type size (%"PRIu64" bytes)"
-			   " exceeds maximum (%d)",
-			   (uint64_t)size, INT_MAX - 1);
-		goto out;
-	}
-
-	buf = (const uint8_t *)sb_stemmer_stem(map->stemmer, map->type.ptr,
-					       (int)size);
-	if (buf == NULL) {
-		err = CORPUS_ERROR_NOMEM;
-		corpus_log(err, "failed allocating memory to stem word"
-			   " of size %"PRIu64" bytes", (uint64_t)size);
-		goto out;
-	}
-
-	// keep old utf8 bit, but update to new size
-	size = (size_t)sb_stemmer_length(map->stemmer);
-	stem.ptr = (uint8_t *)buf;
-	stem.attr = (map->type.attr & ~CORPUS_TEXT_SIZE_MASK) | size;
-	nword = count_words(&stem, &kind);
-
-	// only stem types if the number of words doesn't change; this
-	// protects against turning inner punctuation like 'u.s' to
-	// outer punctuation like 'u.'
-	if (nword == nword0) {
-		memcpy(map->type.ptr, buf, size);
-		map->type.ptr[size] = '\0';
-		map->type.attr = stem.attr;
-	}
-	err = 0;
-
-out:
 	return err;
 }
 
@@ -353,111 +221,23 @@ int corpus_typemap_set_utf32(struct corpus_typemap *map, const uint32_t *ptr,
 				*dst++ = (uint8_t)ch;
 			}
 			continue;
-		} else if (code <= 0xDFFFF) {
+		} else {
 			switch (code) {
+			case 0x055A: // ARMENIAN APOSTROPHE
 			case 0x2018: // LEFT SINGLE QUOTATION MARK
 			case 0x2019: // RIGHT SINGLE QUOTATION MARK
+			case 0x201B: // SINGLE HIGH-REVERSED-9 QUOTATION MARK
+			case 0xFF07: // FULLWIDTH APOSTROPHE
 				if (map_quote) {
 					code = '\'';
 				}
 				break;
 
-			case 0x201C: // LEFT DOUBLE QUOTATION MARK
-			case 0x201D: // RIGHT DOUBLE QUOTATION MARK
-				if (map_quote) {
-					code = '"';
-				}
-				break;
-
-			// Default_Ignorable_Code_Point = Yes
-			case 0x00AD:
-			case 0x034F:
-			case 0x061C:
-			case 0x115F:
-			case 0x1160:
-			case 0x17B4:
-			case 0x17B5:
-			case 0x180B:
-			case 0x180C:
-			case 0x180D:
-			case 0x180E:
-			case 0x200B:
-			case 0x200C:
-			case 0x200D:
-			case 0x200E:
-			case 0x200F:
-			case 0x202A:
-			case 0x202B:
-			case 0x202C:
-			case 0x202D:
-			case 0x202E:
-			case 0x2060:
-			case 0x2061:
-			case 0x2062:
-			case 0x2063:
-			case 0x2064:
-			case 0x2065:
-			case 0x2066:
-			case 0x2067:
-			case 0x2068:
-			case 0x2069:
-			case 0x206A:
-			case 0x206B:
-			case 0x206C:
-			case 0x206D:
-			case 0x206E:
-			case 0x206F:
-			case 0x3164:
-			case 0xFE00:
-			case 0xFE01:
-			case 0xFE02:
-			case 0xFE03:
-			case 0xFE04:
-			case 0xFE05:
-			case 0xFE06:
-			case 0xFE07:
-			case 0xFE08:
-			case 0xFE09:
-			case 0xFE0A:
-			case 0xFE0B:
-			case 0xFE0C:
-			case 0xFE0D:
-			case 0xFE0E:
-			case 0xFE0F:
-			case 0xFEFF:
-			case 0xFFA0:
-			case 0xFFF0:
-			case 0xFFF1:
-			case 0xFFF2:
-			case 0xFFF3:
-			case 0xFFF4:
-			case 0xFFF5:
-			case 0xFFF6:
-			case 0xFFF7:
-			case 0xFFF8:
-			case 0x1BCA0:
-			case 0x1BCA1:
-			case 0x1BCA2:
-			case 0x1BCA3:
-			case 0x1D173:
-			case 0x1D174:
-			case 0x1D175:
-			case 0x1D176:
-			case 0x1D177:
-			case 0x1D178:
-			case 0x1D179:
-			case 0x1D17A:
-				if (rm_di) {
+			default:
+				if (rm_di && corpus_unicode_isignorable(code)) {
 					continue;
 				}
 				break;
-
-			default:
-				break;
-			}
-		} else if (code <= 0xE0FFF) {
-			if (rm_di) {
-				continue;
 			}
 		}
 		if (code >= 0x80) {

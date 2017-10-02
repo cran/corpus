@@ -23,6 +23,12 @@
  * Symbol table, assigning integer IDs to tokens and types.
  */
 
+/** Code for a missing or non-existent token */
+#define CORPUS_TOKEN_NONE (-1)
+
+/** Code for a missing or non-existent type */
+#define CORPUS_TYPE_NONE (-1)
+
 /**
  * Symbol table token.
  */
@@ -63,12 +69,10 @@ struct corpus_symtab {
  * \param tab the symbol table
  * \param type_kind the type kind specifier, a bit mask of #corpus_type_kind
  * 	values
- * \param stemmer the stemming algorithm name, or NULL to disable stemming
  *
  * \returns 0 on success
  */
-int corpus_symtab_init(struct corpus_symtab *tab, int type_kind,
-		       const char *stemmer);
+int corpus_symtab_init(struct corpus_symtab *tab, int type_kind);
 
 /**
  * Release the resources associated with a symbol table.
@@ -83,18 +87,6 @@ void corpus_symtab_destroy(struct corpus_symtab *tab);
  * \param tab the symbol table
  */
 void corpus_symtab_clear(struct corpus_symtab *tab);
-
-/**
- * Add a type to the stem exception list. When a normalized token
- * matches anything on this list, it does not get stemmed.
- *
- * \param tab the symbol table
- * \param typ the normalized, unstemmed, type
- *
- * \returns 0 on success
- */
-int corpus_symtab_stem_except(struct corpus_symtab *tab,
-			      const struct corpus_text *typ);
 
 /**
  * Add a token to a symbol table if it does not already exist there, and

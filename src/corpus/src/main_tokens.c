@@ -30,6 +30,7 @@
 #include "text.h"
 #include "textset.h"
 #include "tree.h"
+#include "stem.h"
 #include "typemap.h"
 #include "symtab.h"
 #include "wordscan.h"
@@ -92,7 +93,7 @@ static int get_arg(const struct string_arg options[], const char *name)
 
 void usage_tokens(void)
 {
-	const char **stems = corpus_stemmer_names();
+	const char **stems = corpus_stem_snowball_names();
 	const char **stops = corpus_stopword_names();
 	int i;
 
@@ -110,7 +111,6 @@ Options:\n\
 \t-o <path>\tSaves output at the given path.\n\
 \t-s <stemmer>\tStems tokens with the given algorithm.\n\
 \t-t <stopwords>\tDrops words from the given stop word list.\n\
-\t-z\t\tKeeps white space tokens.\n\
 ", PROGRAM_NAME);
 	printf("\nCharacter Maps:\n");
 	for (i = 0; char_maps[i].name != NULL; i++) {
@@ -164,6 +164,7 @@ Options:\n\
 int main_tokens(int argc, char * const argv[])
 {
 	struct corpus_filter filter;
+	struct corpus_stem_snowball snowball;
 	struct corpus_data data, val;
 	struct corpus_text name, text, word;
 	const struct corpus_text *type;
@@ -180,15 +181,14 @@ int main_tokens(int argc, char * const argv[])
 	int filter_flags, type_flags;
 	int ch, err, i, name_id, start, type_id, ncomb;
 
-	filter_flags = (CORPUS_FILTER_IGNORE_SPACE
-			| CORPUS_FILTER_IGNORE_OTHER);
+	filter_flags = CORPUS_FILTER_KEEP_ALL;
 	type_flags = (CORPUS_TYPE_MAPCASE | CORPUS_TYPE_MAPCOMPAT
 			| CORPUS_TYPE_MAPQUOTE | CORPUS_TYPE_RMDI);
 
 	field = "text";
 	ncomb = 0;
 
-	while ((ch = getopt(argc, argv, "c:d:f:k:o:s:t:z")) != -1) {
+	while ((ch = getopt(argc, argv, "c:d:f:k:o:s:t:")) != -1) {
 		switch (ch) {
 		case 'c':
 			if (ncomb == COMBINE_MAX) {
@@ -241,9 +241,6 @@ int main_tokens(int argc, char * const argv[])
 				return EXIT_FAILURE;
 			}
 			break;
-		case 'z':
-			filter_flags &= ~CORPUS_FILTER_IGNORE_SPACE;
-			break;
 		default:
 			usage_tokens();
 			return EXIT_FAILURE;
@@ -285,9 +282,21 @@ int main_tokens(int argc, char * const argv[])
 		goto error_schema;
 	}
 
-	if ((err = corpus_filter_init(&filter, type_flags, stemmer,
-				      filter_flags))) {
-		goto error_filter;
+	if (stemmer) {
+		if ((err = corpus_stem_snowball_init(&snowball, stemmer))) {
+			goto error_snowball;
+		}
+		if ((err = corpus_filter_init(&filter, filter_flags,
+					      type_flags, '_',
+					      corpus_stem_snowball,
+					      &snowball))) {
+			goto error_filter;
+		}
+	} else {
+		if ((err = corpus_filter_init(&filter, filter_flags,
+					      type_flags, '_', NULL, NULL))) {
+			goto error_filter;
+		}
 	}
 
 	if (stopwords) {
@@ -372,14 +381,13 @@ int main_tokens(int argc, char * const argv[])
 		fprintf(stream, "[");
 		start = 1;
 
-		if ((err = corpus_filter_start(&filter, &text,
-					       CORPUS_FILTER_SCAN_TOKENS))) {
+		if ((err = corpus_filter_start(&filter, &text))) {
 			goto error;
 		}
 
 		while (corpus_filter_advance(&filter)) {
 			type_id = filter.type_id;
-			if (type_id == CORPUS_FILTER_IGNORED) {
+			if (type_id == CORPUS_TYPE_NONE) {
 				continue;
 			}
 
@@ -392,7 +400,7 @@ int main_tokens(int argc, char * const argv[])
 			if (type_id < 0) {
 				fprintf(stream, "null");
 			} else {
-				type = corpus_filter_type(&filter, type_id);
+				type = &filter.symtab.types[type_id].text;
 
 				corpus_render_clear(&render);
 				corpus_render_text(&render, type);
@@ -423,6 +431,10 @@ error_combine:
 error_stopwords:
 	corpus_filter_destroy(&filter);
 error_filter:
+	if (stemmer) {
+		corpus_stem_snowball_destroy(&snowball);
+	}
+error_snowball:
 	corpus_schema_destroy(&schema);
 error_schema:
 	corpus_render_destroy(&render);

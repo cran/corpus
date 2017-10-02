@@ -79,6 +79,10 @@ static void free_text(SEXP stext)
 			corpus_filter_destroy(&obj->filter);
 		}
 
+		if (obj->has_stemmer) {
+			stemmer_destroy(&obj->stemmer);
+		}
+
 		corpus_free(obj->text);
 		corpus_free(obj);
 	}

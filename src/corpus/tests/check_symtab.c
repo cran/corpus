@@ -33,8 +33,7 @@ void setup_empty_symtab(void)
 	setup();
 	corpus_symtab_init(&tab, (CORPUS_TYPE_MAPCASE
 				  | CORPUS_TYPE_MAPCOMPAT
-				  | CORPUS_TYPE_RMDI),
-			   NULL);
+				  | CORPUS_TYPE_RMDI));
 }
 
 

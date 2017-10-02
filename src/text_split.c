@@ -18,24 +18,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include "corpus/src/array.h"
-#include "corpus/src/memory.h"
-#include "corpus/src/table.h"
-#include "corpus/src/text.h"
-#include "corpus/src/textset.h"
-#include "corpus/src/tree.h"
-#include "corpus/src/typemap.h"
-#include "corpus/src/symtab.h"
-#include "corpus/src/sentscan.h"
-#include "corpus/src/wordscan.h"
-#include "corpus/src/filter.h"
-#include "corpus/src/sentfilter.h"
 #include "rcorpus.h"
-
-// the R 'error' is a #define (to Rf_error) that clashes with the 'error'
-// member of struct corpus_sentfilter
-#ifdef error
-#  undef error
-#endif
 
 
 struct context {
@@ -404,8 +387,8 @@ SEXP text_split_tokens(SEXP sx, SEXP ssize)
 		size = 0;
 		attr = 0;
 
-		TRY(corpus_filter_start(filter, &text[i],
-					CORPUS_FILTER_SCAN_TOKENS));
+		TRY(corpus_filter_start(filter, &text[i]));
+
 		while (corpus_filter_advance(filter)) {
 			// if we encounter a non-dropped, non-ignored
 			// token and the block is already full, add it

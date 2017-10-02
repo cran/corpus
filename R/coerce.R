@@ -28,8 +28,8 @@ as_character_scalar <- function(name, value, utf8 = TRUE)
 
 as_character_vector <- function(name, value, utf8 = TRUE)
 {
-    if (!(is.null(value) || is.character(value) || is_corpus_text(value)
-          || all(is.na(value)))) {
+    if (!(is.null(value) || is.character(value) || is.factor(value)
+          || is_corpus_text(value) || all(is.na(value)))) {
         stop(sprintf("'%s' must be text, a character vector, or NULL", name))
     }
     if (is.null(value)) {
@@ -40,6 +40,13 @@ as_character_vector <- function(name, value, utf8 = TRUE)
         value <- as_utf8(value)
     }
     value
+}
+
+
+as_connector <- function(value)
+{
+    value <- as_character_scalar("connector", value)
+    .Call(C_as_text_filter_connector, value)
 }
 
 
@@ -286,12 +293,13 @@ as_size <- function(size)
 }
 
 
-as_stemmer <- function(stemmer)
+as_snowball_algorithm <- function(name, value)
 {
-    if (is.null(stemmer)) {
-        return(NULL)
+    if (is.null(value)) {
+        return(value)
     }
 
+    value <- as_character_scalar(name, value)
     isocodes <- c(ar = "arabic", da = "danish", de = "german",
                   en = "english", es = "spanish", fi = "finnish",
                   fr = "french", hu = "hungarian", it = "italian",
@@ -301,9 +309,32 @@ as_stemmer <- function(stemmer)
     extra <- "porter"
 
     stemmers <- c(names(isocodes), sort(c(isocodes, extra)))
-    stemmer <- as_enum("stemmer", stemmer, stemmers)
-    if (!is.na(i <- match(stemmer, isocodes))) {
-        stemmer <- names(isocodes)[[i]]
+    value <- as_enum(name, value, stemmers)
+    if (!is.na(i <- match(value, isocodes))) {
+        value <- names(isocodes)[[i]]
+    }
+
+    value
+}
+
+
+as_stemmer <- function(stemmer)
+{
+    if (is.null(stemmer)) {
+        return(NULL)
+    }
+
+    if (is.character(stemmer)) {
+        stemmer <- as_snowball_algorithm("stemmer", stemmer)
+    } else if (!is.function(stemmer)) {
+        if (!is.null(attr(stemmer, "class"))) {
+            stemmer <- as.function(stemmer)
+            if (!is.function(stemmer)) {
+                stop("calling 'as.function' on 'stemmer' value did not return a function")
+            }
+        } else {
+            stop("'stemmer' must be a character string, a function, or NULL")
+        }
     }
     stemmer
 }

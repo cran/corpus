@@ -3,6 +3,9 @@ Todo
 
 ## Features
 
+  
+  * Use Unicdoe character class table in isspace()
+
   * Some sort of index for allowing KWIC queries.
 
   * URL, twitter handling. Notes:

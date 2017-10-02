@@ -243,4 +243,22 @@ enum corpus_charwidth_type {
  */
 int corpus_unicode_charwidth(uint32_t code);
 
+/**
+ * Get whether a Unicode character is white space.
+ *
+ * \param code the codepoint
+ *
+ * \returns 1 if space, 0 otherwise.
+ */
+int corpus_unicode_isspace(uint32_t code);
+
+/**
+ * Get whether a Unicode character is a default ignorable character.
+ *
+ * \param code the codepoint
+ *
+ * \returns 1 if space, 0 otherwise.
+ */
+int corpus_unicode_isignorable(uint32_t code);
+
 #endif /* CORPUS_UNICODE_H */

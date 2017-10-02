@@ -22,12 +22,13 @@ text_filter <- function(x = NULL, ...)
 text_filter.default <- function(x = NULL, ...,
                                 map_case = TRUE, map_quote = TRUE,
                                 remove_ignorable = TRUE,
+                                combine = NULL,
                                 stemmer = NULL, stem_dropped = FALSE,
                                 stem_except = NULL,
-                                combine = corpus::abbreviations_en,
                                 drop_letter = FALSE, drop_number = FALSE,
                                 drop_punct = FALSE, drop_symbol = FALSE,
                                 drop = NULL, drop_except = NULL,
+                                connector = "_",
                                 sent_crlf = FALSE,
                                 sent_suppress = corpus::abbreviations_en)
 {
@@ -44,16 +45,17 @@ text_filter.default <- function(x = NULL, ...,
     ans$map_case <- map_case
     ans$map_quote <- map_quote
     ans$remove_ignorable <- remove_ignorable
+    ans$combine <- combine
     ans$stemmer <- stemmer
     ans$stem_dropped <- stem_dropped
     ans$stem_except <- stem_except
-    ans$combine <- combine
     ans$drop_letter <- drop_letter
     ans$drop_number <- drop_number
     ans$drop_punct <- drop_punct
     ans$drop_symbol <- drop_symbol
     ans$drop <- drop
     ans$drop_except <- drop_except
+    ans$connector <- connector
     ans$sent_crlf <- sent_crlf
     ans$sent_suppress <- sent_suppress
 
@@ -163,6 +165,8 @@ text_filter.corpus_text <- function(x = NULL, ...)
         value <- as_character_vector(name, value)
     } else if (name == "stemmer") {
         value <- as_stemmer(value)
+    } else if (name == "connector") {
+        value <- as_connector(value)
     } else {
         stop(sprintf("unrecognized text filter property: '%s'", name))
     }
@@ -236,13 +240,15 @@ print.corpus_text_filter <- function(x, ...)
     for (k in names(x)) {
         val <- x[[k]]
 
-        cat(paste0("\t", k, ": "))
+        cat(paste0("    ", k, ": "))
         if (is.null(val)) {
             cat("NULL\n")
+        } else if (is.function(val)) {
+            cat("<function>\n")
         } else if (length(val) == 1) {
             cat(paste0(val, "\n"))
         } else {
-            utils::str(val, width = getOption("width") - 8 - nchar(k) - 2,
+            utils::str(val, width = getOption("width") - 4 - nchar(k) - 2,
                        give.attr = FALSE)
         }
     }

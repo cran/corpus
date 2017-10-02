@@ -17,24 +17,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include "corpus/src/table.h"
-#include "corpus/src/intset.h"
-#include "corpus/src/text.h"
-#include "corpus/src/textset.h"
-#include "corpus/src/tree.h"
-#include "corpus/src/typemap.h"
-#include "corpus/src/symtab.h"
-#include "corpus/src/sentscan.h"
-#include "corpus/src/wordscan.h"
-#include "corpus/src/filter.h"
-#include "corpus/src/sentfilter.h"
 #include "rcorpus.h"
-
-// the R 'error' is a #define (to Rf_error) that clashes with the 'error'
-// member of struct corpus_sentfilter
-#ifdef error
-#  undef error
-#endif
 
 
 SEXP text_nsentence(SEXP sx)
@@ -89,7 +72,7 @@ out:
 }
 
 
-static SEXP text_measure(SEXP sx, int include_na)
+SEXP text_ntoken(SEXP sx)
 {
 	SEXP ans, names;
 	struct corpus_filter *filter;
@@ -117,18 +100,12 @@ static SEXP text_measure(SEXP sx, int include_na)
 			continue;
 		}
 
-		TRY(corpus_filter_start(filter, &text[i],
-					CORPUS_FILTER_SCAN_TOKENS));
+		TRY(corpus_filter_start(filter, &text[i]));
 
 		nunit = 0;
 
 		while (corpus_filter_advance(filter)) {
-			if (filter->type_id == CORPUS_FILTER_DROPPED) {
-				if (!include_na) {
-					continue;
-				}
-			} else if (filter->type_id < 0) {
-				// skip ignored tokens
+			if (filter->type_id < 0) {
 				continue;
 			}
 			nunit++;
@@ -142,16 +119,4 @@ out:
 	UNPROTECT(nprot);
 	CHECK_ERROR(err);
 	return ans;
-}
-
-
-SEXP text_ntoken(SEXP sx)
-{
-	return text_measure(sx, 0);
-}
-
-
-SEXP text_length(SEXP sx)
-{
-	return text_measure(sx, 1);
 }

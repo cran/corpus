@@ -94,8 +94,8 @@ test_that("'term_matrix' can transpose", {
     w <- c(100, 3, 1000)
     g <- c("B", "B", "A")
     x <- term_matrix(text, weights = w, group = g, transpose = TRUE)
-    x0 <- t(as.matrix(term_matrix(text, weights = w, group = g)))
-    expect_equal(as.matrix(x), x0)
+    x0 <- t(Matrix::as.matrix(term_matrix(text, weights = w, group = g)))
+    expect_equal(Matrix::as.matrix(x), x0)
 })
 
 
@@ -131,23 +131,23 @@ test_that("'term_matrix' can select stemmed bigrams", {
 
 test_that("'term_matrix' errors for empty terms", {
     expect_error(term_matrix("", select = c("a", "b", " ", "c")),
-                 "select term in position 3 (' ') does not contain a type",
+                 "select term in position 3 (\" \") has empty type (\"\")",
                  fixed = TRUE)
 })
 
 
 test_that("'term_matrix' errors for dropped select terms", {
     f <- text_filter(drop = "a")
-    expect_error(term_matrix("", f, select = c("b b", "b a", "c")),
-                 paste0("select term in position 2 ('b a')",
-                        " contains a dropped type ('a')"),
+    expect_error(term_matrix("", f, select = c("b b", "a a", "c")),
+                 paste0("select term in position 2 (\"a a\")",
+                        " contains a dropped type (\"a\")"),
                  fixed = TRUE)
 })
 
 
 test_that("'term_matrix' errors for duplicated select terms", {
     expect_error(term_matrix("", select = c("a", "b", "c", "b")),
-                 paste0("select terms in positions 2 and 4 ('b' and 'b')",
+                 paste0("select terms in positions 2 and 4 (\"b\" and \"b\")",
                         " have the same type"),
                  fixed = TRUE)
 })
@@ -165,10 +165,10 @@ test_that("'term_matrix' can select really long terms", {
 
 
 test_that("'term_matrix' can select types ending in '.s", {
-    f <- text_filter(stemmer = "english", drop_punct = TRUE, combine = NULL)
-    expect_equal(term_matrix("u.s.", f, select = "u.s"),
+    f <- text_filter(stemmer = "en", drop_punct = TRUE, combine = NULL)
+    expect_equal(term_matrix("u.s.", f, select = "u."),
                  Matrix::sparseMatrix(i = 1, j = 1, x = 1,
-                                      dimnames = list(NULL, "u.s")))
+                                      dimnames = list(NULL, "u.")))
 })
 
 

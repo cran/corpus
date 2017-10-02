@@ -26,8 +26,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct sb_stemmer;
-
 /**
  * Type map descriptor. At a minimum, convert all tokens to
  * composed normal form (NFC). Optionally, apply compatibility maps for
@@ -45,8 +43,8 @@ struct sb_stemmer;
  *  + #CORPUS_TYPE_MAPCOMPAT: apply all compatibility maps required for
  *  	[NFKC normal form](http://unicode.org/reports/tr15/#Norm_Forms)
  *
- *  + #CORPUS_TYPE_MAPQUOTE: quote fold, replace curly quotes with straight
- *      quotes
+ *  + #CORPUS_TYPE_MAPQUOTE: quote fold, replace single quotes and
+ *      Unicode apostrophe with ASCII apostrophe (U+0027)
  *
  *  + #CORPUS_TYPE_RMDI: remove default ignorables (DI) like soft hyphens and
  *  	zero-width spaces, anything with the
@@ -58,7 +56,7 @@ enum corpus_type_kind {
 	CORPUS_TYPE_NORMAL    = 0, /**< transform to composed normal form */
 	CORPUS_TYPE_MAPCASE   = (1 << 0), /**< perform case folding */
 	CORPUS_TYPE_MAPCOMPAT = (1 << 1), /**< apply compatibility mappings */
-	CORPUS_TYPE_MAPQUOTE  = (1 << 2), /**< replace quotes with `'` */
+	CORPUS_TYPE_MAPQUOTE  = (1 << 2), /**< replace apostrophe with `'` */
 	CORPUS_TYPE_RMDI      = (1 << 3)  /**< remove default ignorables */
 };
 
@@ -70,10 +68,6 @@ struct corpus_typemap {
 				  recent typemap_set() call */
 	int8_t ascii_map[128];	/**< a lookup table for the mappings of ASCII
 				  characters; -1 indicates deletion */
-	struct sb_stemmer *stemmer;
-				/**< the stemmer (NULL if none) */
-	struct corpus_textset excepts;
-				/**< types to exempt from stemming */
 	uint32_t *codes;	/**< buffer for intermediate UTF-32 decoding */
 	size_t size_max;	/**< token size maximum; normalizing a larger
 				 	token will force a reallocation */
@@ -83,13 +77,6 @@ struct corpus_typemap {
 				  #corpus_udecomp_type and
 				  #corpus_ucasefold_type values */
 };
-
-/**
- * Get a list of the stemmer algorithms (canonical names, not aliases).
- *
- * \returns a NULL-terminated array of algorithm names
- */
-const char **corpus_stemmer_names(void);
 
 /**
  * Get a list of stop words (common function words) encoded as
@@ -115,12 +102,10 @@ const char **corpus_stopword_names(void);
  *
  * \param map the type map
  * \param kind a bitmask of #corpus_type_kind values, specifying the map type
- * \param stemmer the stemming algorithm name, or NULL to disable stemming
  *
  * \returns 0 on success
  */
-int corpus_typemap_init(struct corpus_typemap *map, int kind,
-			const char *stemmer);
+int corpus_typemap_init(struct corpus_typemap *map, int kind);
 
 /**
  * Release the resources associated with a type map.
@@ -139,17 +124,5 @@ void corpus_typemap_destroy(struct corpus_typemap *map);
  */
 int corpus_typemap_set(struct corpus_typemap *map,
 		       const struct corpus_text *tok);
-
-/**
- * Add a type to the stem exception list. When a normalized token
- * matches anything on this list, it does not get stemmed.
- *
- * \param map the type map
- * \param typ the normalized, unstemmed, type
- *
- * \returns 0 on success
- */
-int corpus_typemap_stem_except(struct corpus_typemap *map,
-			       const struct corpus_text *typ);
 
 #endif /* CORPUS_TYPEMAP_H */

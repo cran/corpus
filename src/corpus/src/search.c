@@ -23,9 +23,11 @@
 #include "text.h"
 #include "textset.h"
 #include "termset.h"
+#include "stem.h"
 #include "typemap.h"
 #include "symtab.h"
 #include "wordscan.h"
+#include "render.h"
 #include "filter.h"
 #include "search.h"
 
@@ -135,8 +137,7 @@ int corpus_search_start(struct corpus_search *search,
 		goto out;
 	}
 
-	if ((err = corpus_filter_start(filter, text,
-				       CORPUS_FILTER_SCAN_TOKENS))) {
+	if ((err = corpus_filter_start(filter, text))) {
 		goto out;
 	}
 
@@ -280,7 +281,7 @@ int buffer_advance(struct corpus_search_buffer *buffer,
 	while (corpus_filter_advance(filter)) {
 		type_id = filter->type_id;
 		current = &filter->current;
-		if (type_id == CORPUS_FILTER_IGNORED) {
+		if (type_id == CORPUS_TYPE_NONE) {
 			buffer_ignore(buffer, current);
 			continue;
 		} else if (type_id < 0) {

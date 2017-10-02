@@ -24,12 +24,13 @@ text_filter(x) <- value
 \method{text_filter}{default}(x = NULL, ...,
             map_case = TRUE, map_quote = TRUE,
             remove_ignorable = TRUE,
+            combine = NULL,
             stemmer = NULL, stem_dropped = FALSE,
             stem_except = NULL,
-            combine = corpus::abbreviations_en,
             drop_letter = FALSE, drop_number = FALSE,
             drop_punct = FALSE, drop_symbol = FALSE,
             drop = NULL, drop_except = NULL,
+            connector = "_",
             sent_crlf = FALSE,
             sent_suppress = corpus::abbreviations_en)
 }
@@ -45,37 +46,19 @@ text_filter(x) <- value
         changes uppercase characters to their lowercase equivalents.}
 
     \item{map_quote}{a logical value indicating whether to replace curly
-        single quotes and double quotes with straight single quotes
-        and double quotes.}
+        single quotes and other Unicode apostrophe characters with
+        ASCII apostrophe (U+0027).}
 
     \item{remove_ignorable}{a logical value indicating whether to remove
         Unicode "default ignorable" characters like zero-width spaces
         and soft hyphens.}
 
-    \item{stemmer}{a character value giving the name of the stemming
-        algorithm, or \code{NULL} to leave words unchanged. The stemming
-        algorithms are provided by the
-        \href{http://snowballstem.org/algorithms/}{Snowball stemming library};
-        the following stemming algorithms are available:
-            \code{"ar"} (\code{"arabic"}),
-            \code{"da"} (\code{"danish"}),
-	        \code{"de"} (\code{"german"}),
-            \code{"en"} (\code{"english"}),
-            \code{"es"} (\code{"spanish"}),
-            \code{"fi"} (\code{"finnish"}),
-            \code{"fr"} (\code{"french"}),
-            \code{"hu"} (\code{"hungarian"}),
-            \code{"it"} (\code{"italian"}),
-            \code{"nl"} (\code{"dutch"}),
-            \code{"no"} (\code{"norwegian"}),
-            \code{"pt"} (\code{"portuguese"}),
-	        \code{"ro"} (\code{"romanian"}),
-            \code{"ru"} (\code{"russian"}),
-            \code{"sv"} (\code{"swedish"}),
-            \code{"ta"} (\code{"tamil"}),
-            \code{"tr"} (\code{"turkish"}),
-            and \code{"porter"}.
-        }
+    \item{combine}{a character vector of multi-word phrases to combine, or
+        \code{NULL}; see \sQuote{Combining words}.}
+
+    \item{stemmer}{a character value giving the name of a Snowball stemming
+        algorithm (see \code{\link{stem_snowball}} for choices), a custom
+        stemming function, or \code{NULL} to leave words unchanged.}
 
     \item{stem_dropped}{a logical value indicating whether to stem words
         in the \code{"drop"} list.}
@@ -83,9 +66,6 @@ text_filter(x) <- value
     \item{stem_except}{a character vector of exception words to exempt from
         stemming, or \code{NULL}. If left unspecified, \code{stem_except}
         is set equal to the \code{drop} argument.}
-
-    \item{combine}{a character vector of multi-word phrases to combine, or
-        \code{NULL}; see \sQuote{Combining words}.}
 
     \item{drop_letter}{a logical value indicating whether to replace
         \code{"letter"} tokens (cased letters, kana, ideographic, letter-like
@@ -109,6 +89,9 @@ text_filter(x) <- value
         rules specified by the \code{drop_letter}, \code{drop_number},
         \code{drop_punct}, \code{drop_symbol}, and \code{drop}
         arguments, or \code{NULL}.}
+
+    \item{connector}{a character to use as a connector in lieu of
+        white space for types that stem to multi-word phrases.}
 
     \item{sent_crlf}{a logical value indicating whether to break
         sentences on carriage returns or line feeds.}
