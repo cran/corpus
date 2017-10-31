@@ -15,15 +15,15 @@
  */
 
 #include <assert.h>
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include "unicode/casefold.h"
-#include "unicode/charwidth.h"
-#include "unicode/compose.h"
-#include "unicode/combining.h"
-#include "unicode/decompose.h"
-#include "error.h"
-#include "unicode.h"
+#include "private/casefold.h"
+#include "private/charwidth.h"
+#include "private/compose.h"
+#include "private/combining.h"
+#include "private/decompose.h"
+#include "utf8lite.h"
 
 /*
   Source:
@@ -48,7 +48,7 @@
 */
 
 
-int corpus_scan_utf8(const uint8_t **bufptr, const uint8_t *end)
+int utf8lite_scan_utf8(const uint8_t **bufptr, const uint8_t *end)
 {
 	const uint8_t *ptr = *bufptr;
 	uint_fast8_t ch, ch1;
@@ -56,7 +56,7 @@ int corpus_scan_utf8(const uint8_t **bufptr, const uint8_t *end)
 	int err;
 
 	if (ptr >= end) {
-		return CORPUS_ERROR_INVAL;
+		return EINVAL;
 	}
 
 	/* First byte
@@ -189,14 +189,14 @@ success:
 	goto out;
 backtrack:
 	ptr--;
-	err = CORPUS_ERROR_INVAL;
+	err = EINVAL;
 out:
 	*bufptr = ptr;
 	return err;
 }
 
 
-void corpus_decode_utf8(const uint8_t **bufptr, uint32_t *codeptr)
+void utf8lite_decode_utf8(const uint8_t **bufptr, uint32_t *codeptr)
 {
 	const uint8_t *ptr = *bufptr;
 	uint32_t code;
@@ -229,7 +229,7 @@ void corpus_decode_utf8(const uint8_t **bufptr, uint32_t *codeptr)
 
 
 // http://www.fileformat.info/info/unicode/utf8.htm
-void corpus_encode_utf8(uint32_t code, uint8_t **bufptr)
+void utf8lite_encode_utf8(uint32_t code, uint8_t **bufptr)
 {
 	uint8_t *ptr = *bufptr;
 	uint32_t x = code;
@@ -254,7 +254,7 @@ void corpus_encode_utf8(uint32_t code, uint8_t **bufptr)
 }
 
 
-void corpus_rencode_utf8(uint32_t code, uint8_t **bufptr)
+void utf8lite_rencode_utf8(uint32_t code, uint8_t **bufptr)
 {
 	uint8_t *ptr = *bufptr;
 	uint32_t x = code;
@@ -357,18 +357,18 @@ static void casefold(int type, uint32_t code, uint32_t **bufp)
 		*dst++ = code;
 		*bufp = dst;
 	} else if (length == 1) {
-		corpus_unicode_map(type, c.data, bufp);
+		utf8lite_map(type, c.data, bufp);
 	} else {
 		src = &casefold_mapping[c.data];
 		while (length-- > 0) {
-			corpus_unicode_map(type, *src, bufp);
+			utf8lite_map(type, *src, bufp);
 			src++;
 		}
 	}
 }
 
 
-void corpus_unicode_map(int type, uint32_t code, uint32_t **bufptr)
+void utf8lite_map(int type, uint32_t code, uint32_t **bufptr)
 {
 	const uint32_t block_size = DECOMPOSITION_BLOCK_SIZE;
 	unsigned i = decomposition_stage1[code / block_size];
@@ -378,7 +378,7 @@ void corpus_unicode_map(int type, uint32_t code, uint32_t **bufptr)
 	uint32_t *dst;
 
 	if (length == 0 || (d.type > 0 && !(type & (1 << (d.type - 1))))) {
-		if (type & CORPUS_UCASEFOLD_ALL) {
+		if (type & UTF8LITE_CASEFOLD_ALL) {
 			casefold(type, code, bufptr);
 		} else {
 			dst = *bufptr;
@@ -386,11 +386,11 @@ void corpus_unicode_map(int type, uint32_t code, uint32_t **bufptr)
 			*bufptr = dst;
 		}
 	} else if (length == 1) {
-		corpus_unicode_map(type, d.data, bufptr);
+		utf8lite_map(type, d.data, bufptr);
 	} else if (d.type >= 0) {
 		src = &decomposition_mapping[d.data];
 		while (length-- > 0) {
-			corpus_unicode_map(type, *src, bufptr);
+			utf8lite_map(type, *src, bufptr);
 			src++;
 		}
 	} else {
@@ -399,7 +399,7 @@ void corpus_unicode_map(int type, uint32_t code, uint32_t **bufptr)
 }
 
 
-void corpus_unicode_order(uint32_t *ptr, size_t len)
+void utf8lite_order(uint32_t *ptr, size_t len)
 {
 	uint32_t *end = ptr + len;
 	uint32_t *c_begin, *c_end, *c_tail, *c_ptr;
@@ -551,7 +551,7 @@ static int has_combiner(uint32_t left, int offset, int length, uint32_t code,
 }
 
 
-void corpus_unicode_compose(uint32_t *ptr, size_t *lenptr)
+void utf8lite_compose(uint32_t *ptr, size_t *lenptr)
 {
 	size_t len = *lenptr;
 	uint32_t *begin = ptr;
@@ -631,32 +631,32 @@ out:
 }
 
 
-int corpus_unicode_charwidth(uint32_t code)
+int utf8lite_charwidth(uint32_t code)
 {
 	int prop = charwidth(code);
 	switch(prop) {
 	case CHARWIDTH_OTHER:
-		return CORPUS_CHARWIDTH_OTHER;
+		return UTF8LITE_CHARWIDTH_OTHER;
 	case CHARWIDTH_EMOJI:
-		return CORPUS_CHARWIDTH_EMOJI;
+		return UTF8LITE_CHARWIDTH_EMOJI;
 	case CHARWIDTH_AMBIGUOUS:
-		return CORPUS_CHARWIDTH_AMBIGUOUS;
+		return UTF8LITE_CHARWIDTH_AMBIGUOUS;
 	case CHARWIDTH_IGNORABLE:
-		return CORPUS_CHARWIDTH_IGNORABLE;
+		return UTF8LITE_CHARWIDTH_IGNORABLE;
 	case CHARWIDTH_NONE:
-		return CORPUS_CHARWIDTH_NONE;
+		return UTF8LITE_CHARWIDTH_NONE;
 	case CHARWIDTH_NARROW:
-		return CORPUS_CHARWIDTH_NARROW;
+		return UTF8LITE_CHARWIDTH_NARROW;
 	case CHARWIDTH_WIDE:
-		return CORPUS_CHARWIDTH_WIDE;
+		return UTF8LITE_CHARWIDTH_WIDE;
 	default:
 		assert(0 && "internal error: unrecognized charwidth property");
-		return CORPUS_CHARWIDTH_OTHER;
+		return UTF8LITE_CHARWIDTH_OTHER;
 	}
 }
 
 // TODO: use character class lookup table
-int corpus_unicode_isspace(uint32_t code)
+int utf8lite_isspace(uint32_t code)
 {
 	if (code <= 0x7F) {
 		return (code == 0x20 || (0x09 <= code && code < 0x0E));
@@ -688,7 +688,7 @@ int corpus_unicode_isspace(uint32_t code)
 }
 
 // TODO use lookup table
-int corpus_unicode_isignorable(uint32_t code)
+int utf8lite_isignorable(uint32_t code)
 {
 	// Default_Ignorable_Code_Point = Yes
 	if (code <= 0x7F) {

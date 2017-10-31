@@ -317,10 +317,6 @@ test_that("'print.corpus_frame' can wrap 4 columns", {
     ctype <- switch_ctype("C")
     on.exit(Sys.setlocale("LC_CTYPE", ctype), add = TRUE)
 
-    oldwidth <- options()$width
-    options(width = 80)
-    on.exit(options(width = oldwidth), add = TRUE)
-
     x <- corpus_frame(
         title = "The Declaration of Independence of The United States of America",
         author = "Founding Fathers",
@@ -333,7 +329,8 @@ test_that("'print.corpus_frame' can wrap 4 columns", {
 '  author           language text                                                ',
 '1 Founding Fathers English  The Declaration of Independence of The United Sta...')
 
-    expect_equal(strsplit(capture_output(print.corpus_frame(x)), "\n")[[1]],
+    expect_equal(strsplit(capture_output(print.corpus_frame(x), width = 80),
+                          "\n")[[1]],
                  lines)
 })
 
@@ -399,4 +396,16 @@ test_that("'is_corpus_frame' works correctly", {
     expect_false(is_corpus_frame(data.frame(text = "hello",
                                             stringsAsFactors = FALSE)))
     expect_true(is_corpus_frame(data.frame(text = as_corpus_text("hello"))))
+})
+
+
+test_that("'print.corpus_frame' can omit row names", {
+    ctype <- switch_ctype("C")
+    on.exit(Sys.setlocale("LC_CTYPE", ctype))
+
+    d <- data.frame(x = letters)
+    expected <- paste0(capture_output(print(d[1:20,,drop=FALSE], row.names = FALSE)),
+                       "\n (26 rows total)")
+    actual <- capture_output(print.corpus_frame(d, row.names = FALSE))
+    expect_equal(actual, expected)
 })

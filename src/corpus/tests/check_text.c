@@ -19,9 +19,9 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../lib/utf8lite/src/utf8lite.h"
 #include "../src/error.h"
 #include "../src/text.h"
-#include "../src/unicode.h"
 #include "testutil.h"
 
 
@@ -49,7 +49,8 @@ int is_valid_text(const char *str)
 {
 	struct corpus_text text;
 	size_t n = strlen(str);
-	int err = corpus_text_assign(&text, (const uint8_t *)str, n, 0);
+	int err = corpus_text_assign(&text, (const uint8_t *)str, n,
+				     CORPUS_TEXT_UNESCAPE);
 	return !err;
 }
 
@@ -58,8 +59,7 @@ int is_valid_raw(const char *str)
 {
 	struct corpus_text text;
 	size_t n = strlen(str);
-	int err = corpus_text_assign(&text, (const uint8_t *)str, n,
-				     CORPUS_TEXT_NOESCAPE);
+	int err = corpus_text_assign(&text, (const uint8_t *)str, n, 0);
 	return !err;
 }
 
@@ -73,7 +73,7 @@ const char *unescape(const struct corpus_text *text)
 
 	corpus_text_iter_make(&it, text);
 	while (corpus_text_iter_advance(&it)) {
-		corpus_encode_utf8(it.current, &ptr);
+		utf8lite_encode_utf8(it.current, &ptr);
 	}
 	*ptr = '\0';
 	return (const char *)buf;
@@ -496,7 +496,7 @@ START_TEST(test_iter_random)
 	}
 
 	ptr = buffer;
-	ck_assert(!corpus_text_assign(&text, ptr, size, 0));
+	ck_assert(!corpus_text_assign(&text, ptr, size, CORPUS_TEXT_UNESCAPE));
 	ck_assert(CORPUS_TEXT_SIZE(&text) == size);
 	ck_assert(CORPUS_TEXT_BITS(&text) == attr);
 

@@ -17,7 +17,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <check.h>
-#include "../src/unicode.h"
+#include "../src/utf8lite.h"
 #include "testutil.h"
 
 
@@ -224,7 +224,7 @@ int is_utf8(const char *str, size_t len)
         int err;
 
         while (ptr < end) {
-                if ((err = corpus_scan_utf8(&ptr, end))) {
+                if ((err = utf8lite_scan_utf8(&ptr, end))) {
 			return 0;
                 }
         }
@@ -392,14 +392,14 @@ static void roundtrip(uint32_t code)
 	uint32_t decode;
 
 	ptr = buf;
-	corpus_encode_utf8(code, &ptr);
+	utf8lite_encode_utf8(code, &ptr);
 
-	ck_assert_int_eq(ptr - buf, CORPUS_UTF8_ENCODE_LEN(code));
-	ck_assert(is_utf8((const char *)buf, CORPUS_UTF8_ENCODE_LEN(code)));
+	ck_assert_int_eq(ptr - buf, UTF8LITE_UTF8_ENCODE_LEN(code));
+	ck_assert(is_utf8((const char *)buf, UTF8LITE_UTF8_ENCODE_LEN(code)));
 
 	ptr = buf;
-	corpus_decode_utf8((const uint8_t **)&ptr, &decode);
-	ck_assert_int_eq(ptr - buf, CORPUS_UTF8_ENCODE_LEN(code));
+	utf8lite_decode_utf8((const uint8_t **)&ptr, &decode);
+	ck_assert_int_eq(ptr - buf, UTF8LITE_UTF8_ENCODE_LEN(code));
 	ck_assert_int_eq(code, decode);
 }
 
@@ -410,7 +410,7 @@ START_TEST(test_encode_decode_utf8)
 
 	// U+0000..U+FFFF
 	for (code = 0; code <= 0xFFFF; code += 0xFF) {
-		if (!CORPUS_IS_UNICODE(code)) {
+		if (!UTF8LITE_IS_UNICODE(code)) {
 			continue;
 		}
 		roundtrip(code);
@@ -445,14 +445,14 @@ static void reverse_roundtrip(uint32_t code)
 	uint32_t decode;
 
 	ptr = end;
-	corpus_rencode_utf8(code, &ptr);
+	utf8lite_rencode_utf8(code, &ptr);
 
-	ck_assert_int_eq(end - ptr, CORPUS_UTF8_ENCODE_LEN(code));
-	ck_assert(is_utf8((const char *)ptr, CORPUS_UTF8_ENCODE_LEN(code)));
+	ck_assert_int_eq(end - ptr, UTF8LITE_UTF8_ENCODE_LEN(code));
+	ck_assert(is_utf8((const char *)ptr, UTF8LITE_UTF8_ENCODE_LEN(code)));
 
 	start = ptr;
-	corpus_decode_utf8((const uint8_t **)&ptr, &decode);
-	ck_assert_int_eq(ptr - start, CORPUS_UTF8_ENCODE_LEN(code));
+	utf8lite_decode_utf8((const uint8_t **)&ptr, &decode);
+	ck_assert_int_eq(ptr - start, UTF8LITE_UTF8_ENCODE_LEN(code));
 	ck_assert_int_eq(code, decode);
 }
 
@@ -463,7 +463,7 @@ START_TEST(test_rencode_decode_utf8)
 
 	// U+0000..U+FFFF
 	for (code = 0; code <= 0xFFFF; code += 0xFF) {
-		if (!CORPUS_IS_UNICODE(code)) {
+		if (!UTF8LITE_IS_UNICODE(code)) {
 			continue;
 		}
 		reverse_roundtrip(code);
@@ -504,13 +504,13 @@ START_TEST(test_normalize_nfc_nfd)
 		dst = buf;
 		for (j = 0; j < test->source_len; j++) {
 			code = test->source[j];
-			corpus_unicode_map(0, code, &dst);
+			utf8lite_map(0, code, &dst);
 		}
 
 		len = (size_t)(dst - buf);
 		ck_assert_int_eq(len, test->nfd_len);
 
-		corpus_unicode_order(buf, len);
+		utf8lite_order(buf, len);
 		for (j = 0; j < test->nfd_len; j++) {
 			if (buf[j] != test->nfd[j]) {
 				write_normalization_test(stderr, test);
@@ -518,7 +518,7 @@ START_TEST(test_normalize_nfc_nfd)
 			ck_assert_uint_eq(buf[j], test->nfd[j]);
 		}
 
-		corpus_unicode_compose(buf, &len);
+		utf8lite_compose(buf, &len);
 		ck_assert_uint_eq(len, test->nfc_len);
 
 		for (j = 0; j < test->nfc_len; j++) {
@@ -546,13 +546,13 @@ START_TEST(test_normalize_nfkc_nfkd)
 		dst = buf;
 		for (j = 0; j < test->source_len; j++) {
 			code = test->source[j];
-			corpus_unicode_map(CORPUS_UDECOMP_ALL, code, &dst);
+			utf8lite_map(UTF8LITE_DECOMP_ALL, code, &dst);
 		}
 
 		len = (size_t)(dst - buf);
 		ck_assert_int_eq(len, test->nfkd_len);
 
-		corpus_unicode_order(buf, len);
+		utf8lite_order(buf, len);
 
 		for (j = 0; j < test->nfkd_len; j++) {
 			if (buf[j] != test->nfkd[j]) {
@@ -561,7 +561,7 @@ START_TEST(test_normalize_nfkc_nfkd)
 			ck_assert_uint_eq(buf[j], test->nfkd[j]);
 		}
 
-		corpus_unicode_compose(buf, &len);
+		utf8lite_compose(buf, &len);
 		ck_assert_uint_eq(len, test->nfkc_len);
 
 		for (j = 0; j < test->nfkc_len; j++) {
@@ -578,52 +578,52 @@ END_TEST
 
 START_TEST(test_whitespace)
 {
-	ck_assert(!corpus_unicode_isspace(0x08));
-	ck_assert(corpus_unicode_isspace('\t'));
-	ck_assert(corpus_unicode_isspace('\n'));
-	ck_assert(corpus_unicode_isspace('\v'));
-	ck_assert(corpus_unicode_isspace('\f'));
-	ck_assert(corpus_unicode_isspace('\r'));
-	ck_assert(!corpus_unicode_isspace(0x0E));
-	ck_assert(corpus_unicode_isspace(' '));
+	ck_assert(!utf8lite_isspace(0x08));
+	ck_assert(utf8lite_isspace('\t'));
+	ck_assert(utf8lite_isspace('\n'));
+	ck_assert(utf8lite_isspace('\v'));
+	ck_assert(utf8lite_isspace('\f'));
+	ck_assert(utf8lite_isspace('\r'));
+	ck_assert(!utf8lite_isspace(0x0E));
+	ck_assert(utf8lite_isspace(' '));
 
-	ck_assert(corpus_unicode_isspace(0x85));
-	ck_assert(!corpus_unicode_isspace(0x86));
-	ck_assert(corpus_unicode_isspace(0xA0));
-	ck_assert(corpus_unicode_isspace(0xA0));
+	ck_assert(utf8lite_isspace(0x85));
+	ck_assert(!utf8lite_isspace(0x86));
+	ck_assert(utf8lite_isspace(0xA0));
+	ck_assert(utf8lite_isspace(0xA0));
 
-	ck_assert(!corpus_unicode_isspace(0x1FFF));
-	ck_assert(corpus_unicode_isspace(0x2000));
-	ck_assert(corpus_unicode_isspace(0x2001));
-	ck_assert(corpus_unicode_isspace(0x200A));
-	ck_assert(!corpus_unicode_isspace(0x200B));
+	ck_assert(!utf8lite_isspace(0x1FFF));
+	ck_assert(utf8lite_isspace(0x2000));
+	ck_assert(utf8lite_isspace(0x2001));
+	ck_assert(utf8lite_isspace(0x200A));
+	ck_assert(!utf8lite_isspace(0x200B));
 
-	ck_assert(corpus_unicode_isspace(0x2028));
-	ck_assert(corpus_unicode_isspace(0x2029));
-	ck_assert(!corpus_unicode_isspace(0x202A));
-	ck_assert(corpus_unicode_isspace(0x3000));
-	ck_assert(!corpus_unicode_isspace(0x3001));
+	ck_assert(utf8lite_isspace(0x2028));
+	ck_assert(utf8lite_isspace(0x2029));
+	ck_assert(!utf8lite_isspace(0x202A));
+	ck_assert(utf8lite_isspace(0x3000));
+	ck_assert(!utf8lite_isspace(0x3001));
 }
 END_TEST
 
 
 START_TEST(test_ignorable)
 {
-	ck_assert(!corpus_unicode_isignorable(0x00));
-	ck_assert(!corpus_unicode_isignorable(0x7F));
+	ck_assert(!utf8lite_isignorable(0x00));
+	ck_assert(!utf8lite_isignorable(0x7F));
 
-	ck_assert(corpus_unicode_isignorable(0x00AD));
-	ck_assert(corpus_unicode_isignorable(0x034F));
-	ck_assert(corpus_unicode_isignorable(0x061C));
-	ck_assert(corpus_unicode_isignorable(0x115F));
-	ck_assert(corpus_unicode_isignorable(0x1160));
-	ck_assert(corpus_unicode_isignorable(0xFE00));
-	ck_assert(corpus_unicode_isignorable(0x1BCA0));
+	ck_assert(utf8lite_isignorable(0x00AD));
+	ck_assert(utf8lite_isignorable(0x034F));
+	ck_assert(utf8lite_isignorable(0x061C));
+	ck_assert(utf8lite_isignorable(0x115F));
+	ck_assert(utf8lite_isignorable(0x1160));
+	ck_assert(utf8lite_isignorable(0xFE00));
+	ck_assert(utf8lite_isignorable(0x1BCA0));
 
-	ck_assert(!corpus_unicode_isignorable(0xDFFFF));
-	ck_assert(corpus_unicode_isignorable(0xE0000));
-	ck_assert(corpus_unicode_isignorable(0xE0FFF));
-	ck_assert(!corpus_unicode_isignorable(0xE1000));
+	ck_assert(!utf8lite_isignorable(0xDFFFF));
+	ck_assert(utf8lite_isignorable(0xE0000));
+	ck_assert(utf8lite_isignorable(0xE0FFF));
+	ck_assert(!utf8lite_isignorable(0xE1000));
 }
 END_TEST
 
