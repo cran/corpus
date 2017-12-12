@@ -20,8 +20,8 @@ test_that("'print.corpus_frame' produces the same results on ASCII", {
     dr$ch <- paste0(d$ch, " ")
 
     dq <- d
-    dq$f <- paste0('"', d$f, '"')
-    dq$ch <- paste0('"', d$ch, '"')
+    #dq$f <- paste0('"', d$f, '"')
+    #dq$ch <- paste0('"', d$ch, '"')
     names(dq) <- c("x", "f  ", "ch ")
 
     expect_equal(capture_output(print.corpus_frame(d)),
@@ -29,7 +29,7 @@ test_that("'print.corpus_frame' produces the same results on ASCII", {
     expect_equal(
         capture_output(print.corpus_frame(d, quote = TRUE,
                                           row.names = FALSE)),
-        capture_output(print(dq, row.names = FALSE)))
+        capture_output(print(dq, quote = TRUE, row.names = FALSE)))
 })
 
 
@@ -41,8 +41,8 @@ test_that("'print.corpus_frame' handles row names", {
     dr$ch <- paste0(d$ch, " ")
 
     dq <- d
-    dq$f <- paste0('"', d$f, '"')
-    dq$ch <- paste0('"', d$ch, '"')
+    #dq$f <- paste0('"', d$f, '"')
+    #dq$ch <- paste0('"', d$ch, '"')
     names(dq) <- c("x", "f  ", "ch ")
 
     expect_equal(capture_output(print.corpus_frame(d)),
@@ -51,7 +51,7 @@ test_that("'print.corpus_frame' handles row names", {
     expect_equal(
         capture_output(print.corpus_frame(d, quote = TRUE,
                                           row.names = FALSE)),
-        capture_output(print(dq, row.names = FALSE)))
+        capture_output(print(dq, quote = TRUE, row.names = FALSE)))
 })
 
 
@@ -104,10 +104,10 @@ test_that("'print.corpus_frame' handles NA in column names", {
     dr$ch <- paste0(d$ch, " ")
 
     names(d) <- c("x", NA, "ch")
-    names(dr) <- c("x", NA, "ch")
+    names(dr) <- c("x", "<NA>", "ch")
 
     expect_equal(capture_output(print.corpus_frame(d)),
-                 capture_output(print(dr)))
+                 capture_output(print.corpus_frame(dr)))
 })
 
 
@@ -127,25 +127,25 @@ test_that("'print.corpus_frame' handles NA elements", {
                  capture_output(print(dr)))
 
     expect_equal(capture_output(print.corpus_frame(d, quote = TRUE)),
-                 capture_output(print(dq, na.print = "NA")))
+                 capture_output(print(dq, quote = TRUE)))
 
     expect_equal(capture_output(print.corpus_frame(d, na.print = "foo")),
                  capture_output(print(dfoo, na.print = "foo")))
 
     expect_equal(capture_output(print.corpus_frame(d, na.print = "foo",
                                                    quote = TRUE)),
-                 capture_output(print(dfoo, na.print = "foo")))
+                 capture_output(print(dfoo, na.print = "foo", quote = TRUE)))
 })
 
 
-test_that("'print.corpus_frame' handles NA row or column names", {
-    d1 <- structure(list(x=1), row.names=NA_character_, class = "data.frame")
-    expect_equal(capture_output(print.corpus_frame(d1)), "   x\nNA 1")
-
+test_that("'print.corpus_frame' handles NA column names", {
     x <- list(1)
     names(x) <- NA
-    d2 <- structure(x, row.names="foo", class = "data.frame")
-    expect_equal(capture_output(print.corpus_frame(d2)), "    NA\nfoo  1")
+    d <- structure(x, row.names="foo", class = "data.frame")
+    d2 <- d
+    names(d2) <- "<NA>"
+    expect_equal(capture_output(print.corpus_frame(d)),
+                 capture_output(print.corpus_frame(d2)))
 })
 
 
@@ -221,7 +221,7 @@ test_that("'print.corpus_frame' handles Unicode correctly", {
     # R can't print all UTF-8 on windows:
     # https://stat.ethz.ch/pipermail/r-devel/2017-June/074556.html
     skip_on_os("windows")
-    ctype <- switch_ctype("Unicode")
+    ctype <- switch_ctype("UTF-8")
     on.exit(Sys.setlocale("LC_CTYPE", ctype))
 
     x <- chartype_frame()

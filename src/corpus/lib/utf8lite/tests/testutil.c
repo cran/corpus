@@ -18,7 +18,10 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <check.h>
+#include "../src/utf8lite.h"
 #include "testutil.h"
+
+static struct utf8lite_text *mktext(const char *str, int flags);
 
 
 static void **allocs;
@@ -55,4 +58,37 @@ void *alloc(size_t size)
 	nalloc++;
 
 	return ptr;
+}
+
+
+struct utf8lite_text *JS(const char *str)
+{
+	return mktext(str, UTF8LITE_TEXT_UNESCAPE);
+}
+
+
+struct utf8lite_text *S(const char *str)
+{
+	return mktext(str, 0);
+}
+
+
+struct utf8lite_text *mktext(const char *str, int flags)
+{
+	struct utf8lite_text *text = alloc(sizeof(*text));
+	struct utf8lite_text text2;
+	size_t size = strlen(str);
+	uint8_t *ptr = alloc(size + 1);
+	int err;
+
+	memcpy(ptr, str, size + 1);
+	err = utf8lite_text_assign(text, ptr, size, flags, NULL);
+	ck_assert(!err);
+
+	ck_assert(!utf8lite_text_assign(&text2, ptr, size,
+					flags | UTF8LITE_TEXT_VALID, NULL));
+	ck_assert(text->ptr == text2.ptr);
+	ck_assert_uint_eq(text->attr, text2.attr);
+
+	return text;
 }

@@ -1,3 +1,24 @@
+corpus 0.10.0
+=============
+
+NEW FEATURES
+
+  * Implement length<- for corpus_text objects.
+
+  * Added str() method for corpus_text objects. Currently just a minimal
+    implementation; this may change in the future.
+
+  * Add ANSI styling to corpus_frame objects.
+
+DEPRECATED AND DEFUNCT
+
+  * Remove text_length(). Use text_ntoken() instead.
+
+  * Remove as_utf8(), utf8_valid(), utf8_normalize(),
+    utf8_encode(), utf8_format(), utf8_print(), and utf8_width();
+    these functions are in the *utf8* package now.
+
+
 corpus 0.9.4 (2017-10-31)
 =========================
 

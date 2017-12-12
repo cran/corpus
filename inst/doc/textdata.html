@@ -136,7 +136,7 @@ raw &lt;-<span class="st"> </span><span class="kw">c</span>(
 x &lt;-<span class="st"> &quot;fa</span><span class="ch">\xE7</span><span class="st">ile&quot;</span>
 <span class="kw">Encoding</span>(x) &lt;-<span class="st"> &quot;UTF-8&quot;</span>
 <span class="kw">as_corpus_text</span>(x) ## fails</code></pre></div>
-<pre><code>Error in as_corpus_text.character(x): argument entry 1 is marked as &quot;UTF-8&quot; but contains an invalid byte in position 3 (\xe7)</code></pre>
+<pre><code>Error in as_corpus_text.character(x): argument entry 1 is incorrectly marked as &quot;UTF-8&quot;: leading byte 0xE7 followed by invalid continuation byte (0x69) at position 4</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">as_corpus_text</span>(<span class="kw">iconv</span>(x, <span class="st">&quot;Latin1&quot;</span>, <span class="st">&quot;UTF-8&quot;</span>)) ## succeeds</code></pre></div>
 <pre><code>[1] &quot;façile&quot;</code></pre>
 </div>
@@ -173,7 +173,7 @@ data &lt;-<span class="st"> </span><span class="kw">read_ndjson</span>(tmp, <spa
 <span class="co"># display the internal representation of the resulting 'corpus_text' object</span>
 <span class="kw">unclass</span>(data<span class="op">$</span>text)</code></pre></div>
 <pre><code>$handle
-&lt;pointer: 0x7fdb34633d20&gt;
+&lt;pointer: 0x7fba65dd4ba0&gt;
 
 $sources
 $sources[[1]]
@@ -213,7 +213,7 @@ NULL</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># segmenting does not allocate new objects for the segments</span>
 <span class="kw">unclass</span>(chunks<span class="op">$</span>text) <span class="co"># inspect text internals</span></code></pre></div>
 <pre><code>$handle
-&lt;pointer: 0x7fdb38109760&gt;
+&lt;pointer: 0x7fba65fa0fb0&gt;
 
 $sources
 $sources[[1]]
@@ -255,8 +255,10 @@ NULL</code></pre>
 &quot;'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into the fields or down the lane,\nbut don't go into Mr. McGregor's garden --\nyour Father had an accident there;\nhe was put in a pie by Mrs. McGregor.'&quot; </code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># print a corpus_text object</span>
 <span class="kw">print</span>(text)</code></pre></div>
-<pre><code>para1 &quot;Once upon a time there were four little Rabbits,\nand their names were: Flopsy, Mopsy,…&quot;
-para2 &quot;'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into the fields or dow…&quot;</code></pre>
+<pre><code>para1                                                                                          
+&quot;Once upon a time there were four little Rabbits,\nand their names were: Flopsy, Mopsy, Cotto…&quot;
+para2                                                                                          
+&quot;'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into the fields or down the …&quot;</code></pre>
 <p>If you’d like to print the entire contents, you can convert the text to character and then print:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># print entire contents</span>
 <span class="kw">print</span>(<span class="kw">as.character</span>(text))</code></pre></div>
@@ -311,15 +313,24 @@ para2 &quot;'Now, my dears,' said old Mrs. Rabbit one morning,\n'you may go into
 <p>You can convert a <em>quanteda</em> corpus to a data frame using <code>as_corpus_frame()</code>, or extract its text using <code>as_corpus_text()</code>:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># convert to corpus_text:</span>
 <span class="kw">print</span>(<span class="kw">as_corpus_text</span>(uk2010immigCorpus))</code></pre></div>
-<pre><code>BNP          &quot;IMMIGRATION: AN UNPARALLELED CRISIS WHICH ONLY THE BNP CAN SOLVE. \n\n- At curr…&quot;
-Coalition    &quot;IMMIGRATION. \n\nThe Government believes that immigration has enriched our cult…&quot;
-Conservative &quot;Attract the brightest and best to our country.\n\nImmigration has enriched our …&quot;
-Greens       &quot;Immigration.\n\nMigration is a fact of life.  People have always moved from one…&quot;
-Labour       &quot;Crime and immigration\n\nThe challenge for Britain\n\nWe will control immigrati…&quot;
-LibDem       &quot;firm but fair immigration system\n\nBritain has always been an open, welcoming …&quot;
-PC           &quot;As a welcoming nation, Plaid Cymru recognises the invaluable contribution that …&quot;
-SNP          &quot;And we will argue for Scotland to take responsibility for immigration so that w…&quot;
-UKIP         &quot;Immigration &amp; Asylum.\n\nAs a member of the EU, Britain has lost control of her…&quot;</code></pre>
+<pre><code>BNP                                                                                            
+&quot;IMMIGRATION: AN UNPARALLELED CRISIS WHICH ONLY THE BNP CAN SOLVE. \n\n- At current immigrati…&quot;
+Coalition                                                                                      
+&quot;IMMIGRATION. \n\nThe Government believes that immigration has enriched our culture and stren…&quot;
+Conservative                                                                                   
+&quot;Attract the brightest and best to our country.\n\nImmigration has enriched our nation over t…&quot;
+Greens                                                                                         
+&quot;Immigration.\n\nMigration is a fact of life.  People have always moved from one country to a…&quot;
+Labour                                                                                         
+&quot;Crime and immigration\n\nThe challenge for Britain\n\nWe will control immigration with our n…&quot;
+LibDem                                                                                         
+&quot;firm but fair immigration system\n\nBritain has always been an open, welcoming country, and …&quot;
+PC                                                                                             
+&quot;As a welcoming nation, Plaid Cymru recognises the invaluable contribution that migrants have…&quot;
+SNP                                                                                            
+&quot;And we will argue for Scotland to take responsibility for immigration so that we can develop…&quot;
+UKIP                                                                                           
+&quot;Immigration &amp; Asylum.\n\nAs a member of the EU, Britain has lost control of her borders. Som…&quot;</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># convert to data frame:</span>
 <span class="kw">print</span>(<span class="kw">as_corpus_frame</span>(uk2010immigCorpus))</code></pre></div>
 <pre><code>             party        text                                                                 
@@ -365,26 +376,46 @@ UKIP         UKIP         Immigration &amp; Asylum.\n\nAs a member of the EU, Br
 <p>The <code>as_corpus_frame()</code> and <code>as_corpus_text()</code> functions also work on <em>tm</em> Corpus objects:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># convert to corpus_text</span>
 <span class="kw">print</span>(<span class="kw">as_corpus_text</span>(crude))</code></pre></div>
-<pre><code>127 &quot;Diamond Shamrock Corp said that\neffective today it had cut its contract prices for crud…&quot;
-144 &quot;OPEC may be forced to meet before a\nscheduled June session to readdress its production …&quot;
-191 &quot;Texaco Canada said it lowered the\ncontract price it will pay for crude oil 64 Canadian …&quot;
-194 &quot;Marathon Petroleum Co said it reduced\nthe contract price it will pay for all grades of …&quot;
-211 &quot;Houston Oil Trust said that independent\npetroleum engineers completed an annual study t…&quot;
-236 &quot;Kuwait\&quot;s Oil Minister, in remarks\npublished today, said there were no plans for an eme…&quot;
-237 &quot;Indonesia appears to be nearing a\npolitical crossroads over measures to deregulate its …&quot;
-242 &quot;Saudi riyal interbank deposits were\nsteady at yesterday's higher levels in a quiet mark…&quot;
-246 &quot;The Gulf oil state of Qatar, recovering\nslightly from last year's decline in world oil …&quot;
-248 &quot;Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last Dec…&quot;
-273 &quot;Saudi crude oil output last month fell\nto an average of 3.5 mln barrels per day (bpd) f…&quot;
-349 &quot;Deputy oil ministers from six Gulf\nArab states will meet in Bahrain today to discuss co…&quot;
-352 &quot;Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last Dec…&quot;
-353 &quot;Kuwait's oil minister said in a newspaper\ninterview that there were no plans for an eme…&quot;
-368 &quot;The port of Philadelphia was closed\nwhen a Cypriot oil tanker, Seapride II, ran aground…&quot;
-489 &quot;A study group said the United States\nshould increase its strategic petroleum reserve to…&quot;
-502 &quot;A study group said the United States\nshould increase its strategic petroleum reserve to…&quot;
-543 &quot;Unocal Corp's Union Oil Co said it\nlowered its posted prices for crude oil one to 1.50 …&quot;
-704 &quot;The New York Mercantile Exchange set\nApril one for the debut of a new procedure in the …&quot;
-708 &quot;Argentine crude oil production was\ndown 10.8 pct in January 1987 to 12.32 mln barrels, …&quot;</code></pre>
+<pre><code>127                                                                                            
+&quot;Diamond Shamrock Corp said that\neffective today it had cut its contract prices for crude oi…&quot;
+144                                                                                            
+&quot;OPEC may be forced to meet before a\nscheduled June session to readdress its production cutt…&quot;
+191                                                                                            
+&quot;Texaco Canada said it lowered the\ncontract price it will pay for crude oil 64 Canadian cts …&quot;
+194                                                                                            
+&quot;Marathon Petroleum Co said it reduced\nthe contract price it will pay for all grades of crud…&quot;
+211                                                                                            
+&quot;Houston Oil Trust said that independent\npetroleum engineers completed an annual study that …&quot;
+236                                                                                            
+&quot;Kuwait\&quot;s Oil Minister, in remarks\npublished today, said there were no plans for an emergen…&quot;
+237                                                                                            
+&quot;Indonesia appears to be nearing a\npolitical crossroads over measures to deregulate its prot…&quot;
+242                                                                                            
+&quot;Saudi riyal interbank deposits were\nsteady at yesterday's higher levels in a quiet market.…&quot; 
+246                                                                                            
+&quot;The Gulf oil state of Qatar, recovering\nslightly from last year's decline in world oil pric…&quot;
+248                                                                                            
+&quot;Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last Decembe…&quot;
+273                                                                                            
+&quot;Saudi crude oil output last month fell\nto an average of 3.5 mln barrels per day (bpd) from …&quot;
+349                                                                                            
+&quot;Deputy oil ministers from six Gulf\nArab states will meet in Bahrain today to discuss coordi…&quot;
+352                                                                                            
+&quot;Saudi Arabian Oil Minister Hisham Nazer\nreiterated the kingdom's commitment to last Decembe…&quot;
+353                                                                                            
+&quot;Kuwait's oil minister said in a newspaper\ninterview that there were no plans for an emergen…&quot;
+368                                                                                            
+&quot;The port of Philadelphia was closed\nwhen a Cypriot oil tanker, Seapride II, ran aground aft…&quot;
+489                                                                                            
+&quot;A study group said the United States\nshould increase its strategic petroleum reserve to one…&quot;
+502                                                                                            
+&quot;A study group said the United States\nshould increase its strategic petroleum reserve to one…&quot;
+543                                                                                            
+&quot;Unocal Corp's Union Oil Co said it\nlowered its posted prices for crude oil one to 1.50 dlrs…&quot;
+704                                                                                            
+&quot;The New York Mercantile Exchange set\nApril one for the debut of a new procedure in the ener…&quot;
+708                                                                                            
+&quot;Argentine crude oil production was\ndown 10.8 pct in January 1987 to 12.32 mln barrels, from…&quot;</code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># convert to data frame</span>
 <span class="kw">print</span>(<span class="kw">as_corpus_frame</span>(crude))</code></pre></div>
 <pre><code>    text                                                                                       

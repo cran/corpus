@@ -32,37 +32,37 @@ START_TEST(test_wcwidth9)
 	int32_t code;
 
 	nfail = 0;
-	for (code = 0; code <= UTF8LITE_UNICODE_MAX; code++) {
+	for (code = 0; code <= UTF8LITE_CODE_MAX; code++) {
 		prop0 = (code < 0x10FFFE) ? wcwidth9(code) : -3;
 		prop = utf8lite_charwidth(code);
 
 		switch (prop) {
-		case UTF8LITE_CHARWIDTH_OTHER:
-			ok = prop0 == -1 || prop0 == -3;
-			break;
-
-		case UTF8LITE_CHARWIDTH_EMOJI:
-			ok = prop0 == 2 || prop0 == -1;
-			break;
-
-		case UTF8LITE_CHARWIDTH_AMBIGUOUS:
-			ok = prop0 == -2;
+		case UTF8LITE_CHARWIDTH_NONE:
+			ok = prop0 == -1 || prop0 == -3 || prop0 == 1;
 			break;
 
 		case UTF8LITE_CHARWIDTH_IGNORABLE:
 			ok = prop0 == -1 || prop0 >= 1;
 			break;
 
-		case UTF8LITE_CHARWIDTH_NONE:
-			ok = prop0 == -1;
+		case UTF8LITE_CHARWIDTH_MARK:
+			ok = prop0 == -1 || prop0 == 1;
 			break;
 
 		case UTF8LITE_CHARWIDTH_NARROW:
 			ok = prop0 == 1 || prop0 == -1;
 			break;
 
+		case UTF8LITE_CHARWIDTH_AMBIGUOUS:
+			ok = prop0 == -2;
+			break;
+
 		case UTF8LITE_CHARWIDTH_WIDE:
 			ok = prop0 == 2 || prop0 == -1;
+			break;
+
+		case UTF8LITE_CHARWIDTH_EMOJI:
+			ok = prop0 == 2 || prop0 == 1 || prop0 == -1 || prop0 == -2;
 			break;
 
 		default:

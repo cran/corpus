@@ -25,8 +25,6 @@
 
 #include <stdio.h>
 
-struct corpus_render;
-
 /**
  * A basic data type.
  */
@@ -143,7 +141,7 @@ void corpus_schema_clear(struct corpus_schema *s);
  * \returns 0 on success
  */
 int corpus_schema_name(struct corpus_schema *s,
-		       const struct corpus_text *name, int *idptr);
+		       const struct utf8lite_text *name, int *idptr);
 
 /**
  * Create a new array type, or get the type's ID if it already exists.
@@ -204,7 +202,7 @@ int corpus_schema_scan(struct corpus_schema *s, const uint8_t *ptr,
  * \param s the schema
  * \param id the type id
  */
-void corpus_render_datatype(struct corpus_render *r,
+void corpus_render_datatype(struct utf8lite_render *r,
 			    const struct corpus_schema *s, int id);
 
 /**

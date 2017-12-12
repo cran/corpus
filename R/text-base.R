@@ -112,8 +112,7 @@ cbind.corpus_text <- function(..., deparse.level = 1)
 format.corpus_text <- function(x, trim = FALSE, chars = NULL,
                                justify = "left", width = NULL,
                                na.encode = TRUE, quote = FALSE,
-                               na.print = NULL, print.gap = NULL,
-                               ...)
+                               na.print = NULL, print.gap = NULL, ...)
 {
     with_rethrow({
         x <- as_corpus_text(x)
@@ -127,31 +126,13 @@ format.corpus_text <- function(x, trim = FALSE, chars = NULL,
         print.gap <- as_print_gap("print.gap", print.gap)
     })
 
-    utf8 <- Sys.getlocale("LC_CTYPE") != "C"
+    trunc <- if (is.null(chars)) getOption("width") else chars
+    right <- (justify == "right")
+    x <- .Call(C_text_trunc, x, trunc, right)
 
-    if (is.null(chars)) {
-        linewidth <- getOption("width")
-        ellipsis <- if (utf8) 1 else 3
-        quotes <- if (quote) 2 else 0
-        gap <- if (is.null(print.gap)) 1 else print.gap
-
-        names <- names(x)
-        if (is.null(names)) {
-            n <- length(x)
-            if (n == 0) {
-                namewidth <- 0
-            } else {
-                namewidth <- (floor(log10(n)) + 1) + 2 # digits + len("[]")
-            }
-        } else {
-            namewidth <- max(0, utf8_width(names))
-        }
-        chars <- (linewidth - ellipsis - quotes - gap - namewidth)
-        chars <- max(chars, 12)
-    }
-
-    fmt <- .Call(C_format_text, x, trim, chars, justify, width, na.encode,
-                 quote, na.print, utf8)
+    fmt <- utf8_format(x, trim = trim, chars = chars, justify = justify,
+                       width = width, na.encode = na.encode, quote = quote,
+                       na.print = na.print, print.gap = print.gap)
     names(fmt) <- names(x)
     fmt
 }
@@ -188,16 +169,35 @@ print.corpus_text <- function(x, rows = 20L, chars = NULL, quote = TRUE,
         rows <- .Machine$integer.max
     }
 
-    if (is.null(print.gap)) {
-        print.gap <- 1L
-    }
-
     if (is.null(max)) {
         max <- getOption("max.print")
     }
 
+    if (is.null(print.gap)) {
+        print.gap <- 1L
+    }
+
     width <- getOption("width")
-    stdout <- as.integer(stdout()) == 1
+    utf8 <- output_utf8()
+
+    if (is.null(chars)) {
+        ellipsis <- if (utf8) 1 else 3
+        quotes <- if (quote) 2 else 0
+        names <- names(x)
+        if (is.null(names)) {
+            gap <- print.gap
+            n <- length(x)
+            if (n == 0) {
+                namewidth <- 0
+            } else {
+                namewidth <- (floor(log10(n)) + 1) + 2 # digits + len("[]")
+            }
+        } else {
+            gap <- 0
+            namewidth <- 0
+        }
+        chars <- max(24L, width - ellipsis - quotes - gap - namewidth)
+    }
 
     if (length(x) <= rows) {
         xsub <- x
@@ -207,26 +207,36 @@ print.corpus_text <- function(x, rows = 20L, chars = NULL, quote = TRUE,
         nextra <- length(x) - rows
     }
 
-    fmt <- format.corpus_text(xsub, chars = chars, quote = quote,
-                              na.print = na.print, print.gap = print.gap)
-    fmt <- utf8_encode(fmt, display)
-
-    mat <- cbind(fmt)
-    if (is.null(rownames(mat))) {
-        rownames(mat) <- format(paste0("[", seq_len(nrow(mat)), "]"),
-                                justify = "right")
+    fmt <- format.corpus_text(xsub, trim = TRUE, chars = chars,
+                              quote = quote, na.print = na.print,
+                              print.gap = print.gap)
+    if (length(fmt) > 0) {
+        utf8_print(fmt, chars = .Machine$integer.max, quote = quote,
+                   na.print = na.print, print.gap = print.gap, max = max,
+                   names = style_bold, rownames = style_faint,
+                   escapes = style_faint, display = display)
     }
-    colnames(mat) <- NULL
-    .Call(C_print_table, mat, print.gap, FALSE, max, width, stdout)
 
     if (nextra > 0) {
-        name_width <- max(0, utf8_width(rownames(mat)))
-
-        ellipsis <- ifelse(Sys.getlocale("LC_CTYPE") == "C", "...", "\u22ee")
-        ellipsis <- substr(ellipsis, 1, name_width)
-
-        space <- format(ellipsis, width = name_width + print.gap)
-        cat(sprintf("%s(%d entries total)\n", space, length(x)))
+        if (length(fmt) == 0) {
+            cat(sprintf("(%d entries total)\n", length(x)))
+        } else if (is.null(names(fmt))) {
+            # [XX]
+            ellipsis <- ifelse(utf8, "\u22ee", "...")
+            ellipsis <- format(substr(ellipsis, 1, namewidth - 1),
+                               width = namewidth - 1, justify = "right")
+            space <- format(ellipsis, width = namewidth + print.gap)
+            if (output_ansi()) {
+                space <- paste0("\x1b[", style_faint, "m", space, "\x1b[0m")
+            }
+            cat(space, sprintf("(%d entries total)\n", length(x)), sep = "")
+        } else {
+            ellipsis <- ifelse(utf8, "\u2026", "...")
+            if (output_ansi()) {
+                ellipsis <- paste0("\x1b[1m", ellipsis, "\x1b[0m")
+            }
+            cat(sprintf("%s (%d entries total)\n", ellipsis, length(x)))
+        }
     }
 
     invisible(x)

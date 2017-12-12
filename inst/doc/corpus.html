@@ -266,38 +266,56 @@ ch24 Home Again                                  Aunt Em had just come out of th
 <p>You can set subsequences of consecutive tokens using the <code>text_sub</code> function. This function accepts two arguments specifying the start and then end token position. The following example extracts the subsequences from positions 2 to 4:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">text_sub</span>(<span class="kw">c</span>(<span class="st">&quot;One, two, three!&quot;</span>, <span class="st">&quot;4 5 6 7 8 9 10&quot;</span>), <span class="dv">2</span>, <span class="dv">4</span>,
          <span class="dt">filter =</span> <span class="kw">text_filter</span>(<span class="dt">drop_punct =</span> <span class="ot">TRUE</span>))</code></pre></div>
-<pre><code>[1] &quot;two, three!&quot;
-[2] &quot;5 6 7 &quot;     </code></pre>
+<pre><code>[1] &quot;two, three!&quot; &quot;5 6 7 &quot;     </code></pre>
 <p>Negative indices count from the end of the sequence, with <code>-1</code> denoting the last token.</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="co"># last 2 tokens</span>
 <span class="kw">text_sub</span>(<span class="kw">c</span>(<span class="st">&quot;One, two, three!&quot;</span>, <span class="st">&quot;4 5 6 7 8 9 10&quot;</span>), <span class="op">-</span><span class="dv">2</span>, <span class="op">-</span><span class="dv">1</span>,
          <span class="dt">filter =</span> <span class="kw">text_filter</span>(<span class="dt">drop_punct =</span> <span class="ot">TRUE</span>))</code></pre></div>
-<pre><code>[1] &quot;two, three!&quot;
-[2] &quot;9 10&quot;       </code></pre>
+<pre><code>[1] &quot;two, three!&quot; &quot;9 10&quot;       </code></pre>
 <p>Note that <code>text_ntoken</code> and <code>text_sub</code> ignore dropped tokens.</p>
 <p>Here’s how to get the last 10 tokens in each chapter:</p>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">text_sub</span>(data, <span class="op">-</span><span class="dv">10</span>)</code></pre></div>
-<pre><code>ch01 &quot;wind,\nDorothy soon closed her eyes and fell fast asleep.&quot;               
-ch02 &quot;just that way, and was not surprised in the least.&quot;                      
-ch03 &quot;made you?\&quot;\n\n\&quot;No,\&quot; answered the Scarecrow; \&quot;it's a lighted match.\&quot;&quot;
-ch04 &quot;up in another\ncorner and waited patiently until morning came.&quot;          
-ch05 &quot;nor straw, and could not live unless she was fed.&quot;                       
-ch06 &quot;me a heart of course I needn't mind so much.\&quot;&quot;                          
-ch07 &quot;would soon send her back to her own home again.&quot;                         
-ch08 &quot;grass\nand waited for the fresh breeze to waken her.&quot;                    
-ch09 &quot;a tree near by, which she\nate for her dinner.&quot;                          
-ch10 &quot;through the portal into the streets of the Emerald City.&quot;                
-ch11 &quot;cackling of a hen that had laid a\ngreen egg.&quot;                           
-ch12 &quot;that they were no longer prisoners in a strange\nland.&quot;                  
-ch13 &quot;three cheers and many good wishes to\ncarry with them.&quot;                  
-ch14 &quot;How\nlucky it was you brought away that wonderful Cap!\&quot;&quot;                
-ch15 &quot;if he did she was willing to forgive him everything.&quot;                    
-ch16 &quot;I'm sure I don't know\nhow it can be done.\&quot;&quot;                            
-ch17 &quot;loss of the Wonderful\nWizard, and would not be comforted.&quot;              
-ch18 &quot;all get ready, for it will be a long journey.\&quot;&quot;                         
-ch19 &quot;Tin Woodman, \&quot;for we certainly must\nclimb over the wall.\&quot;&quot;            
-ch20 &quot;are worse things in the\nworld than being a Scarecrow.\&quot;&quot;                
-⋮    (24 entries total)</code></pre>
+<pre><code>ch01                                                                      
+&quot;wind,\nDorothy soon closed her eyes and fell fast asleep.&quot;               
+ch02                                                                      
+&quot;just that way, and was not surprised in the least.&quot;                      
+ch03                                                                      
+&quot;made you?\&quot;\n\n\&quot;No,\&quot; answered the Scarecrow; \&quot;it's a lighted match.\&quot;&quot;
+ch04                                                                      
+&quot;up in another\ncorner and waited patiently until morning came.&quot;          
+ch05                                                                      
+&quot;nor straw, and could not live unless she was fed.&quot;                       
+ch06                                                                      
+&quot;me a heart of course I needn't mind so much.\&quot;&quot;                          
+ch07                                                                      
+&quot;would soon send her back to her own home again.&quot;                         
+ch08                                                                      
+&quot;grass\nand waited for the fresh breeze to waken her.&quot;                    
+ch09                                                                      
+&quot;a tree near by, which she\nate for her dinner.&quot;                          
+ch10                                                                      
+&quot;through the portal into the streets of the Emerald City.&quot;                
+ch11                                                                      
+&quot;cackling of a hen that had laid a\ngreen egg.&quot;                           
+ch12                                                                      
+&quot;that they were no longer prisoners in a strange\nland.&quot;                  
+ch13                                                                      
+&quot;three cheers and many good wishes to\ncarry with them.&quot;                  
+ch14                                                                      
+&quot;How\nlucky it was you brought away that wonderful Cap!\&quot;&quot;                
+ch15                                                                      
+&quot;if he did she was willing to forgive him everything.&quot;                    
+ch16                                                                      
+&quot;I'm sure I don't know\nhow it can be done.\&quot;&quot;                            
+ch17                                                                      
+&quot;loss of the Wonderful\nWizard, and would not be comforted.&quot;              
+ch18                                                                      
+&quot;all get ready, for it will be a long journey.\&quot;&quot;                         
+ch19                                                                      
+&quot;Tin Woodman, \&quot;for we certainly must\nclimb over the wall.\&quot;&quot;            
+ch20                                                                      
+&quot;are worse things in the\nworld than being a Scarecrow.\&quot;&quot;                
+… (24 entries total)</code></pre>
 <p>In this example, we do not specify the ending position, so it defaults to <code>-1</code>.</p>
 </div>
 <div id="text-statistics" class="section level2">
@@ -608,14 +626,22 @@ FALSE FALSE  TRUE  TRUE  TRUE  TRUE FALSE FALSE FALSE  TRUE  TRUE  TRUE FALSE FA
  ch16  ch17  ch18  ch19  ch20  ch21  ch22  ch23  ch24 
 FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE FALSE </code></pre>
 <div class="sourceCode"><pre class="sourceCode r"><code class="sourceCode r"><span class="kw">text_subset</span>(data, <span class="st">&quot;the great oz&quot;</span>)</code></pre></div>
-<pre><code>ch03 &quot;When Dorothy was left alone she began to feel hungry.  So she went to\nthe cupboard and…&quot;
-ch04 &quot;After a few hours the road began to be rough, and the walking grew so\ndifficult that t…&quot;
-ch05 &quot;When Dorothy awoke the sun was shining through the trees and Toto had\nlong been out ch…&quot;
-ch06 &quot;All this time Dorothy and her companions had been walking through the\nthick woods.  Th…&quot;
-ch10 &quot;It was some time before the Cowardly Lion awakened, for he had lain\namong the poppies …&quot;
-ch11 &quot;Even with eyes protected by the green spectacles, Dorothy and her\nfriends were at firs…&quot;
-ch12 &quot;The soldier with the green whiskers led them through the streets of the\nEmerald City u…&quot;
-ch15 &quot;The four travelers walked up to the great gate of Emerald City and rang\nthe bell.  Aft…&quot;</code></pre>
+<pre><code>ch03                                                                                           
+&quot;When Dorothy was left alone she began to feel hungry.  So she went to\nthe cupboard and cut …&quot;
+ch04                                                                                           
+&quot;After a few hours the road began to be rough, and the walking grew so\ndifficult that the Sc…&quot;
+ch05                                                                                           
+&quot;When Dorothy awoke the sun was shining through the trees and Toto had\nlong been out chasing…&quot;
+ch06                                                                                           
+&quot;All this time Dorothy and her companions had been walking through the\nthick woods.  The roa…&quot;
+ch10                                                                                           
+&quot;It was some time before the Cowardly Lion awakened, for he had lain\namong the poppies a lon…&quot;
+ch11                                                                                           
+&quot;Even with eyes protected by the green spectacles, Dorothy and her\nfriends were at first daz…&quot;
+ch12                                                                                           
+&quot;The soldier with the green whiskers led them through the streets of the\nEmerald City until …&quot;
+ch15                                                                                           
+&quot;The four travelers walked up to the great gate of Emerald City and rang\nthe bell.  After ri…&quot;</code></pre>
 </div>
 <div id="segmenting-text" class="section level2">
 <h2>Segmenting text</h2>

@@ -36,7 +36,6 @@ static const R_CallMethodDef CallEntries[] = {
 	CALLDEF(as_text_filter_connector, 1),
 	CALLDEF(as_text_json, 2),
 	CALLDEF(dim_json, 1),
-	CALLDEF(format_text, 9),
 	CALLDEF(is_na_text, 1),
 	CALLDEF(length_json, 1),
 	CALLDEF(length_text, 1),
@@ -45,7 +44,6 @@ static const R_CallMethodDef CallEntries[] = {
 	CALLDEF(mmap_ndjson, 2),
 	CALLDEF(names_json, 1),
 	CALLDEF(names_text, 1),
-	CALLDEF(print_table, 6),
 	CALLDEF(print_json, 1),
 	CALLDEF(read_ndjson, 2),
 	CALLDEF(simplify_json, 1),
@@ -66,15 +64,10 @@ static const R_CallMethodDef CallEntries[] = {
 	CALLDEF(text_split_sentences, 2),
 	CALLDEF(text_split_tokens, 2),
 	CALLDEF(text_sub, 3),
+	CALLDEF(text_trunc, 3),
 	CALLDEF(text_tokens, 1),
 	CALLDEF(text_types, 2),
 	CALLDEF(text_valid, 1),
-	CALLDEF(utf8_coerce, 1),
-	CALLDEF(utf8_encode, 3),
-	CALLDEF(utf8_format, 9),
-	CALLDEF(utf8_normalize, 5),
-	CALLDEF(utf8_valid, 1),
-	CALLDEF(utf8_width, 3),
         {NULL, NULL, 0}
 };
 
