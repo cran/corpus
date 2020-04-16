@@ -70,7 +70,7 @@ text_tokens(text, stemmer = stem_hunspell)
 ## Dictionary stemmer
 
 One common way to build a stemmer is from a list of (term, stem) pairs. Many
-such lists are available at [lexoconista.com][lexiconista]. Here's an example
+such lists are available at [lexiconista.com][lexiconista]. Here's an example
 stemmer for English:
 
 
@@ -387,5 +387,4 @@ stats
 ⋮  (8766 rows total)
 ```
 
-[lexiconista]: http://www.lexiconista.com/datasets/lemmatization/ "Lexiconista Lemmatization Lists"
 [snowball]: https://snowballstem.org/ "Snowball Stemming Library"

@@ -1,9 +1,12 @@
 Package: corpus
-Version: 0.10.0
+Version: 0.10.1
 Title: Text Corpus Analysis
 Authors@R: c(
+  person("Leslie Huang",
+        role = c("cre", "ctb"),
+        email = "lesliehuang@nyu.edu"),
   person(c("Patrick", "O."), "Perry",
-         role = c("aut", "cph", "cre"),
+         role = c("aut", "cph"),
          email = "pperry@stern.nyu.edu"),
   person(c("Finn", "\u00c5rup"), "Nielsen",
          role = c("cph", "dtc"),
@@ -26,14 +29,17 @@ Suggests: knitr, Matrix, testthat
 Enhances: quanteda, tm
 Description: Text corpus data analysis, with full support for international text (Unicode).  Functions for reading data from newline-delimited 'JSON' files, for normalizing and tokenizing text, for searching for term occurrences, and for computing term occurrence frequencies, including n-grams.
 License: Apache License (== 2.0) | file LICENSE
-URL: http://corpustext.com, https://github.com/patperry/r-corpus
-BugReports: https://github.com/patperry/r-corpus/issues
+URL: https://leslie-huang.github.io/r-corpus/,
+        https://github.com/leslie-huang/r-corpus
+BugReports: https://github.com/leslie-huang/r-corpus/issues
 LazyData: Yes
 Encoding: UTF-8
 VignetteBuilder: knitr
+RoxygenNote: 7.0.2
 NeedsCompilation: yes
-Packaged: 2017-12-12 20:42:29 UTC; ptrck
-Author: Patrick O. Perry [aut, cph, cre],
+Packaged: 2020-04-15 19:38:53 UTC; lesliehuang
+Author: Leslie Huang [cre, ctb],
+  Patrick O. Perry [aut, cph],
   Finn Årup Nielsen [cph, dtc] (AFINN Sentiment Lexicon),
   Martin Porter and Richard Boulton [ctb, cph, dtc] (Snowball Stemmer and
     Stopword Lists),
@@ -42,6 +48,6 @@ Author: Patrick O. Perry [aut, cph, cre],
   Carlo Strapparava and Alessandro Valitutti [cph, dtc] (WordNet-Affect
     Lexicon),
   Unicode, Inc. [cph, dtc] (Unicode Character Database)
-Maintainer: Patrick O. Perry <pperry@stern.nyu.edu>
+Maintainer: Leslie Huang <lesliehuang@nyu.edu>
 Repository: CRAN
-Date/Publication: 2017-12-12 22:10:07 UTC
+Date/Publication: 2020-04-16 07:30:02 UTC

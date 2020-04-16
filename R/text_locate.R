@@ -127,7 +127,7 @@ format.corpus_text_locate <- function(x, width = getOption("width"),
 
     nctx <- 0
     rval <- list()
-    colwidths <- c()
+    colwidths <- numeric(length(x))
     charmax <- .Machine$integer.max
     names <- names(x)
 

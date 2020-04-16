@@ -596,6 +596,23 @@ START_TEST(test_encode_emoji_zwsp_rmdi)
 END_TEST
 
 
+START_TEST(test_encode_emoji_zwj_sequence)
+{
+	set_flags(0);
+	// \U0001F469\u200D\u2764\uFE0F\u200D\U0001F48B\u200D\U0001F469
+        ck_assert(!utf8lite_render_text(&render, JS("\\ud83d\\udc69\\u200d\\u2764\\ufe0f\\u200d\\ud83d\\udc8b\\u200d\\ud83d\\udc69")));
+	assert_text_eq(S(render.string), JS("\\ud83d\\udc69\\u200d\\u2764\\ufe0f\\u200d\\ud83d\\udc8b\\u200d\\ud83d\\udc69"));
+	clear();
+
+	set_flags(UTF8LITE_ENCODE_EMOJIZWSP | UTF8LITE_ENCODE_RMDI);
+        ck_assert(!utf8lite_render_text(&render, JS("\\ud83d\\udc69\\u200d\\u2764\\ufe0f\\u200d\\ud83d\\udc8b\\u200d\\ud83d\\udc69")));
+
+	assert_text_eq(S(render.string), JS("\\ud83d\\udc69\\u200d\\u2764\\ufe0f\\u200d\\ud83d\\udc8b\\u200d\\ud83d\\udc69\u200b"));
+	clear();
+}
+END_TEST
+
+
 START_TEST(test_byte_single)
 {
 	char byte;
@@ -861,6 +878,16 @@ START_TEST(test_width_emoji)
 END_TEST
 
 
+START_TEST(test_width_emoji_escape)
+{
+	set_flags(UTF8LITE_ENCODE_C | UTF8LITE_ESCAPE_CONTROL
+			| UTF8LITE_ESCAPE_UTF8);
+	ck_assert_int_eq(width(JS("\\uD83D\\uDC87\\u200D\\u2642\\uFE0F")),
+			 28);
+}
+END_TEST
+
+
 Suite *render_suite(void)
 {
         Suite *s;
@@ -896,6 +923,7 @@ Suite *render_suite(void)
         tcase_add_test(tc, test_encode_emoji_zwsp);
         tcase_add_test(tc, test_encode_emoji_extended_zwsp);
         tcase_add_test(tc, test_encode_emoji_zwsp_rmdi);
+	tcase_add_test(tc, test_encode_emoji_zwj_sequence);
         suite_add_tcase(s, tc);
 
 	tc = tcase_create("bytes");
@@ -918,6 +946,7 @@ Suite *render_suite(void)
         tcase_add_test(tc, test_width_wide);
         tcase_add_test(tc, test_width_mark);
         tcase_add_test(tc, test_width_emoji);
+        tcase_add_test(tc, test_width_emoji_escape);
         suite_add_tcase(s, tc);
 
 	return s;
