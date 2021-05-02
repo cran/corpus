@@ -34,7 +34,7 @@ and Swedish (\code{stopwords_sv}).
 
 These built-in word lists are reasonable defaults, but they may require
 further tailoring to suit your particular task. The original lists were
-compiled by the \href{http://snowballstem.org/}{Snowball stemming project}.
+compiled by the \href{https://snowballstem.org/}{Snowball stemming project}.
 Following the Quanteda text analysis software, we have tailored the original
 lists by adding the word "will" to the English list.
 }

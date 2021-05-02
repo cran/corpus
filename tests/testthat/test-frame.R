@@ -314,6 +314,7 @@ test_that("'print.corpus_frame' does not need a gap at the end", {
 
 
 test_that("'print.corpus_frame' can wrap 4 columns", {
+    skip_on_os("windows")
     ctype <- switch_ctype("C")
     on.exit(Sys.setlocale("LC_CTYPE", ctype), add = TRUE)
 

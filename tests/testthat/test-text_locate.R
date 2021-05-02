@@ -149,6 +149,7 @@ test_that("'text_locate' can use a custom filter", {
 
 
 test_that("'text_locate' prints results correctly", {
+    skip_on_os("windows")
     text <- c("Rose is a rose is a rose is a rose.",
               "A rose by any other name would smell as sweet.",
               "Snow White and Rose Red")

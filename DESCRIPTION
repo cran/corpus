@@ -1,5 +1,5 @@
 Package: corpus
-Version: 0.10.1
+Version: 0.10.2
 Title: Text Corpus Analysis
 Authors@R: c(
   person("Leslie Huang",
@@ -25,7 +25,7 @@ Authors@R: c(
          comment = "Unicode Character Database"))
 Depends: R (>= 3.3),
 Imports: stats, utf8 (>= 1.1.0)
-Suggests: knitr, Matrix, testthat
+Suggests: knitr, rmarkdown, Matrix, testthat
 Enhances: quanteda, tm
 Description: Text corpus data analysis, with full support for international text (Unicode).  Functions for reading data from newline-delimited 'JSON' files, for normalizing and tokenizing text, for searching for term occurrences, and for computing term occurrence frequencies, including n-grams.
 License: Apache License (== 2.0) | file LICENSE
@@ -37,7 +37,7 @@ Encoding: UTF-8
 VignetteBuilder: knitr
 RoxygenNote: 7.0.2
 NeedsCompilation: yes
-Packaged: 2020-04-15 19:38:53 UTC; lesliehuang
+Packaged: 2021-05-02 02:57:11 UTC; lesliehuang
 Author: Leslie Huang [cre, ctb],
   Patrick O. Perry [aut, cph],
   Finn Årup Nielsen [cph, dtc] (AFINN Sentiment Lexicon),
@@ -50,4 +50,4 @@ Author: Leslie Huang [cre, ctb],
   Unicode, Inc. [cph, dtc] (Unicode Character Database)
 Maintainer: Leslie Huang <lesliehuang@nyu.edu>
 Repository: CRAN
-Date/Publication: 2020-04-16 07:30:02 UTC
+Date/Publication: 2021-05-02 04:30:04 UTC

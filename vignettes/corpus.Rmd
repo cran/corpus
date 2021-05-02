@@ -1686,4 +1686,4 @@ with `library(help = "corpus")`.
 
 [gutenberg-oz]: http://www.gutenberg.org/ebooks/55 "The Wonderful Wizard of Oz"
 [heaps-law]: https://en.wikipedia.org/wiki/Heaps%27_law "Heap's law"
-[wn-affect]: http://wndomains.fbk.eu/wnaffect.html "WordNet-Affect"
+[wn-affect]: https://wndomains.fbk.eu/wnaffect.html "WordNet-Affect"

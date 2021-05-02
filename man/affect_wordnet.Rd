@@ -24,7 +24,7 @@
 }
 \usage{affect_wordnet}
 \format{A data frame with one row for each term classification.}
-\source{\url{http://wndomains.fbk.eu/wnaffect.html}}
+\source{\url{https://wndomains.fbk.eu/wnaffect.html}}
 \references{
     Strapparava, C and Valitutti A. (2004).
     WordNet-Affect: an affective extension of WordNet.

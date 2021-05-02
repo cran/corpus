@@ -46,7 +46,7 @@ The function only stems single-word terms of kind "letter"; it leaves
 other inputs (multi-word terms, and terms of kind "number", "punct", and
 "symbol") unchanged.
 
-The \href{http://snowballstem.org/algorithms/}{Snowball stemming library}
+The \href{https://snowballstem.org/algorithms/}{Snowball stemming library}
 provides the underlying implementation. The \code{wordStem} function from
 the \pkg{SnowballC} package provides a similar interface, but that function
 applies the algorithm to all input terms, regardless of the kind of the term.

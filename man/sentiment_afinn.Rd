@@ -19,12 +19,12 @@ must keep the adapted lexicon open and apply a similar license.
 }
 \usage{sentiment_afinn}
 \format{A data frame with one row for each term}
-\source{\url{http://www2.imm.dtu.dk/pubdb/views/publication_details.php?id=6010}}
+\source{\url{https://www2.imm.dtu.dk/pubdb/pubs/6010-full.html}}
 \references{
 Finn \enc{Årup}{Aarup} Nielsen
 A new ANEW: Evaluation of a word list for sentiment analysis in microblogs.
 \emph{Proceedings of the ESWC2011 Workshop on 'Making Sense of Microposts': Big things come in small packages 718 in CEUR Workshop Proceedings}
 93-98. 2011 May.
-\url{http://arxiv.org/abs/1103.2903}.
+\url{https://arxiv.org/abs/1103.2903}.
 }
 \keyword{datasets}
